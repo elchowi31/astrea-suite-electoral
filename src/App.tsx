@@ -1,3 +1,4 @@
+import { AdministrativeOverview } from './components/AdministrativeOverview';
 import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { 
   Tenant, 
@@ -528,6 +529,7 @@ export default function App() {
           <main className="mx-auto max-w-7xl p-3 sm:p-6 lg:p-8">
             <Suspense fallback={<div className="p-10 text-center text-sm text-slate-400">Cargando presentación…</div>}>
               {publicDemoView === 'dashboard' ? (
+            <div className="space-y-4"><AdministrativeOverview tenantId={PUBLIC_DEMO_TENANT.tenantId} expenses={PUBLIC_DEMO_DATA.expenses} /><details className="rounded-xl border border-slate-800 p-3"><summary className="cursor-pointer text-sm font-bold text-cyan-300">Otros indicadores</summary><div className="mt-3">
                 <DashboardView
                   currentTenant={PUBLIC_DEMO_TENANT}
                   currentUser={PUBLIC_DEMO_USER}
@@ -543,6 +545,8 @@ export default function App() {
                   voters={PUBLIC_DEMO_DATA.voters}
                   onNavigateTab={() => {}}
                 />
+
+            </div></details></div>
               ) : (
                 <TerritorialMapView
                   leaders={PUBLIC_DEMO_DATA.leaders}
@@ -615,7 +619,7 @@ export default function App() {
         />
 
         {/* Content Area */}
-        <main className="flex-1 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+        <main className="min-w-0 flex-1 p-3 pb-24 md:pb-6 sm:p-4 lg:p-5 mx-auto w-full space-y-3">
           
           {/* Personalized User Recognition & Salutation Banner */}
           {currentUser && activeTab !== 'login' && (
@@ -631,39 +635,15 @@ export default function App() {
           )}
 
           {currentUser && activeTab !== 'login' && (realDataCount === 0 || demoBundle) && (
-            <section className={`relative overflow-hidden rounded-3xl border p-5 shadow-2xl backdrop-blur-xl ${demoActive ? 'border-amber-400/40 bg-gradient-to-r from-slate-900 via-amber-950/30 to-slate-900' : 'border-cyan-500/30 bg-gradient-to-r from-slate-900 via-[#070e1f] to-slate-900'}`} aria-label="Control de datos de demostración">
-              <div className="absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.02)_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none" />
-              <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2.5 h-2.5 rounded-full ${demoActive ? 'bg-amber-400 animate-ping' : 'bg-cyan-400'}`} />
-                    <p className={`text-sm font-black ${demoActive ? 'text-amber-200' : 'text-cyan-200'}`}>
-                      {demoActive ? 'Entorno de Presentación Activo — Datos Ficticios Aislados' : demoBundle ? 'Colección Demo Lista (Sin cruce con datos reales)' : 'Espacio de Datos Listo para Alimentación'}
-                    </p>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-300 leading-relaxed max-w-2xl">
-                    {demoActive
-                      ? 'La vista utiliza exclusivamente el documento aislado en Firestore /demo. Ninguna cifra o registro altera la operación electoral real.'
-                      : demoBundle
-                        ? 'Al existir información operativa real, Astrea desactiva automáticamente la demostración para proteger la integridad de los datos.'
-                        : 'Cree una presentación completa en la colección /demo sin contaminar las colecciones operativas del partido.'}
-                  </p>
-                  {demoError && <p className="mt-2 text-xs font-semibold text-rose-300">{demoError}</p>}
-                </div>
-                <div className="flex shrink-0 flex-wrap gap-2">
-                  {!demoBundle && (
-                    <button type="button" disabled={demoBusy} onClick={handleCreateDemo} className="rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 px-5 py-2.5 text-xs font-black text-white shadow-lg shadow-cyan-950/40 border border-cyan-400/30 transition disabled:cursor-wait disabled:opacity-60 cursor-pointer">
-                      {demoBusy ? 'Creando demo…' : 'Crear entorno demo'}
-                    </button>
-                  )}
-                  {demoBundle && canManageDemo && (
-                    <button type="button" disabled={demoBusy} onClick={handleDeleteDemo} className="rounded-2xl border border-rose-500/40 bg-rose-950/40 px-5 py-2.5 text-xs font-black text-rose-200 transition hover:bg-rose-900/60 disabled:cursor-wait disabled:opacity-60 cursor-pointer">
-                      {demoBusy ? 'Eliminando…' : 'Eliminar demo'}
-                    </button>
-                  )}
-                </div>
+            <details className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs">
+              <summary className="cursor-pointer font-bold text-cyan-200">{demoActive ? 'Datos demo' : 'Datos'} · {currentTenant.name}</summary>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <span className="text-slate-400">{demoActive ? 'Demostración · datos ficticios' : 'Datos operativos'}</span>
+                {!demoBundle && <button disabled={demoBusy} onClick={handleCreateDemo} className="rounded-lg bg-cyan-700 px-3 py-2 text-white">{demoBusy ? 'Creando…' : 'Crear demo'}</button>}
+                {demoBundle && canManageDemo && <button disabled={demoBusy} onClick={handleDeleteDemo} className="rounded-lg bg-rose-950 px-3 py-2 text-rose-200">{demoBusy ? 'Eliminando…' : 'Eliminar demo'}</button>}
+                {demoError && <span role="alert" className="text-rose-300">{demoError}</span>}
               </div>
-            </section>
+            </details>
           )}
 
           {/* Real-time Save Toast Notification */}
@@ -684,7 +664,7 @@ export default function App() {
             <div className="bg-slate-950/80 border border-cyan-500/20 rounded-2xl px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-slate-400 shadow-md backdrop-blur-md">
               <div className="flex items-center gap-2.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                <span className="font-bold text-slate-200">Organización Activa: <strong className="text-white">{currentTenant.name}</strong></span>
+                <span className="font-bold text-slate-200"><strong className="text-white">{currentTenant.name}</strong></span>
               </div>
               
               <div className="flex items-center gap-3">
@@ -693,9 +673,9 @@ export default function App() {
                   className="flex items-center gap-1.5 text-cyan-300 hover:text-white bg-cyan-500/10 hover:bg-cyan-500/20 px-3 py-1 rounded-xl border border-cyan-500/30 font-bold transition cursor-pointer shadow-sm"
                 >
                   <Database className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Auditoría Firestore</span>
+                  <span>Datos</span>
                 </button>
-                <span className="hidden md:inline font-mono text-[11px] text-slate-400">{lastSyncStatus}</span>
+                
               </div>
             </div>
           )}
@@ -762,6 +742,7 @@ export default function App() {
             </div>
           )}>
           {currentUser && activeTab === 'dashboard' && (
+            <div className="space-y-4"><AdministrativeOverview tenantId={currentTenant.tenantId} expenses={visibleExpenses} /><details className="rounded-xl border border-slate-800 p-3"><summary className="cursor-pointer text-sm font-bold text-cyan-300">Otros indicadores</summary><div className="mt-3">
             <DashboardView
               currentTenant={currentTenant}
               currentUser={currentUser}
@@ -777,6 +758,8 @@ export default function App() {
               voters={visibleVoters}
               onNavigateTab={setActiveTab}
             />
+
+            </div></details></div>
           )}
 
           {currentUser && activeTab === 'campaign_structure' && (

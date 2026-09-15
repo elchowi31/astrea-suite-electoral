@@ -862,15 +862,13 @@ export const UniversalDataIngestionView: React.FC<UniversalDataIngestionViewProp
             }
           }
         } catch (pdfErr) {
-          console.warn('PDF server ingestion failed, applying template generator:', pdfErr);
+          console.warn('PDF extraction failed:', pdfErr);
         }
 
-        // Graceful fallback for PDF
-        const sampleRows = generateMockItemsForEntity(selectedEntity);
-        setParsedRows(sampleRows);
+        setParsedRows([]);
         setStatusMessage({
-          type: 'info',
-          text: `Documento PDF analizado. Se inicializaron ${sampleRows.length} registros estructurados según el censo de Astrea para revisión y validación.`
+          type: 'error',
+          text: 'No se pudo extraer el PDF. No se crearon registros. Reintente cuando el servicio de digitalización esté disponible o cargue un Excel revisado.'
         });
       }
       // Case 5: Text (.txt) or unstructured text

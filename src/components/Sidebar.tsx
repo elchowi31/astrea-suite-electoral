@@ -24,6 +24,7 @@ type MenuGroup = { label: string; tone: string; items: MenuItem[] };
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, driveFileCount, candidateCount, leaderCount = 0, vehicleCount = 0, voterCount = 0, prospectCount = 0, currentUser = null, userRole = 'Consulta', onLogout }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [desktopOpen, setDesktopOpen] = useState(false);
   const effectiveRole = currentUser?.role || userRole;
   const level = getRoleHierarchyLevel(effectiveRole);
   const scope = getTerritorialScope(currentUser, effectiveRole);
@@ -56,7 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, driveF
   ];
   const allowedGroups = groups.map((group) => ({ ...group, items: group.items.filter((item) => item.globalOnly ? scope.isGlobalAdmin : level >= (item.minLevel || 0)) })).filter((group) => group.items.length > 0);
   const allAllowed = allowedGroups.flatMap((group) => group.items);
-  const go = (id: ActiveTab) => { onTabChange(id); setMobileOpen(false); };
+  const go = (id: ActiveTab) => { onTabChange(id); setMobileOpen(false); setDesktopOpen(false); };
   const mobileQuick = ['dashboard', 'campaign_structure', 'hierarchy_pyramid', 'finances'].map((id) => allAllowed.find((item) => item.id === id)).filter(Boolean) as MenuItem[];
 
   const resolveSidebarName = (): string => {
@@ -76,7 +77,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, driveF
 
   return (
     <>
-      <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-64 shrink-0 flex-col overflow-y-auto border-r border-slate-800 bg-slate-950/95 md:flex">
+      <div className="hidden w-12 shrink-0 md:block" onMouseEnter={() => setDesktopOpen(true)}>
+      <button type="button" aria-label="Abrir menú" aria-expanded={desktopOpen} onClick={() => setDesktopOpen(!desktopOpen)} onFocus={() => setDesktopOpen(true)} className="sticky top-20 m-1 rounded-lg border border-slate-700 bg-slate-950 p-2 text-cyan-300"><Menu className="h-5 w-5" /></button>
+      </div>
+      <aside onMouseLeave={() => setDesktopOpen(false)} onKeyDown={(event) => { if (event.key === 'Escape') { setDesktopOpen(false); (event.target as HTMLElement).blur(); } }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDesktopOpen(false); }} className={`fixed left-0 top-16 z-50 hidden h-[calc(100dvh-4rem)] w-64 flex-col overflow-y-auto border-r border-slate-800 bg-slate-950 shadow-2xl md:flex ${desktopOpen ? '' : 'invisible -translate-x-full'}`}>
+        <button type="button" aria-label="Cerrar menú" onClick={() => setDesktopOpen(false)} className="self-end p-3 text-slate-300"><X className="h-5 w-5" /></button>
         <nav className="flex-1 space-y-5 p-3" aria-label="Navegación principal">
           {allowedGroups.map((group) => <div key={group.label}>
             <p className={`px-3 pb-1.5 text-[10px] font-black uppercase tracking-[.18em] ${group.tone}`}>{group.label}</p>
@@ -92,7 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, driveF
         </div>
       </aside>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-slate-700 bg-slate-950/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur-xl md:hidden" aria-label="Navegación móvil">
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid border-t border-slate-700 bg-slate-950/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur-xl md:hidden" aria-label="Navegación móvil" style={{ gridTemplateColumns: `repeat(${mobileQuick.length + 1}, minmax(0, 1fr))` }}>
         {mobileQuick.map((item) => <MobileItem key={item.id} item={item} active={activeTab === item.id} onClick={() => go(item.id)} />)}
         <button onClick={() => setMobileOpen(true)} className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[9px] font-bold text-slate-400"><Menu className="h-5 w-5" />Más</button>
       </nav>
