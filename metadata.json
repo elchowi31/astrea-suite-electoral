@@ -1,0 +1,9 @@
+{
+  "name": "Astrea Suite Electoral",
+  "description": "Plataforma de Inteligencia y Gestión Electoral para Gobernaciones, Alcaldías, Asambleas y Concejos. Desarrollado por Wilson José Arias Carrillo.",
+  "requestFramePermissions": [
+    "geolocation",
+    "microphone"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

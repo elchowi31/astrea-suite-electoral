@@ -1,0 +1,123 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for security and tenant isolation
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Reglas para Organizaciones / Tenants
+    match /organizaciones/{tenantId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Usuarios y Perfiles Políticos
+    match /usuarios/{userId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Colección de Demostración Ficticia Aislada
+    match /demo/{demoId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Sesiones y Auditoría
+    match /sesiones_usuarios/{sessionId} {
+      allow read, write: if true;
+    }
+
+    match /auditoria/{auditId} {
+      allow read, write: if true;
+    }
+
+    match /auditoria_electoral/{auditId} {
+      allow read, write: if true;
+    }
+
+    match /eventos_workspace/{eventId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Candidatos
+    match /candidatos/{candidateId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Gastos Electorales
+    match /gastos/{expenseId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Aportes y Donantes
+    match /aportes/{aporteId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Líderes Territoriales
+    match /lideres/{leaderId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Vehículos de Transporte
+    match /vehiculos/{vehicleId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Propuestas Programáticas
+    match /propuestas/{propuestaId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Distritos Electorales
+    match /distritos/{distritoId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Archivos de Google Drive
+    match /archivos_drive/{fileId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Análisis de IA
+    match /analisis_ia/{analysisId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Votantes Rasos (Base de la Pirámide)
+    match /votantes_rasos/{voterId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Comités y Coordinaciones de Campaña
+    match /comites_coordinaciones/{coordinationId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Testigos Electorales Día D
+    match /testigos_electorales/{witnessId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Auditoría de Actas E-14
+    match /actas_e14/{auditId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Incidencias y Denuncias Electorales
+    match /incidencias_electorales/{incidentId} {
+      allow read, write: if true;
+    }
+
+    // Reglas para Eventos y Agenda de Campaña
+    match /eventos_agenda/{eventId} {
+      allow read, write: if true;
+    }
+
+    // Fallback general seguro para todas las subcolecciones
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+

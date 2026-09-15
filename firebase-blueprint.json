@@ -1,0 +1,280 @@
+{
+  "entities": {
+    "Tenant": {
+      "title": "Tenant",
+      "description": "Multi-tenant organization for parliamentary campaign",
+      "type": "object",
+      "properties": {
+        "tenantId": { "type": "string", "description": "Unique ID for the tenant" },
+        "name": { "type": "string", "maxLength": 100 },
+        "primaryColor": { "type": "string", "maxLength": 20 },
+        "secondaryColor": { "type": "string", "maxLength": 20 },
+        "logoUrl": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["tenantId", "name"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with multi-tenant role assignments",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "maxLength": 150 },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "tenantId": { "type": "string" },
+        "role": { "type": "string", "enum": ["AdminGlobal", "AdminTenant", "Supervisor", "Operador", "Consulta", "Invitado"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "tenantId", "role"]
+    },
+    "Candidate": {
+      "title": "Candidate",
+      "description": "Parliamentary and territorial candidate profile for Colombia",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "fullName": { "type": "string", "maxLength": 150 },
+        "district": { "type": "string", "maxLength": 100 },
+        "chamber": { "type": "string" },
+        "electoralLevel": { "type": "string" },
+        "department": { "type": "string", "maxLength": 100 },
+        "municipality": { "type": "string", "maxLength": 100 },
+        "veredaOrBarrio": { "type": "string", "maxLength": 150 },
+        "parentCandidateId": { "type": "string", "maxLength": 100 },
+        "party": { "type": "string", "maxLength": 100 },
+        "coalition": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string", "enum": ["Inscrito", "En Campaña", "Elección Previa", "Electo"] },
+        "bio": { "type": "string", "maxLength": 2000 },
+        "keyProposals": { "type": "array" },
+        "pollingPercentage": { "type": "number" },
+        "voteTarget": { "type": "number" },
+        "votesCommitted": { "type": "number" },
+        "photoUrl": { "type": "string", "maxLength": 500 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["tenantId", "fullName", "party"]
+    },
+    "CampaignExpense": {
+      "title": "CampaignExpense",
+      "description": "Campaign expenses in Colombian Pesos (COP)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "component": { "type": "string" },
+        "description": { "type": "string", "maxLength": 255 },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pagado", "Pendiente", "Aprobado"] },
+        "supplier": { "type": "string", "maxLength": 150 },
+        "department": { "type": "string", "maxLength": 100 },
+        "municipality": { "type": "string", "maxLength": 100 },
+        "veredaOrBarrio": { "type": "string", "maxLength": 150 },
+        "notes": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["tenantId", "component", "description", "amount", "date", "status"]
+    },
+    "Leader": {
+      "title": "Leader",
+      "description": "Territorial campaign leader in Colombian municipalities and veredas",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "fullName": { "type": "string", "maxLength": 150 },
+        "zoneOrDistrict": { "type": "string", "maxLength": 100 },
+        "commune": { "type": "string", "maxLength": 100 },
+        "department": { "type": "string", "maxLength": 100 },
+        "municipality": { "type": "string", "maxLength": 100 },
+        "veredaOrBarrio": { "type": "string", "maxLength": 150 },
+        "assignedCandidateId": { "type": "string", "maxLength": 100 },
+        "voteTarget": { "type": "number" },
+        "votesCommitted": { "type": "number" },
+        "activistsCount": { "type": "number" },
+        "phone": { "type": "string", "maxLength": 50 },
+        "email": { "type": "string", "maxLength": 150 },
+        "status": { "type": "string", "enum": ["Activo", "Destacado", "En Riesgo"] },
+        "budgetAllocated": { "type": "number" },
+        "photoUrl": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["tenantId", "fullName", "municipality", "voteTarget", "phone"]
+    },
+    "TransportVehicle": {
+      "title": "TransportVehicle",
+      "description": "Logistics and transport vehicle allocated for election day",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "vehicleType": { "type": "string" },
+        "licensePlate": { "type": "string", "maxLength": 20 },
+        "driverName": { "type": "string", "maxLength": 150 },
+        "driverPhone": { "type": "string", "maxLength": 50 },
+        "assignedZone": { "type": "string", "maxLength": 150 },
+        "department": { "type": "string", "maxLength": 100 },
+        "municipality": { "type": "string", "maxLength": 100 },
+        "capacity": { "type": "number" },
+        "dailyCost": { "type": "number" },
+        "fuelBudget": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["tenantId", "vehicleType", "licensePlate", "driverName", "driverPhone", "capacity", "dailyCost"]
+    },
+    "District": {
+      "title": "District",
+      "description": "Electoral district data and metrics",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "region": { "type": "string", "maxLength": 100 },
+        "voterCensus": { "type": "number" },
+        "seatsAvailable": { "type": "number" },
+        "keyIssues": { "type": "array" },
+        "projectedSupport": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["tenantId", "name", "region"]
+    },
+    "Proposal": {
+      "title": "Proposal",
+      "description": "Legislative project or campaign proposal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "title": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 100 },
+        "summary": { "type": "string", "maxLength": 2000 },
+        "fullText": { "type": "string", "maxLength": 10000 },
+        "status": { "type": "string", "enum": ["Borrador", "En Revisión", "Aprobado", "Presentado"] },
+        "author": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["tenantId", "title", "category", "summary"]
+    },
+    "DriveFile": {
+      "title": "DriveFile",
+      "description": "Metadata for Google Drive files linked from folder astrea-parlamentarias-2026",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "driveFileId": { "type": "string" },
+        "name": { "type": "string", "maxLength": 255 },
+        "mimeType": { "type": "string", "maxLength": 100 },
+        "webViwerLink": { "type": "string", "maxLength": 500 },
+        "category": { "type": "string", "maxLength": 100 },
+        "summary": { "type": "string", "maxLength": 2000 },
+        "syncedAt": { "type": "string" }
+      },
+      "required": ["tenantId", "driveFileId", "name"]
+    },
+    "AiAnalysis": {
+      "title": "AiAnalysis",
+      "description": "AI-generated electoral report or candidate strategy document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "title": { "type": "string", "maxLength": 200 },
+        "type": { "type": "string", "enum": ["Análisis Electoral", "Estrategia Discurso", "Debate Prep", "Resumen Documento Drive", "Proyección Votos"] },
+        "content": { "type": "string", "maxLength": 10000 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["tenantId", "title", "type", "content"]
+    },
+    "GrassrootsVoter": {
+      "title": "GrassrootsVoter",
+      "description": "Votante raso registrado en la base de la pirámide electoral",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "fullName": { "type": "string", "maxLength": 150 },
+        "documentId": { "type": "string", "maxLength": 50 },
+        "phone": { "type": "string", "maxLength": 50 },
+        "department": { "type": "string", "maxLength": 100 },
+        "municipality": { "type": "string", "maxLength": 100 },
+        "veredaOrBarrio": { "type": "string", "maxLength": 150 },
+        "pollingStation": { "type": "string", "maxLength": 150 },
+        "tableNumber": { "type": "string", "maxLength": 20 },
+        "assignedLeaderId": { "type": "string", "maxLength": 100 },
+        "assignedCandidateId": { "type": "string", "maxLength": 100 },
+        "intentionScore": { "type": "number" },
+        "needsTransport": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["Comprometido", "Firme", "Indeciso", "Verificado"] }
+      },
+      "required": ["tenantId", "fullName", "municipality", "veredaOrBarrio", "assignedLeaderId"]
+    },
+    "CampaignCoordination": {
+      "title": "CampaignCoordination",
+      "description": "Comités y coordinaciones organizacionales de campaña",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 500 },
+        "leaderName": { "type": "string", "maxLength": 150 },
+        "leaderRole": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string" }
+      },
+      "required": ["tenantId", "name", "leaderName"]
+    }
+  },
+  "firestore": {
+    "/organizaciones/{tenantId}": {
+      "schema": { "$ref": "#/entities/Tenant" },
+      "description": "Colección de organizaciones y partidos multi-tenant"
+    },
+    "/usuarios/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Colección de perfiles de usuario y asignaciones de rol"
+    },
+    "/candidatos/{candidateId}": {
+      "schema": { "$ref": "#/entities/Candidate" },
+      "description": "Colección de candidaturas electorales (Gobernación, Alcaldías, Asambleas, Concejos)"
+    },
+    "/distritos/{districtId}": {
+      "schema": { "$ref": "#/entities/District" },
+      "description": "Colección de subregiones y distritos electorales"
+    },
+    "/propuestas/{proposalId}": {
+      "schema": { "$ref": "#/entities/Proposal" },
+      "description": "Colección de propuestas legislativas y proyectos de campaña"
+    },
+    "/archivos_drive/{fileId}": {
+      "schema": { "$ref": "#/entities/DriveFile" },
+      "description": "Metadatos de expedientes y archivos de Google Drive"
+    },
+    "/analisis_ia/{analysisId}": {
+      "schema": { "$ref": "#/entities/AiAnalysis" },
+      "description": "Informes estratégicos y análisis generados con IA"
+    },
+    "/gastos/{expenseId}": {
+      "schema": { "$ref": "#/entities/CampaignExpense" },
+      "description": "Colección de gastos e inversiones de campaña en Pesos Colombianos (COP)"
+    },
+    "/lideres/{leaderId}": {
+      "schema": { "$ref": "#/entities/Leader" },
+      "description": "Colección de líderes territoriales y veredales de movilización electoral"
+    },
+    "/vehiculos/{vehicleId}": {
+      "schema": { "$ref": "#/entities/TransportVehicle" },
+      "description": "Colección de unidades de transporte y logística para el Día D"
+    },
+    "/votantes_rasos/{voterId}": {
+      "schema": { "$ref": "#/entities/GrassrootsVoter" },
+      "description": "Colección de votantes rasos en la base de la pirámide electoral"
+    },
+    "/comites_coordinaciones/{coordinationId}": {
+      "schema": { "$ref": "#/entities/CampaignCoordination" },
+      "description": "Colección de comités y comisiones organizativas oficiales de campaña"
+    }
+  }
+}
