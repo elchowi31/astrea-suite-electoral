@@ -1,4 +1,3 @@
-import { AdministrativeOverview } from './components/AdministrativeOverview';
 import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { 
   Tenant, 
@@ -46,6 +45,7 @@ import { UserGreetingBanner } from './components/UserGreetingBanner';
 import { SynapticNeuralBackground } from './components/SynapticNeuralBackground';
 import { ArrowLeft, LogIn, Sparkles, CheckCircle2, AlertCircle, RefreshCw, Database, LayoutDashboard, MapPinned } from 'lucide-react';
 
+const AdministrativeOverview = React.lazy(() => import('./components/AdministrativeOverview').then(module => ({ default: module.AdministrativeOverview })));
 const DashboardView = lazy(() => import('./components/DashboardView').then(module => ({ default: module.DashboardView })));
 const CampaignStructureView = lazy(() => import('./components/CampaignStructureView').then(module => ({ default: module.CampaignStructureView })));
 const ElectoralHierarchyRollupView = lazy(() => import('./components/ElectoralHierarchyRollupView').then(module => ({ default: module.ElectoralHierarchyRollupView })));

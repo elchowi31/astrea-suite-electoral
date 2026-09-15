@@ -12,7 +12,7 @@ interface UserGreetingBannerProps {
 }
 
 export const UserGreetingBanner: React.FC<UserGreetingBannerProps> = ({ currentUser, currentTenant, onOpenAuthModal, onUpdateUserName }) => {
-  const registeredName = [currentUser.fullName, currentUser.displayName].find(name => name?.trim() && !name.includes('@') && name.toLowerCase().trim() !== currentUser.email?.split('@')[0].toLowerCase())?.trim() || '';
+  const registeredName = (currentUser.fullName?.trim() && !currentUser.fullName.includes('@') ? currentUser.fullName.trim() : '') || [currentUser.displayName].find(name => name?.trim() && !name.includes('@') && name.toLowerCase().trim() !== currentUser.email?.split('@')[0].toLowerCase())?.trim() || '';
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(registeredName);
   const [saving, setSaving] = useState(false);
