@@ -29,11 +29,11 @@ import {
   saveUserToFirestore,
   saveGrassrootsVoterToFirestore,
   saveCoordinationToFirestore,
-  createDemoCollection,
   deleteDemoCollection,
   subscribeToDemoCollection
 } from './lib/firebase';
 import { buildDemoBundle, type DemoBundle } from './data/demoSeed';
+import { savePresentation } from './lib/demoPersistence';
 import { logoutFirebaseAuth, observeAuthenticatedProfile } from './lib/firebaseAuth';
 import { Header } from './components/Header';
 import { Sidebar, ActiveTab } from './components/Sidebar';
@@ -45,6 +45,7 @@ import { UserGreetingBanner } from './components/UserGreetingBanner';
 import { SynapticNeuralBackground } from './components/SynapticNeuralBackground';
 import { ArrowLeft, LogIn, Sparkles, CheckCircle2, AlertCircle, RefreshCw, Database, LayoutDashboard, MapPinned } from 'lucide-react';
 
+const DemoDataModal = lazy(() => import('./components/DemoDataModal').then(module => ({ default: module.DemoDataModal })));
 const AdministrativeOverview = React.lazy(() => import('./components/AdministrativeOverview').then(module => ({ default: module.AdministrativeOverview })));
 const DashboardView = lazy(() => import('./components/DashboardView').then(module => ({ default: module.DashboardView })));
 const CampaignStructureView = lazy(() => import('./components/CampaignStructureView').then(module => ({ default: module.CampaignStructureView })));
@@ -95,6 +96,7 @@ export default function App() {
   const [publicDemoView, setPublicDemoView] = useState<'dashboard' | 'map'>('dashboard');
 
   // Firestore modal state
+  const [showDemoData, setShowDemoData] = useState(false);
   const [showFirestoreModal, setShowFirestoreModal] = useState<boolean>(false);
   const [firestoreSyncNotice, setFirestoreSyncNotice] = useState<string | null>(null);
 
@@ -425,22 +427,11 @@ export default function App() {
     }
   };
 
-  const handleCreateDemo = async () => {
-    setDemoBusy(true);
-    setDemoError(null);
-    try {
-      const bundle = await createDemoCollection(currentTenant.tenantId);
-      setDemoBundle(bundle);
-      notifyFirestoreSave('Colección demo creada en Firestore. Todos los registros mostrados son ficticios.');
-    } catch (error) {
-      console.warn('Advertencia al sincronizar demo en nube:', error);
-      // Fallback: build bundle locally so the presentation mode is instantly active
-      const localBundle = buildDemoBundle(currentTenant.tenantId);
-      setDemoBundle(localBundle);
-      notifyFirestoreSave('Modo presentación demo activado correctamente.');
-    } finally {
-      setDemoBusy(false);
-    }
+  const handleSavePresentation = async (bundle: DemoBundle) => {
+    if (realDataCount > 0) throw new Error('Ya existen registros reales en esta organización.');
+    await savePresentation(bundle);
+    setDemoBundle(bundle);
+    notifyFirestoreSave('Datos ficticios guardados en Firestore.');
   };
 
   const handleDeleteDemo = async () => {
@@ -453,6 +444,7 @@ export default function App() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No fue posible eliminar la colección demo.';
       setDemoError(message);
+      throw error;
     } finally {
       setDemoBusy(false);
     }
@@ -475,10 +467,8 @@ export default function App() {
     setActiveTab('ai');
   };
 
-  const realDataCount = candidates.length + districts.length + proposals.length + driveFiles.length
-    + expenses.length + donorContributions.length + leaders.length + vehicles.length
-    + coordinations.length + grassrootsVoters.length;
-  const demoActive = realDataCount === 0 && Boolean(demoBundle);
+  const realDataCount = [candidates, districts, proposals, driveFiles, expenses, donorContributions, leaders, vehicles, coordinations, grassrootsVoters].reduce((sum, items) => sum + items.filter(item => item.tenantId === currentTenant.tenantId).length, 0);
+  const demoActive = realDataCount === 0 && demoBundle?.tenantId === currentTenant.tenantId;
   const visibleCandidates = demoActive ? demoBundle!.candidates : candidates;
   const visibleDistricts = demoActive ? demoBundle!.districts : districts;
   const visibleProposals = demoActive ? demoBundle!.proposals : proposals;
@@ -634,18 +624,6 @@ export default function App() {
             />
           )}
 
-          {currentUser && activeTab !== 'login' && (realDataCount === 0 || demoBundle) && (
-            <details className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs">
-              <summary className="cursor-pointer font-bold text-cyan-200">{demoActive ? 'Datos demo' : 'Datos'} · {currentTenant.name}</summary>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <span className="text-slate-400">{demoActive ? 'Demostración · datos ficticios' : 'Datos operativos'}</span>
-                {!demoBundle && <button disabled={demoBusy} onClick={handleCreateDemo} className="rounded-lg bg-cyan-700 px-3 py-2 text-white">{demoBusy ? 'Creando…' : 'Crear demo'}</button>}
-                {demoBundle && canManageDemo && <button disabled={demoBusy} onClick={handleDeleteDemo} className="rounded-lg bg-rose-950 px-3 py-2 text-rose-200">{demoBusy ? 'Eliminando…' : 'Eliminar demo'}</button>}
-                {demoError && <span role="alert" className="text-rose-300">{demoError}</span>}
-              </div>
-            </details>
-          )}
-
           {/* Real-time Save Toast Notification */}
           {firestoreSyncNotice && (
             <div className="bg-slate-950/95 border border-cyan-500/40 rounded-2xl px-5 py-3.5 flex items-center justify-between text-xs text-cyan-200 shadow-2xl shadow-cyan-950/50 backdrop-blur-xl animate-fade-in">
@@ -664,12 +642,12 @@ export default function App() {
             <div className="bg-slate-950/80 border border-cyan-500/20 rounded-2xl px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-slate-400 shadow-md backdrop-blur-md">
               <div className="flex items-center gap-2.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                <span className="font-bold text-slate-200"><strong className="text-white">{currentTenant.name}</strong></span>
+                <span className="font-bold text-slate-200"><strong className="text-white">{currentTenant.name}</strong>{demoActive && <span className="ml-2 text-[10px] text-amber-300">DEMO · cifras ficticias</span>}</span>
               </div>
               
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setShowFirestoreModal(true)}
+                  onClick={() => setShowDemoData(true)}
                   className="flex items-center gap-1.5 text-cyan-300 hover:text-white bg-cyan-500/10 hover:bg-cyan-500/20 px-3 py-1 rounded-xl border border-cyan-500/30 font-bold transition cursor-pointer shadow-sm"
                 >
                   <Database className="w-3.5 h-3.5 text-cyan-400" />
@@ -970,6 +948,21 @@ export default function App() {
         onUpdateProfile={handleUpdateProfile}
         onLogout={handleLogout}
       />
+
+      {showDemoData && currentUser && <Suspense fallback={<div role="status" className="fixed inset-0 z-50 grid place-items-center bg-black/70 text-white">Cargando datos…</div>}><DemoDataModal
+        key={currentTenant.tenantId}
+        tenantId={currentTenant.tenantId}
+        tenantName={currentTenant.name}
+        municipality={currentTenant.tenantId.toLowerCase().includes('astrea') ? 'Astrea' : ['AdminGlobal', 'Gobernador', 'Diputado'].includes(currentUser.role) ? '' : currentUser.municipality || ''}
+        allowDepartment={['AdminGlobal', 'Gobernador', 'Diputado'].includes(currentUser.role)}
+        canManage={canManageDemo}
+        realCount={realDataCount}
+        bundle={demoBundle}
+        onClose={() => setShowDemoData(false)}
+        onAudit={() => { setShowDemoData(false); setShowFirestoreModal(true); }}
+        onSave={handleSavePresentation}
+        onDelete={handleDeleteDemo}
+      /></Suspense>}
 
       {/* Firestore Verification & Seeding Modal */}
       <FirestoreStatusModal

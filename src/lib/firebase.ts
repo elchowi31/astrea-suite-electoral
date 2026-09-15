@@ -486,6 +486,7 @@ export async function deleteDemoCollection(tenantId: string): Promise<void> {
       await deleteDoc(doc(db, 'demo', `${tenantId}-presentacion`));
     } catch (fallbackErr) {
       console.warn('Advertencia secundaria al eliminar documento demo:', fallbackErr);
+      throw fallbackErr;
     }
   }
 }
