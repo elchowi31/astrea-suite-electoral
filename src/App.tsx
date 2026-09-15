@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { 
   Tenant, 
   UserRole, 
@@ -33,7 +33,7 @@ import {
   subscribeToDemoCollection
 } from './lib/firebase';
 import { buildDemoBundle, type DemoBundle } from './data/demoSeed';
-import { savePresentation } from './lib/demoPersistence';
+import { savePresentation, DemoCloudError } from './lib/demoPersistence';
 import { logoutFirebaseAuth, observeAuthenticatedProfile } from './lib/firebaseAuth';
 import { Header } from './components/Header';
 import { Sidebar, ActiveTab } from './components/Sidebar';
@@ -114,6 +114,13 @@ export default function App() {
   const [coordinations, setCoordinations] = useState<CampaignCoordination[]>([]);
   const [grassrootsVoters, setGrassrootsVoters] = useState<GrassrootsVoter[]>([]);
   const [demoBundle, setDemoBundle] = useState<DemoBundle | null>(null);
+  const localDemoRef = useRef<DemoBundle | null>(null);
+  const [demoCloudError, setDemoCloudError] = useState('');
+  useEffect(() => {
+    localDemoRef.current = null;
+    setDemoCloudError('');
+    setDemoBundle(null);
+  }, [currentUser?.uid, currentTenant.tenantId]);
   const [demoBusy, setDemoBusy] = useState(false);
   const [demoError, setDemoError] = useState<string | null>(null);
 
@@ -199,7 +206,7 @@ export default function App() {
     }, [], currentUser?.tenantId);
 
     const unsubDemo = currentUser?.tenantId
-      ? subscribeToDemoCollection(currentUser.tenantId, setDemoBundle)
+      ? subscribeToDemoCollection(currentUser.tenantId, (bundle) => setDemoBundle(localDemoRef.current?.tenantId === currentUser.tenantId ? localDemoRef.current : bundle))
       : (() => { setDemoBundle(null); return () => {}; })();
 
     const voterManagers: UserRole[] = ['AdminGlobal', 'AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'Concejal', 'JefePolitico'];
@@ -429,12 +436,30 @@ export default function App() {
 
   const handleSavePresentation = async (bundle: DemoBundle) => {
     if (realDataCount > 0) throw new Error('Ya existen registros reales en esta organización.');
-    await savePresentation(bundle);
-    setDemoBundle(bundle);
-    notifyFirestoreSave('Datos ficticios guardados en Firestore.');
+    try {
+      await savePresentation(bundle);
+      localDemoRef.current = null;
+      setDemoCloudError('');
+      setDemoBundle(bundle);
+      notifyFirestoreSave('Datos ficticios guardados en Firestore.');
+      return 'cloud' as const;
+    } catch (error) {
+      if (!(error instanceof DemoCloudError)) throw error;
+      // Generated fixtures are only an in-memory preview, never operational data.
+      localDemoRef.current = bundle;
+      setDemoBundle(bundle);
+      setDemoCloudError(error.message);
+      return 'session' as const;
+    }
   };
 
   const handleDeleteDemo = async () => {
+    if (localDemoRef.current) {
+      localDemoRef.current = null;
+      setDemoBundle(null);
+      setDemoCloudError('');
+      return;
+    }
     setDemoBusy(true);
     setDemoError(null);
     try {
@@ -642,7 +667,7 @@ export default function App() {
             <div className="bg-slate-950/80 border border-cyan-500/20 rounded-2xl px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-slate-400 shadow-md backdrop-blur-md">
               <div className="flex items-center gap-2.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                <span className="font-bold text-slate-200"><strong className="text-white">{currentTenant.name}</strong>{demoActive && <span className="ml-2 text-[10px] text-amber-300">DEMO · cifras ficticias</span>}</span>
+                <span className="font-bold text-slate-200"><strong className="text-white">{currentTenant.name}</strong>{demoActive && <span className="ml-2 text-[10px] text-amber-300">{demoCloudError ? 'DEMO LOCAL · no guardada' : 'DEMO · cifras ficticias'}</span>}</span>
               </div>
               
               <div className="flex items-center gap-3">
@@ -958,6 +983,7 @@ export default function App() {
         canManage={canManageDemo}
         realCount={realDataCount}
         bundle={demoBundle}
+        cloudError={demoCloudError}
         onClose={() => setShowDemoData(false)}
         onAudit={() => { setShowDemoData(false); setShowFirestoreModal(true); }}
         onSave={handleSavePresentation}
