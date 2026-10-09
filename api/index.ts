@@ -3,6 +3,7 @@ import { Buffer } from 'node:buffer';
 import { createVerify } from 'node:crypto';
 import firebaseConfig from '../firebase-applet-config.json' with { type: 'json' };
 import { isPlatformAdminClaims } from '../src/lib/accessPolicy.js';
+import { withAvailableModel } from '../src/lib/aiAvailability.js';
 
 type ApiRequest = IncomingMessage & { body?: Record<string, unknown> };
 type TokenPayload = {
@@ -117,7 +118,7 @@ async function generate(prompt: string) {
   if (!apiKey) throw new Error('AI_SERVICE_UNAVAILABLE');
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 30_000 } });
-  const response = await ai.models.generateContent({ model: process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash', contents: prompt });
+  const response = await withAvailableModel([process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash', process.env.GEMINI_FALLBACK_MODEL?.trim() || 'gemini-3.5-flash'], model => ai.models.generateContent({ model, contents: prompt }));
   if (!response.text?.trim()) throw new Error('EMPTY_AI_RESPONSE');
   return response.text;
 }

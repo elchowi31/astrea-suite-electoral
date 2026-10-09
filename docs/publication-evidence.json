@@ -6,7 +6,7 @@
   "coreDeployment": "dpl_9qyB4XmHGHVhsfRoMUMaV3PwB95a",
   "firestoreDatabase": "ai-studio-astreasuiteelect-5da3410d-4b0c-4301-8bd6-083fbb5c653b",
   "ruleset": "f3914cbd-99f2-4378-b528-c5f4cd85bc88",
-  "automatedTests": {"passed": 26, "failed": 0, "skipped": 0},
+  "automatedTests": {"passed": 29, "failed": 0, "skipped": 0},
   "productionChecks": [
     "Registration creates an owned organization and authorized profile",
     "Creating a team account preserves the administrator session",
@@ -25,6 +25,8 @@
     "reason": "Provider returned NOT_FOUND for gemini-2.5-flash with instruction to use gemini-3.8-flash",
     "defaultModel": "gemini-3.8-flash",
     "configurableVia": "GEMINI_MODEL",
+    "temporaryFailures": "At most two attempts per model and two models; authorization errors fail immediately",
+    "alternateModel": "gemini-3.5-flash",
     "providerDocumentation": "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash"
   }
 }
