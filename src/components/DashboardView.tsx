@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { Activity, ArrowDownRight, ArrowUpRight, CircleDollarSign, Filter, MapPinned, Target, Truck, Users, Vote } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { AlertTriangle, ArrowRight, BadgeCheck, BarChart3, CircleDollarSign, ClipboardCheck, Database, Gauge, MapPinned, ShieldCheck, Sparkles, Target, Truck, Users } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { CampaignExpense, Candidate, District, DonorContribution, DriveFileItem, GrassrootsVoter, Leader, Proposal, Tenant, TransportVehicle, UserProfile, UserRole } from '../types';
 import { calculateExecutiveAnalytics } from '../lib/analytics';
+import { getTerritorialScope } from '../lib/permissions';
+import { AuthorHeader } from './common/AuthorHeader';
 
 interface DashboardViewProps {
   currentTenant: Tenant;
@@ -20,145 +22,103 @@ interface DashboardViewProps {
   onNavigateTab: (tab: any) => void;
 }
 
-const COLORS = ['#22d3ee', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#f43f5e'];
-const formatCOP = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', notation: Math.abs(value) >= 1_000_000 ? 'compact' : 'standard', maximumFractionDigits: 1 }).format(value);
+const formatCOP = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
 const formatNumber = (value: number) => new Intl.NumberFormat('es-CO').format(Math.round(value));
-const normalize = (value?: string) => (value || '').trim().toLocaleLowerCase('es-CO');
-const pct = (value: number, total: number) => total > 0 ? Math.min(100, Math.max(0, (value / total) * 100)) : 0;
+const pieColors = ['#22d3ee', '#38bdf8', '#818cf8', '#a78bfa', '#f59e0b', '#fb7185'];
 
-const uniqueVoters = (rows: GrassrootsVoter[]) => {
-  const unique = new Map<string, GrassrootsVoter>();
-  rows.forEach((row) => {
-    const key = normalize(row.documentNumber) || row.id;
-    const previous = unique.get(key);
-    if (!previous || new Date(row.registeredAt).getTime() >= new Date(previous.registeredAt).getTime()) unique.set(key, row);
-  });
-  return [...unique.values()];
-};
-
-export const DashboardView: React.FC<DashboardViewProps> = ({ currentTenant, candidates, districts, proposals, expenses = [], contributions = [], leaders = [], vehicles = [], voters = [], onNavigateTab }) => {
-  const tenantCandidates = candidates.filter((row) => row.tenantId === currentTenant.tenantId);
-  const tenantDistricts = districts.filter((row) => row.tenantId === currentTenant.tenantId);
-  const tenantLeaders = leaders.filter((row) => row.tenantId === currentTenant.tenantId);
-  const tenantVehicles = vehicles.filter((row) => row.tenantId === currentTenant.tenantId);
-  const tenantExpenses = expenses.filter((row) => row.tenantId === currentTenant.tenantId);
-  const tenantContributions = contributions.filter((row) => row.tenantId === currentTenant.tenantId);
-  const tenantVoters = voters.filter((row) => row.tenantId === currentTenant.tenantId);
-  const tenantProposals = proposals.filter((row) => row.tenantId === currentTenant.tenantId);
-
-  const territories = useMemo(() => {
-    const values = new Set<string>();
-    tenantDistricts.forEach((row) => row.name && values.add(row.name));
-    tenantCandidates.forEach((row) => row.municipality && values.add(row.municipality));
-    tenantLeaders.forEach((row) => row.municipality && values.add(row.municipality));
-    tenantVoters.forEach((row) => row.municipality && values.add(row.municipality));
-    return ['Todos los territorios', ...[...values].sort((a, b) => a.localeCompare(b, 'es'))];
-  }, [tenantCandidates, tenantDistricts, tenantLeaders, tenantVoters]);
-
-  const [territory, setTerritory] = useState('Todos los territorios');
-  const allTerritories = territory === 'Todos los territorios';
-  const matches = (value?: string) => allTerritories || normalize(value) === normalize(territory);
-  const scopedCandidates = tenantCandidates.filter((row) => matches(row.municipality));
-  const scopedDistricts = tenantDistricts.filter((row) => matches(row.name));
-  const scopedLeaders = tenantLeaders.filter((row) => matches(row.municipality));
-  const scopedVehicles = tenantVehicles.filter((row) => matches(row.municipality));
-  const scopedExpenses = tenantExpenses.filter((row) => matches(row.municipality));
-  const scopedContributions = tenantContributions.filter((row) => matches(row.municipality));
-  const scopedVoters = uniqueVoters(tenantVoters.filter((row) => matches(row.municipality)));
-
-  const analytics = useMemo(() => calculateExecutiveAnalytics({ tenant: currentTenant, candidates: scopedCandidates, leaders: scopedLeaders, vehicles: scopedVehicles, expenses: scopedExpenses, contributions: scopedContributions, voters: scopedVoters, proposals: tenantProposals }), [currentTenant, scopedCandidates, scopedLeaders, scopedVehicles, scopedExpenses, scopedContributions, scopedVoters, tenantProposals]);
-  const confirmed = scopedVoters.filter((row) => row.verified && row.supportLevel >= 4).length;
-  const undecided = scopedVoters.filter((row) => row.supportLevel === 3 || (!row.verified && row.supportLevel >= 3)).length;
-  const verified = scopedVoters.filter((row) => row.verified).length;
-  const managedBase = scopedVoters.length;
-  const voteTarget = scopedCandidates.reduce((sum, row) => sum + Math.max(0, row.voteTarget || 0), 0) || scopedLeaders.reduce((sum, row) => sum + Math.max(0, row.voteTarget || 0), 0);
-  const electoralPotential = scopedDistricts.reduce((sum, row) => sum + Math.max(0, row.voterCensus || 0), 0);
-  const transportDemand = scopedVoters.filter((row) => row.requiresTransport).length;
-  const transportCapacity = scopedVehicles.filter((row) => row.status === 'Operativo - Día D' || row.status === 'Reservado').reduce((sum, row) => sum + Math.max(0, row.capacity || 0), 0);
-  const transportDeficit = Math.max(0, transportDemand - transportCapacity);
-  const logisticExpenses = scopedExpenses.filter((row) => ['Transporte y Movilización', 'Combustible', 'Alimentación y Refrigerios'].includes(row.component));
-  const logisticCost = logisticExpenses.reduce((sum, row) => sum + Math.max(0, row.amount || 0), 0);
-  const costPerConfirmed = confirmed > 0 ? logisticCost / confirmed : 0;
-  const conversionRate = pct(confirmed, confirmed + undecided);
-  const funnelData = [{ name: 'Base gestionada', value: managedBase, fill: '#334155' }, { name: 'Verificados', value: verified, fill: '#3b82f6' }, { name: 'Confirmados', value: confirmed, fill: '#22d3ee' }];
-  const transportData = transportDemand > 0 ? [{ name: 'Cubiertos', value: Math.min(transportDemand, transportCapacity), fill: '#10b981' }, { name: 'Déficit', value: transportDeficit, fill: '#f43f5e' }] : [{ name: 'Sin solicitudes', value: 1, fill: '#334155' }];
-
-  const logisticsData = useMemo(() => {
-    const totals = new Map<string, number>();
-    logisticExpenses.forEach((row) => totals.set(row.component, (totals.get(row.component) || 0) + row.amount));
-    return [...totals.entries()].map(([name, value]) => ({ name: name.replace(' y ', ' + '), value }));
-  }, [logisticExpenses]);
-
-  const territoryData = useMemo(() => {
-    const names = new Set<string>();
-    scopedDistricts.forEach((row) => names.add(row.name));
-    scopedCandidates.forEach((row) => names.add(row.municipality || row.district));
-    scopedLeaders.forEach((row) => row.municipality && names.add(row.municipality));
-    return [...names].map((name) => {
-      const localCandidates = scopedCandidates.filter((row) => normalize(row.municipality || row.district) === normalize(name));
-      const localLeaders = scopedLeaders.filter((row) => normalize(row.municipality) === normalize(name));
-      const localVoters = scopedVoters.filter((row) => normalize(row.municipality) === normalize(name));
-      const meta = localCandidates.reduce((sum, row) => sum + Math.max(0, row.voteTarget || 0), 0) || localLeaders.reduce((sum, row) => sum + Math.max(0, row.voteTarget || 0), 0);
-      const candidateVotes = localCandidates.reduce((sum, row) => sum + Math.max(0, row.votesCommitted || 0), 0);
-      const leaderVotes = localLeaders.reduce((sum, row) => sum + Math.max(0, row.votesCommitted || 0), 0);
-      const verifiedVotes = localVoters.filter((row) => row.verified && row.supportLevel >= 4).length;
-      return { name, meta, confirmados: Math.max(candidateVotes, leaderVotes, verifiedVotes) };
-    }).filter((row) => row.meta > 0 || row.confirmados > 0).sort((a, b) => b.confirmados - a.confirmados).slice(0, 8);
-  }, [scopedCandidates, scopedDistricts, scopedLeaders, scopedVoters]);
-
-  const leaderRanking = useMemo(() => scopedLeaders.map((row) => ({ id: row.id, name: row.fullName, votes: row.votesCommitted, progress: pct(row.votesCommitted, row.voteTarget) })).sort((a, b) => b.votes - a.votes).slice(0, 7), [scopedLeaders]);
-  const latestUpdate = useMemo(() => {
-    const dates = [...scopedCandidates.map((row) => row.updatedAt), ...scopedVoters.map((row) => row.registeredAt), ...scopedExpenses.map((row) => row.date)].map((value) => new Date(value).getTime()).filter(Number.isFinite);
-    return dates.length ? new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(Math.max(...dates))) : 'Sin registros';
-  }, [scopedCandidates, scopedExpenses, scopedVoters]);
+export const DashboardView: React.FC<DashboardViewProps> = ({
+  currentTenant,
+  currentUser = null,
+  userRole = 'Consulta',
+  candidates,
+  districts,
+  proposals,
+  driveFiles,
+  expenses = [],
+  contributions = [],
+  leaders = [],
+  vehicles = [],
+  voters = [],
+  onNavigateTab,
+}) => {
+  const scope = getTerritorialScope(currentUser, userRole);
+  const analytics = useMemo(() => calculateExecutiveAnalytics({ tenant: currentTenant, candidates, leaders, vehicles, expenses, contributions, voters, proposals }), [currentTenant, candidates, leaders, vehicles, expenses, contributions, voters, proposals]);
+  const healthTone = analytics.healthScore >= 80 ? 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10' : analytics.healthScore >= 60 ? 'text-amber-300 border-amber-500/30 bg-amber-500/10' : 'text-rose-300 border-rose-500/30 bg-rose-500/10';
+  const kpis = [
+    { label: 'Cobertura de meta', value: `${analytics.coveragePct.toFixed(1)}%`, detail: `${formatNumber(analytics.projectedSupport)} proyectados · faltan ${formatNumber(analytics.remainingVotes)}`, icon: Target, tone: 'text-cyan-300 bg-cyan-500/10 border-cyan-500/20', progress: analytics.coveragePct, destination: 'zone_projections' },
+    { label: 'Equipo activo', value: `${analytics.activeLeaders} líderes`, detail: `${analytics.leadersAtRisk} en seguimiento · productividad ${analytics.leaderProductivity}%`, icon: Users, tone: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20', progress: analytics.leaderProductivity, destination: 'leaders' },
+    { label: 'Capacidad logística', value: `${analytics.transportCoveragePct.toFixed(0)}%`, detail: `${formatNumber(analytics.transportCapacity)} cupos · ${formatNumber(analytics.transportDemand)} solicitudes`, icon: Truck, tone: 'text-amber-300 bg-amber-500/10 border-amber-500/20', progress: analytics.transportCoveragePct, destination: 'transport' },
+    { label: 'Saldo operativo', value: formatCOP(analytics.availableBalance), detail: `${formatCOP(analytics.totalSpent)} ejecutados · soportes ${analytics.documentedExpensePct.toFixed(0)}%`, icon: CircleDollarSign, tone: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20', progress: analytics.documentedExpensePct, destination: 'finances' },
+  ];
+  const severityClass = { critical: 'border-rose-500/30 bg-rose-500/[0.07]', warning: 'border-amber-500/30 bg-amber-500/[0.07]', opportunity: 'border-cyan-500/30 bg-cyan-500/[0.07]', healthy: 'border-emerald-500/30 bg-emerald-500/[0.07]' } as const;
 
   return (
-    <div className="space-y-4 pb-20 md:pb-8 animate-fade-in">
-      <section className="relative overflow-hidden rounded-3xl border border-cyan-500/25 bg-gradient-to-r from-slate-950 via-[#071426] to-slate-950 p-4 shadow-2xl sm:p-5">
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300 to-transparent" />
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300"><Activity className="h-3.5 w-3.5" /> Centro de Dirección Electoral</div><h2 className="mt-1 text-xl font-black text-white sm:text-2xl">{currentTenant.name}</h2></div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <label className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs text-slate-300"><Filter className="h-3.5 w-3.5 text-cyan-400" /><select value={territory} onChange={(event) => setTerritory(event.target.value)} className="min-w-44 bg-transparent font-bold text-white outline-none" aria-label="Filtrar tablero por territorio">{territories.map((item) => <option key={item} value={item} className="bg-slate-900">{item}</option>)}</select></label>
-            <span className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2 text-[10px] font-mono text-slate-400">Actualizado {latestUpdate}</span>
+    <div className="space-y-5 pb-20 md:pb-0">
+      <AuthorHeader title="Centro de control" subtitle="Una vista gerencial basada únicamente en los registros de la organización activa" />
+
+      <section className="grid grid-cols-1 xl:grid-cols-[1.35fr_.65fr] gap-4">
+        <div className="relative overflow-hidden rounded-3xl border border-cyan-500/20 bg-gradient-to-br from-slate-900 via-slate-900 to-cyan-950/40 p-5 sm:p-6 shadow-2xl">
+          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
+          <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="max-w-2xl">
+              <div className="mb-3 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em]">
+                <span className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-2.5 py-1 text-cyan-200">{currentTenant.name}</span>
+                <span className="rounded-full border border-slate-700 bg-slate-950/70 px-2.5 py-1 text-slate-300">{scope.scopeLevel}</span>
+                <span className="rounded-full border border-slate-700 bg-slate-950/70 px-2.5 py-1 text-slate-300">Confianza {analytics.confidence}</span>
+              </div>
+              <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">{analytics.insights.some((item) => item.severity === 'critical') ? 'Hay decisiones que requieren atención hoy.' : 'La operación está bajo control.'}</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">La lectura combina avance territorial, productividad del equipo, capacidad logística, soportes financieros y calidad de los datos. Cada alerta muestra la evidencia que la origina.</p>
+            </div>
+            <div className={`flex min-w-40 items-center gap-4 self-stretch rounded-2xl border p-4 ${healthTone}`}>
+              <div className="relative grid h-20 w-20 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(currentColor ${analytics.healthScore * 3.6}deg, rgba(100,116,139,.2) 0deg)` }}>
+                <div className="grid h-16 w-16 place-items-center rounded-full bg-slate-950"><span className="text-2xl font-black text-white">{analytics.healthScore}</span></div>
+              </div>
+              <div><p className="text-[10px] font-black uppercase tracking-wider opacity-80">Salud operativa</p><p className="mt-1 text-xs text-slate-300">Índice explicable de 0 a 100</p></div>
+            </div>
           </div>
+        </div>
+
+        <div className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-xl">
+          <div className="flex items-center gap-3"><div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-2.5 text-emerald-300"><ShieldCheck className="h-5 w-5" /></div><div><p className="text-xs font-black uppercase tracking-wider text-slate-400">Calidad y gobierno</p><p className="text-lg font-black text-white">{analytics.dataQualityPct}% completo</p></div></div>
+          <div className="mt-5 space-y-3 text-xs"><MetricLine label="Soportes de gastos" value={analytics.documentedExpensePct} /><MetricLine label="Propuestas aprobadas" value={analytics.proposalProgressPct} /><MetricLine label="Cobertura logística" value={analytics.transportCoveragePct} /></div>
+          <button onClick={() => onNavigateTab('costs_report')} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2.5 text-xs font-bold text-slate-200 transition hover:border-cyan-500/40 hover:text-white">Ver control administrativo <ArrowRight className="h-3.5 w-3.5" /></button>
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-        <MetricCard title="Confirmados únicos" value={formatNumber(confirmed)} icon={Vote} tone="cyan" onClick={() => onNavigateTab('hierarchy_pyramid')} />
-        <MetricCard title="Indecisos" value={formatNumber(undecided)} icon={Users} tone="amber" badge={`${conversionRate.toFixed(0)}% conversión`} onClick={() => onNavigateTab('hierarchy_pyramid')} />
-        <MetricCard title="Avance de meta" value={`${pct(confirmed, voteTarget).toFixed(1)}%`} icon={Target} tone="blue" badge={`${formatNumber(Math.max(0, voteTarget - confirmed))} faltan`} onClick={() => onNavigateTab('zone_projections')} />
-        <MetricCard title="Potencial electoral" value={formatNumber(electoralPotential)} icon={MapPinned} tone="violet" badge="Censo territorial" onClick={() => onNavigateTab('districts')} />
-        <MetricCard title="Déficit transporte" value={formatNumber(transportDeficit)} icon={Truck} tone={transportDeficit > 0 ? 'rose' : 'emerald'} badge={`${formatNumber(transportCapacity)} cupos`} onClick={() => onNavigateTab('transport')} />
-        <MetricCard title="Costo logístico" value={formatCOP(logisticCost)} icon={CircleDollarSign} tone="emerald" badge={`${formatCOP(costPerConfirmed)} / voto`} onClick={() => onNavigateTab('finances')} />
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {kpis.map((kpi) => { const Icon = kpi.icon; return (
+          <button key={kpi.label} onClick={() => onNavigateTab(kpi.destination)} className="group rounded-2xl border border-slate-800 bg-slate-900 p-4 text-left shadow-lg transition hover:-translate-y-0.5 hover:border-slate-700">
+            <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{kpi.label}</p><p className="mt-1 text-xl font-black text-white">{kpi.value}</p></div><div className={`rounded-xl border p-2.5 ${kpi.tone}`}><Icon className="h-5 w-5" /></div></div>
+            <p className="mt-2 min-h-8 text-[11px] leading-relaxed text-slate-400">{kpi.detail}</p><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-500" style={{ width: `${Math.min(100, Math.max(0, kpi.progress))}%` }} /></div>
+          </button>
+        ); })}
       </section>
 
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <ChartCard title="Avance territorial" className="xl:col-span-7"><div className="h-72">{territoryData.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={territoryData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}><CartesianGrid stroke="#1e293b" vertical={false} strokeDasharray="3 3" /><XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} /><YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} /><Tooltip content={<DashboardTooltip formatter={formatNumber} />} /><Bar dataKey="meta" name="Meta" fill="#334155" radius={[5, 5, 0, 0]} /><Bar dataKey="confirmados" name="Confirmados" fill="#22d3ee" radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer> : <EmptyChart label="Sin metas territoriales" />}</div></ChartCard>
-        <ChartCard title="Embudo electoral" value={`${conversionRate.toFixed(0)}% conversión`} className="xl:col-span-5"><div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={funnelData} layout="vertical" margin={{ top: 16, right: 28, left: 18, bottom: 8 }}><CartesianGrid stroke="#1e293b" horizontal={false} strokeDasharray="3 3" /><XAxis type="number" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} /><YAxis type="category" dataKey="name" width={100} stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} /><Tooltip content={<DashboardTooltip formatter={formatNumber} />} /><Bar dataKey="value" name="Personas" radius={[0, 7, 7, 0]}>{funnelData.map((row) => <Cell key={row.name} fill={row.fill} />)}</Bar></BarChart></ResponsiveContainer></div></ChartCard>
+      <section className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-xl">
+        <div className="flex flex-col gap-2 border-b border-slate-800 pb-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><div className="rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 p-2.5 text-white"><Sparkles className="h-5 w-5" /></div><div><h3 className="font-black text-white">Prioridades sugeridas por los datos</h3><p className="text-xs text-slate-400">Reglas estadísticas transparentes; no sustituyen la decisión del equipo.</p></div></div><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Actualización en tiempo real</span></div>
+        <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {analytics.insights.map((insight) => (
+            <article key={insight.id} className={`rounded-2xl border p-4 ${severityClass[insight.severity]}`}><div className="flex items-start gap-3"><AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${insight.severity === 'critical' ? 'text-rose-400' : insight.severity === 'healthy' ? 'text-emerald-400' : 'text-amber-400'}`} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="text-[9px] font-black uppercase tracking-wider text-slate-400">{insight.area}</span><h4 className="text-sm font-bold text-white">{insight.title}</h4></div><p className="mt-1 text-xs leading-relaxed text-slate-300">{insight.evidence}</p><p className="mt-2 text-xs leading-relaxed text-cyan-200"><strong>Siguiente paso:</strong> {insight.recommendation}</p><button onClick={() => onNavigateTab(insight.destination)} className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-bold text-white hover:text-cyan-200">Abrir módulo <ArrowRight className="h-3 w-3" /></button></div></div></article>
+          ))}
+        </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-12">
-        <ChartCard title="Cobertura de transporte" value={`${analytics.transportCoveragePct.toFixed(0)}%`} className="xl:col-span-3"><Donut data={transportData} centerValue={transportDemand ? formatNumber(transportDemand) : '0'} centerLabel="solicitudes" /></ChartCard>
-        <ChartCard title="Costos logísticos" value={formatCOP(logisticCost)} className="xl:col-span-4">{logisticsData.length ? <Donut data={logisticsData} centerValue={formatCOP(costPerConfirmed)} centerLabel="por voto" currency /> : <EmptyChart label="Sin costos registrados" />}</ChartCard>
-        <ChartCard title="Ranking de líderes" value={`${leaderRanking.length} visibles`} className="md:col-span-2 xl:col-span-5"><div className="space-y-3 pt-2">{leaderRanking.length ? leaderRanking.map((row, index) => <button key={row.id} type="button" onClick={() => onNavigateTab('leaders')} className="group grid w-full grid-cols-[28px_1fr_auto] items-center gap-3 text-left"><span className="grid h-7 w-7 place-items-center rounded-lg bg-slate-800 text-[10px] font-black text-slate-400">{index + 1}</span><span className="min-w-0"><span className="flex items-center justify-between gap-3 text-xs"><span className="truncate font-bold text-white group-hover:text-cyan-300">{row.name}</span><span className="text-slate-500">{row.progress.toFixed(0)}%</span></span><span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-slate-800"><span className="block h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400" style={{ width: `${row.progress}%` }} /></span></span><span className="text-sm font-black text-cyan-300">{formatNumber(row.votes)}</span></button>) : <EmptyChart label="Sin líderes registrados" />}</div></ChartCard>
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <ChartCard icon={MapPinned} title="Cobertura por territorio" subtitle="Metas y compromisos registrados, sin valores de relleno">
+          {analytics.territoryRows.length > 0 ? <ResponsiveContainer width="100%" height="100%"><BarChart data={analytics.territoryRows.slice(0, 10)} margin={{ top: 8, right: 8, left: -12, bottom: 8 }}><CartesianGrid stroke="#1e293b" vertical={false} /><XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} /><YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} /><Tooltip formatter={(value: any) => `${formatNumber(Number(value))} votos`} contentStyle={{ background: '#020617', border: '1px solid #334155', borderRadius: 12 }} /><Bar dataKey="meta" name="Meta" fill="#334155" radius={[5, 5, 0, 0]} /><Bar dataKey="comprometidos" name="Comprometidos" fill="#22d3ee" radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer> : <EmptyChart text="Registre candidatos con territorio y meta de votos para activar esta comparación." />}
+        </ChartCard>
+        <ChartCard icon={BarChart3} title="Distribución del gasto" subtitle="Participación real por componente operativo">
+          {analytics.expenseRows.length > 0 ? <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={analytics.expenseRows.slice(0, 6)} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>{analytics.expenseRows.slice(0, 6).map((row, index) => <Cell key={row.name} fill={pieColors[index % pieColors.length]} />)}</Pie><Tooltip formatter={(value: any) => formatCOP(Number(value))} contentStyle={{ background: '#020617', border: '1px solid #334155', borderRadius: 12 }} /></PieChart></ResponsiveContainer> : <EmptyChart text="Registre gastos para visualizar la composición presupuestal." />}
+        </ChartCard>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-3 text-center sm:grid-cols-4">
-        <MiniStat label="Salud de campaña" value={`${analytics.healthScore}/100`} positive={analytics.healthScore >= 60} />
-        <MiniStat label="Calidad de datos" value={`${analytics.dataQualityPct}%`} positive={analytics.dataQualityPct >= 80} />
-        <MiniStat label="Líderes activos" value={formatNumber(analytics.activeLeaders)} positive />
-        <MiniStat label="Balance disponible" value={formatCOP(analytics.availableBalance)} positive={analytics.availableBalance >= 0} />
-      </section>
+      <section className="grid grid-cols-1 gap-3 md:grid-cols-3"><QuickModule icon={Gauge} title="Operación territorial" detail={`${leaders.length} líderes · ${voters.length} registros de base`} onClick={() => onNavigateTab('campaign_structure')} /><QuickModule icon={ClipboardCheck} title="Administración" detail={`${expenses.length} gastos · ${contributions.length} aportes`} onClick={() => onNavigateTab('finances')} /><QuickModule icon={Database} title="Conectividad" detail={`${driveFiles.length} archivos · ${districts.length} territorios`} onClick={() => onNavigateTab('workspace')} /></section>
+      <div className="flex flex-col gap-2 rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-[11px] text-slate-500 sm:flex-row sm:items-center sm:justify-between"><span className="flex items-center gap-2"><BadgeCheck className="h-4 w-4 text-emerald-400" /> Aislamiento activo: {scope.scopeTitle}</span><span>La confianza aumenta con volumen, completitud, soportes y verificación.</span></div>
     </div>
   );
 };
 
-const toneClasses: Record<string, string> = { cyan: 'border-cyan-500/25 bg-cyan-500/10 text-cyan-300', blue: 'border-blue-500/25 bg-blue-500/10 text-blue-300', violet: 'border-violet-500/25 bg-violet-500/10 text-violet-300', amber: 'border-amber-500/25 bg-amber-500/10 text-amber-300', emerald: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300', rose: 'border-rose-500/25 bg-rose-500/10 text-rose-300' };
-const MetricCard: React.FC<{ title: string; value: string; badge?: string; icon: any; tone: string; onClick: () => void }> = ({ title, value, badge, icon: Icon, tone, onClick }) => <button type="button" onClick={onClick} className="group min-w-0 rounded-2xl border border-slate-800 bg-slate-900/80 p-3.5 text-left shadow-lg transition hover:-translate-y-0.5 hover:border-cyan-500/35"><div className="flex items-center justify-between gap-2"><span className="truncate text-[10px] font-black uppercase tracking-wider text-slate-400">{title}</span><span className={`rounded-lg border p-1.5 ${toneClasses[tone]}`}><Icon className="h-3.5 w-3.5" /></span></div><div className="mt-2 truncate text-xl font-black text-white sm:text-2xl">{value}</div>{badge && <div className="mt-1 truncate text-[10px] font-semibold text-slate-500">{badge}</div>}</button>;
-const ChartCard: React.FC<{ title: string; value?: string; className?: string; children: React.ReactNode }> = ({ title, value, className = '', children }) => <article className={`rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-xl ${className}`}><header className="flex items-center justify-between gap-3 border-b border-slate-800 pb-3"><h3 className="text-xs font-black uppercase tracking-wider text-slate-300">{title}</h3>{value && <span className="text-xs font-black text-cyan-300">{value}</span>}</header>{children}</article>;
-const Donut: React.FC<{ data: Array<{ name: string; value: number; fill?: string }>; centerValue: string; centerLabel: string; currency?: boolean }> = ({ data, centerValue, centerLabel, currency }) => <div className="relative h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={data} dataKey="value" nameKey="name" innerRadius={62} outerRadius={88} paddingAngle={4}>{data.map((row, index) => <Cell key={row.name} fill={row.fill || COLORS[index % COLORS.length]} />)}</Pie><Tooltip content={<DashboardTooltip formatter={currency ? formatCOP : formatNumber} />} /></PieChart></ResponsiveContainer><div className="pointer-events-none absolute inset-0 grid place-content-center text-center"><strong className="text-xl font-black text-white">{centerValue}</strong><span className="text-[10px] uppercase tracking-wider text-slate-500">{centerLabel}</span></div></div>;
-const DashboardTooltip = ({ active, payload, label, formatter }: any) => !active || !payload?.length ? null : <div className="rounded-xl border border-slate-700 bg-slate-950/95 px-3 py-2 text-xs text-white shadow-2xl">{label && <div className="mb-1 font-bold text-slate-300">{label}</div>}{payload.map((item: any) => <div key={`${item.name}-${item.value}`} style={{ color: item.color || item.payload?.fill }}>{item.name}: {formatter(Number(item.value))}</div>)}</div>;
-const EmptyChart: React.FC<{ label: string }> = ({ label }) => <div className="grid h-full min-h-40 place-items-center text-xs font-semibold text-slate-600">{label}</div>;
-const MiniStat: React.FC<{ label: string; value: string; positive: boolean }> = ({ label, value, positive }) => <div className="min-w-0 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2"><div className="truncate text-[9px] font-black uppercase tracking-wider text-slate-500">{label}</div><div className={`mt-1 flex items-center justify-center gap-1 text-sm font-black ${positive ? 'text-emerald-300' : 'text-rose-300'}`}>{positive ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}{value}</div></div>;
+const MetricLine = ({ label, value }: { label: string; value: number }) => <div><div className="mb-1 flex items-center justify-between"><span className="text-slate-400">{label}</span><strong className="text-white">{value.toFixed(0)}%</strong></div><div className="h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.min(100, Math.max(0, value))}%` }} /></div></div>;
+const ChartCard = ({ icon: Icon, title, subtitle, children }: { icon: any; title: string; subtitle: string; children: React.ReactNode }) => <div className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-xl"><div className="mb-4 flex items-center gap-3 border-b border-slate-800 pb-3"><div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-2 text-cyan-300"><Icon className="h-4 w-4" /></div><div><h3 className="text-sm font-black text-white">{title}</h3><p className="text-[11px] text-slate-400">{subtitle}</p></div></div><div className="h-72">{children}</div></div>;
+const EmptyChart = ({ text }: { text: string }) => <div className="grid h-full place-items-center rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 p-6 text-center text-xs text-slate-400">{text}</div>;
+const QuickModule = ({ icon: Icon, title, detail, onClick }: { icon: any; title: string; detail: string; onClick: () => void }) => <button onClick={onClick} className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 text-left transition hover:border-cyan-500/30 hover:bg-slate-800/80"><div className="rounded-xl bg-slate-800 p-2.5 text-cyan-300"><Icon className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h3 className="text-sm font-bold text-white">{title}</h3><p className="truncate text-[11px] text-slate-400">{detail}</p></div><ArrowRight className="h-4 w-4 text-slate-500" /></button>;

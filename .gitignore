@@ -1,8 +1,14 @@
 node_modules/
-dist/
 build/
+dist/
 coverage/
-.vercel/
+.DS_Store
+*.log
 .env*
 !.env.example
-*.log
+.data-cache/
+.firebase/
+.continue/
+.vercel/
+docs/evidence/
+scripts/diagnose-firebase-access.cjs

@@ -1,3 +1,5 @@
+import { createRecordId } from '../lib/recordIds';
+import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
 import React, { useState, useEffect } from 'react';
 import { Candidate, Tenant, ElectoralLevel, UserProfile, UserRole } from '../types';
 import { getTerritorialScope, filterCandidatesByScope } from '../lib/permissions';
@@ -38,7 +40,7 @@ interface CandidatesViewProps {
   currentUser?: UserProfile | null;
   userRole?: UserRole;
   candidates: Candidate[];
-  onAddCandidate: (cand: Candidate) => void;
+  onAddCandidate: (cand: Candidate) => Promise<void>;
   onGenerateSpeechForCandidate: (candName: string, district: string, chamber: string) => void;
 }
 
@@ -51,6 +53,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
   onGenerateSpeechForCandidate,
 }) => {
   const scope = getTerritorialScope(currentUser, userRole);
+  const { saving, saveError, submit, runSave } = useFirestoreForm();
   const [search, setSearch] = useState('');
   const [selectedLevel, setSelectedLevel] = useState<string>('TODOS');
   const [showModal, setShowModal] = useState(false);
@@ -133,7 +136,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     setVeredaOrBarrio(veredasInfo.veredas[0] || '');
   };
 
-  const handleSubmitNewCandidate = (e: React.FormEvent) => {
+  const handleSubmitNewCandidate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName || !district) return;
 
@@ -151,7 +154,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
     });
 
     const newCand: Candidate = {
-      id: generatedDocId || `candidato-${Date.now()}`,
+      id: createRecordId(currentTenant.tenantId, generatedDocId || 'candidato'),
       tenantId: currentTenant.tenantId,
       fullName,
       district,
@@ -171,7 +174,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
       updatedAt: new Date().toISOString()
     };
 
-    onAddCandidate(newCand);
+    await onAddCandidate(newCand);
     setShowModal(false);
     setFullName('');
   };
@@ -409,7 +412,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
               </span>
             </div>
 
-            <form onSubmit={handleSubmitNewCandidate} className="space-y-4 text-xs">
+            <form onSubmit={event => submit(event, handleSubmitNewCandidate)} className="space-y-4 text-xs"><FormSaveStatus saving={saving} error={saveError} /><fieldset disabled={saving} className="contents">
               
               {/* Nombre Completo */}
               <div>
@@ -584,7 +587,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                 </div>
               </div>
 
-            </form>
+            </fieldset></form>
           </div>
         </div>
       )}

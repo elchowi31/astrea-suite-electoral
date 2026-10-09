@@ -13,7 +13,10 @@ export const SynapticNeuralBackground: React.FC<SynapticNeuralBackgroundProps> =
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    let animationFrameId: number;
+    let animationFrameId = 0;
+    const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+    let reducedMotion = motionPreference.matches;
     let width = (canvas.width = window.innerWidth);
     let height = (canvas.height = window.innerHeight);
 
@@ -22,6 +25,7 @@ export const SynapticNeuralBackground: React.FC<SynapticNeuralBackgroundProps> =
       width = canvas.width = window.innerWidth;
       height = canvas.height = window.innerHeight;
       initNodes();
+      restart();
     };
     window.addEventListener('resize', handleResize);
 
@@ -72,7 +76,6 @@ export const SynapticNeuralBackground: React.FC<SynapticNeuralBackgroundProps> =
     let nodes: Node[] = [];
     let pulses: Pulse[] = [];
 
-    const nodeCount = Math.min(Math.floor((width * height) / 14000), 75);
 
     const colors = [
       { base: '#22d3ee', glow: 'rgba(34, 211, 238, 0.8)' },   // Cyan electrical
@@ -85,6 +88,7 @@ export const SynapticNeuralBackground: React.FC<SynapticNeuralBackgroundProps> =
     function initNodes() {
       nodes = [];
       pulses = [];
+      const nodeCount = Math.min(Math.floor((width * height) / 14000), 75);
       for (let i = 0; i < nodeCount; i++) {
         const x = Math.random() * width;
         const y = Math.random() * height;
@@ -113,7 +117,7 @@ export const SynapticNeuralBackground: React.FC<SynapticNeuralBackgroundProps> =
     let time = 0;
 
     const render = () => {
-      time += 0.015;
+      if (!reducedMotion) time += 0.015;
       ctx.clearRect(0, 0, width, height);
 
       // 1. Hypnotic Synaptic Waves / Alpha-Theta Brain Rhythm Gradient
@@ -144,20 +148,22 @@ export const SynapticNeuralBackground: React.FC<SynapticNeuralBackgroundProps> =
         const n = nodes[i];
 
         // Smooth sinusoidal drift
-        n.pulsePhase += n.pulseSpeed;
-        n.x += n.vx + Math.sin(time + i) * 0.15;
-        n.y += n.vy + Math.cos(time + i) * 0.15;
+        if (!reducedMotion) {
+          n.pulsePhase += n.pulseSpeed;
+          n.x += n.vx + Math.sin(time + i) * 0.15;
+          n.y += n.vy + Math.cos(time + i) * 0.15;
+        }
 
         // Bounce on boundaries
         if (n.x < 0 || n.x > width) n.vx *= -1;
         if (n.y < 0 || n.y > height) n.vy *= -1;
 
         // Mouse magnetic pulse interaction
-        if (mouse.active) {
+        if (interactive && finePointer.matches && mouse.active && !reducedMotion) {
           const dx = mouse.x - n.x;
           const dy = mouse.y - n.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < mouse.radius) {
+          if (dist > 0 && dist < mouse.radius) {
             const force = (1 - dist / mouse.radius) * 0.8;
             n.x -= (dx / dist) * force * 2;
             n.y -= (dy / dist) * force * 2;
@@ -174,7 +180,7 @@ export const SynapticNeuralBackground: React.FC<SynapticNeuralBackgroundProps> =
 
           if (dist < maxDist) {
             const alpha = Math.pow(1 - dist / maxDist, 1.6) * 0.45;
-            
+
             // Draw axon line with subtle gradient
             ctx.beginPath();
             ctx.moveTo(n.x, n.y);
@@ -184,7 +190,7 @@ export const SynapticNeuralBackground: React.FC<SynapticNeuralBackgroundProps> =
             ctx.stroke();
 
             // Randomly trigger action potential pulses along axons
-            if (Math.random() < 0.0018 && pulses.length < 24) {
+            if (!reducedMotion && Math.random() < 0.0018 && pulses.length < 24) {
               pulses.push({
                 fromX: n.x,
                 fromY: n.y,
@@ -252,9 +258,18 @@ export const SynapticNeuralBackground: React.FC<SynapticNeuralBackgroundProps> =
         ctx.shadowBlur = 0; // reset
       }
 
-      animationFrameId = requestAnimationFrame(render);
+      if (!reducedMotion && !document.hidden) animationFrameId = requestAnimationFrame(render);
     };
 
+    const restart = () => {
+      cancelAnimationFrame(animationFrameId);
+      reducedMotion = motionPreference.matches;
+      mouse.active = false;
+      pulses = [];
+      if (!document.hidden) render();
+    };
+    motionPreference.addEventListener('change', restart);
+    document.addEventListener('visibilitychange', restart);
     render();
 
     return () => {
@@ -264,13 +279,16 @@ export const SynapticNeuralBackground: React.FC<SynapticNeuralBackgroundProps> =
         window.removeEventListener('mouseleave', handleMouseLeave);
       }
       cancelAnimationFrame(animationFrameId);
+      motionPreference.removeEventListener('change', restart);
+      document.removeEventListener('visibilitychange', restart);
     };
   }, [interactive]);
 
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 pointer-events-none -z-20 w-full h-full opacity-85 transition-opacity duration-1000"
+      aria-hidden="true"
+      className="fixed inset-0 pointer-events-none -z-20 w-full h-full opacity-85"
     />
   );
 };

@@ -1,6 +1,5 @@
 import {
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signInWithPopup,
   sendPasswordResetEmail,
   GoogleAuthProvider,
@@ -8,9 +7,11 @@ import {
   onAuthStateChanged,
   User as FirebaseUser
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { UserProfile } from '../types';
+import { accountError, createPersonalOrganization } from './userProvisioning';
+import { isPlatformAdminClaims } from './accessPolicy';
 
 // Real Firebase Auth Provider
 const googleProvider = new GoogleAuthProvider();
@@ -49,7 +50,7 @@ export const sendPasswordReset = async (email: string): Promise<void> => {
 export async function logSessionToFirestore(user: UserProfile, method: string = 'email_password'): Promise<void> {
   try {
     const timestamp = new Date().toISOString();
-    
+
     // 1. Update user document in Firestore /usuarios/{uid}
     const userRef = doc(db, 'usuarios', user.uid);
     await setDoc(userRef, { lastLoginAt: timestamp }, { merge: true });
@@ -92,67 +93,21 @@ export async function loginWithEmailPassword(
     if (!pinOrPassword || pinOrPassword.length < 6) throw new Error('La contraseña debe tener al menos 6 caracteres.');
     const cred = await signInWithEmailAndPassword(auth, cleanEmail, pinOrPassword);
     const fbUser = cred.user;
-
-    const isAlcalde = cleanEmail.includes('alcalde');
-    const isGobernador = cleanEmail.includes('gobernador');
-    const isConcejal = cleanEmail.includes('concejal');
-    const isTestigo = cleanEmail.includes('testigo');
-
-    let defaultRole: any = 'Consulta';
-    if (isAlcalde) defaultRole = 'Alcalde';
-    else if (isGobernador) defaultRole = 'Gobernador';
-    else if (isConcejal) defaultRole = 'Concejal';
-    else if (isTestigo) defaultRole = 'Testigo';
-
-    const emailAlias = cleanEmail.split('@')[0].toLowerCase();
-    const derivedName = emailAlias === 'expcal'
-      ? 'Wilson José Arias'
-      : emailAlias
-        .replace(/(alcalde|gobernador|concejal|diputado|astrea|cesar)/g, ' ')
-        .replace(/[._-]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .replace(/\b\w/g, l => l.toUpperCase()) || 'Perfil por completar';
-
-    let profile: UserProfile = {
-      uid: fbUser.uid,
-      email: cleanEmail,
-      displayName: fbUser.displayName || derivedName || 'Usuario Astrea Suite',
-      prefix: 'Dr.',
-      role: defaultRole,
-      electoralLevel: defaultRole === 'Gobernador' ? 'Gobernación' : defaultRole === 'Concejal' ? 'Concejo Municipal' : 'Alcaldía',
-      tenantId: 'tenant-astrea-2026',
-      municipality: 'Astrea',
-      department: 'Cesar',
-      party: 'Coalición 2026',
-      active: true,
-      createdAt: new Date().toISOString()
-    };
-
-    try {
-      const docSnap = await getDoc(doc(db, 'usuarios', fbUser.uid));
-      if (docSnap.exists()) {
-        profile = { uid: fbUser.uid, ...docSnap.data() } as UserProfile;
-      } else {
-        await setDoc(doc(db, 'usuarios', fbUser.uid), profile, { merge: true });
-      }
-    } catch (fsErr) {
-      console.warn('Advertencia al consultar/escribir perfil en Firestore:', fsErr);
-      // Even if Firestore read/write throws permission-denied due to propagation delay or rules,
-      // the Firebase Auth user is authentic and we provide full session profile to prevent blocking the user
+    const docSnap = await getDoc(doc(db, 'usuarios', fbUser.uid));
+    if (!docSnap.exists()) {
+      await signOut(auth);
+      throw new Error('La cuenta existe, pero todavía no tiene un perfil autorizado para esta plataforma.');
     }
-
-    if (profile.active === false) {
+    const claims = await fbUser.getIdTokenResult();
+    const profile = { ...docSnap.data(), uid: fbUser.uid } as UserProfile;
+    profile.role = isPlatformAdminClaims(claims.claims) ? 'AdminGlobal' : profile.role === 'AdminGlobal' ? 'Consulta' : profile.role;
+    if (!isPlatformAdminClaims(claims.claims) && (profile.active !== true || profile.accessVersion !== 2)) {
       await signOut(auth);
       throw new Error('Este acceso se encuentra inactivo. Contacte al administrador de su organización.');
     }
 
-    // Record session and write user to Firestore non-blockingly
-    try {
-      await logSessionToFirestore(profile, 'correo_password');
-    } catch (e) {
-      console.warn('No se pudo registrar la sesión en auditoría:', e);
-    }
+    // Record session and write user to Firestore
+    await logSessionToFirestore(profile, 'correo_password');
 
     return {
       success: true,
@@ -161,6 +116,12 @@ export async function loginWithEmailPassword(
     };
   } catch (error: any) {
     console.error('Error in loginWithEmailPassword:', error);
+    if (error?.code === 'permission-denied') {
+      return {
+        success: false,
+        error: 'Firebase aceptó las credenciales, pero no permitió leer el perfil de la plataforma. Revise la base de datos configurada y los permisos del perfil; no necesita cambiar la contraseña.'
+      };
+    }
     return {
       success: false,
       error: error?.message || 'Error al iniciar sesión en Firebase'
@@ -176,84 +137,38 @@ export async function registerWithEmailPassword(
   password?: string
 ): Promise<AuthResult> {
   try {
-    const cleanEmail = profileData.email.trim().toLowerCase();
-    if (!password || password.length < 8) throw new Error('Use una contraseña de al menos 8 caracteres.');
-    if (!profileData.tenantId) throw new Error('No se identificó la organización. Solicite un enlace de invitación válido.');
-    const cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-    const fbUser = cred.user;
-
-    const newUser: UserProfile = {
-      ...profileData,
-      fullName: profileData.fullName || profileData.displayName,
-      uid: fbUser.uid,
-      email: cleanEmail,
-      requestedRole: profileData.role,
-      role: 'Consulta',
-      active: true,
-      createdAt: new Date().toISOString()
-    };
-
-    // Create the minimum-privilege profile before recording the session.
-    await setDoc(doc(db, 'usuarios', fbUser.uid), newUser);
-    await logSessionToFirestore(newUser, 'registro_plataforma');
-
-    return {
-      success: true,
-      user: newUser,
-      firebaseUser: fbUser
-    };
-  } catch (error: any) {
-    console.error('Error in registerWithEmailPassword:', error);
-    if (error?.code === 'auth/email-already-in-use') {
-      return {
-        success: false,
-        error: 'Este correo ya tiene una cuenta en Firebase. Inicie sesión o use la opción de recuperación de contraseña.'
-      };
-    }
-    return {
-      success: false,
-      error: error?.message || 'Error al registrar usuario en Firebase'
-    };
-  }
+    const user = await createPersonalOrganization(profileData, password || '');
+    await logSessionToFirestore(user, 'registro_correo');
+    return { success: true, user, firebaseUser: auth.currentUser! };
+  } catch (error) { return { success: false, error: accountError(error) }; }
 }
 
 /**
  * Sign in with Google Auth Popup
  */
-export async function loginWithGoogle(currentTenantId: string = 'tenant-astrea-2026'): Promise<AuthResult> {
+export async function loginWithGoogle(_currentTenantId: string = 'tenant-astrea-2026'): Promise<AuthResult> {
   try {
     const cred = await signInWithPopup(auth, googleProvider);
     const fbUser = cred.user;
-
-    const email = fbUser.email || '';
-    const displayName = fbUser.displayName || 'Usuario Google';
-    const photoUrl = fbUser.photoURL || undefined;
 
     // Check if user exists in Firestore
     const userRef = doc(db, 'usuarios', fbUser.uid);
     const snap = await getDoc(userRef);
 
-    let profile: UserProfile;
-    if (snap.exists()) {
-      profile = snap.data() as UserProfile;
-    } else {
-      profile = {
-        uid: fbUser.uid,
-        email,
-        displayName,
-        prefix: 'Dr.',
-        role: 'Consulta',
-        tenantId: currentTenantId,
-        municipality: 'Astrea',
-        department: 'Cesar',
-        party: 'Movimiento Departamental 2026',
-        avatarUrl: photoUrl,
-        createdAt: new Date().toISOString()
+    if (!snap.exists()) {
+      await signOut(auth);
+      return {
+        success: false,
+        error: 'La cuenta de Google no tiene un perfil autorizado. Solicite una invitación a su administrador.'
       };
     }
 
-    if (!snap.exists()) {
-      await setDoc(userRef, profile);
+    const claims = await fbUser.getIdTokenResult();
+    const profile = { ...snap.data(), uid: fbUser.uid } as UserProfile;
+    profile.role = isPlatformAdminClaims(claims.claims) ? 'AdminGlobal' : profile.role === 'AdminGlobal' ? 'Consulta' : profile.role;
+    if (!isPlatformAdminClaims(claims.claims) && (profile.active !== true || profile.accessVersion !== 2)) {
+      await signOut(auth);
+      return { success: false, error: 'Este acceso se encuentra inactivo. Contacte al administrador de su organización.' };
     }
     await logSessionToFirestore(profile, 'google_oauth');
 
@@ -272,23 +187,32 @@ export async function loginWithGoogle(currentTenantId: string = 'tenant-astrea-2
 }
 
 export function observeAuthenticatedProfile(callback: (profile: UserProfile | null) => void): () => void {
-  return onAuthStateChanged(auth, async (firebaseUser) => {
+  let version = 0;
+  let unsubscribeProfile: (() => void) | undefined;
+  const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+    const observedVersion = ++version;
+    unsubscribeProfile?.();
+    unsubscribeProfile = undefined;
     if (!firebaseUser) {
       callback(null);
       return;
     }
     try {
-      const snapshot = await getDoc(doc(db, 'usuarios', firebaseUser.uid));
-      if (!snapshot.exists()) {
-        callback(null);
-        return;
-      }
-      const profile = { uid: firebaseUser.uid, ...snapshot.data() } as UserProfile;
-      callback(profile.active === false ? null : profile);
+      const token = await firebaseUser.getIdTokenResult();
+      if (version !== observedVersion) return;
+      unsubscribeProfile = onSnapshot(doc(db, 'usuarios', firebaseUser.uid), { includeMetadataChanges: true }, snapshot => {
+        if (version !== observedVersion) return;
+        if (snapshot.metadata.hasPendingWrites) return;
+        if (!snapshot.exists()) { callback(null); return; }
+        const profile = { ...snapshot.data(), uid: firebaseUser.uid } as UserProfile;
+        profile.role = isPlatformAdminClaims(token.claims) ? 'AdminGlobal' : profile.role === 'AdminGlobal' ? 'Consulta' : profile.role;
+        callback(isPlatformAdminClaims(token.claims) || (profile.active === true && profile.accessVersion === 2) ? profile : null);
+      }, () => { if (version === observedVersion) callback(null); });
     } catch {
-      callback(null);
+      if (version === observedVersion) callback(null);
     }
   });
+  return () => { ++version; unsubscribeProfile?.(); unsubscribeAuth(); };
 }
 
 /**

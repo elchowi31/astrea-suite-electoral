@@ -1,123 +1,235 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions for security and tenant isolation
-    function isAuthenticated() {
-      return request.auth != null;
+    function signedIn() {
+      return request.auth != null && request.auth.token.get('email', '') != ''
+        && request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'anonymous';
     }
 
-    // Reglas para Organizaciones / Tenants
-    match /organizaciones/{tenantId} {
-      allow read, write: if true;
+    function profileExists() {
+      return signedIn() && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
     }
 
-    // Reglas para Usuarios y Perfiles Políticos
+    function me() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function platformAdmin() {
+      // `admin` is an optional custom claim. Access it with get() so a normal
+      // Firebase user without that claim is evaluated as false instead of
+      // producing a rules error that denies an otherwise valid request.
+      return signedIn() && (request.auth.token.get('admin', false) == true
+        || (request.auth.token.get('email', '') == 'expcal@expcal.net'
+          && request.auth.token.get('email_verified', false) == true));
+    }
+
+    function sameTenant(tenantId) {
+      return profileExists()
+        && me().get('active', false) == true
+        && me().get('accessVersion', 0) == 2
+        && me().get('tenantId', '') == tenantId
+        && exists(/databases/$(database)/documents/organizaciones/$(tenantId))
+        && get(/databases/$(database)/documents/organizaciones/$(tenantId)).data.active == true;
+    }
+
+    function manager() {
+      return profileExists() && me().get('role', 'Consulta') in ['AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'Concejal', 'JefePolitico'];
+    }
+
+    function operator() {
+      return profileExists() && teamRole(me().get('role', ''));
+    }
+
+    function financialManager() {
+      return profileExists() && me().get('role', 'Consulta') in ['AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'JefePolitico'];
+    }
+
+    function roleRank(role) {
+      return role == 'AdminTenant' ? 85 : role == 'Gobernador' ? 70
+        : role == 'Diputado' ? 60 : role == 'Alcalde' ? 50
+        : role == 'Concejal' ? 40 : role == 'JefePolitico' ? 35
+        : role == 'Supervisor' ? 30 : role in ['Operador', 'LiderVeredal'] ? 20 : 10;
+    }
+
+    function teamRole(role) {
+      return role in ['AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'Concejal', 'JefePolitico', 'Supervisor', 'Operador', 'LiderVeredal', 'Consulta', 'Invitado'];
+    }
+
+    function canProvision(data) {
+      return teamRole(data.role) && (platformAdmin() || (sameTenant(data.tenantId)
+        && manager() && roleRank(data.role) <= roleRank(me().role)));
+    }
+
+    function ownOrganizationBootstrap(data, userId) {
+      let tenant = getAfter(/databases/$(database)/documents/organizaciones/$(data.tenantId)).data;
+      return signedIn() && request.auth.uid == userId
+        && data.email == request.auth.token.email
+        && data.tenantId == 'org-' + userId && data.role == 'AdminTenant'
+        && data.active == true && tenant.ownerUid == userId
+        && data.accessVersion == 2
+        && tenant.tenantId == data.tenantId && tenant.active == true;
+    }
+
+    function canReadTenant(tenantId) {
+      return platformAdmin() || sameTenant(tenantId);
+    }
+
+    function canOperateTenant(tenantId) {
+      return platformAdmin() || (sameTenant(tenantId) && operator());
+    }
+
+    function canManageTenant(tenantId) {
+      return platformAdmin() || (sameTenant(tenantId) && manager());
+    }
+
+    function immutableTenant() {
+      return request.resource.data.tenantId == resource.data.tenantId;
+    }
+
     match /usuarios/{userId} {
-      allow read, write: if true;
+      allow create: if request.resource.data.uid == userId
+        && request.resource.data.email is string
+        && request.resource.data.displayName is string
+        && request.resource.data.tenantId is string
+        && request.resource.data.accessVersion == 2
+        && (ownOrganizationBootstrap(request.resource.data, userId)
+          || canProvision(request.resource.data));
+      allow read: if signedIn() && (
+        request.auth.uid == userId
+        || platformAdmin()
+        || (manager() && sameTenant(resource.data.tenantId))
+      );
+      allow update: if platformAdmin()
+        || (request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'prefix', 'phone', 'avatarUrl', 'lastLoginAt', 'updatedAt', 'updatedBy']))
+        || (canProvision(request.resource.data)
+          && sameTenant(resource.data.tenantId)
+          && request.resource.data.tenantId == resource.data.tenantId
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && resource.data.get('uid', userId) != request.auth.uid
+          && !(resource.data.role == 'AdminGlobal')
+          && roleRank(resource.data.role) <= roleRank(me().role));
+      allow delete: if platformAdmin();
     }
 
-    // Reglas para Colección de Demostración Ficticia Aislada
-    match /demo/{demoId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Sesiones y Auditoría
     match /sesiones_usuarios/{sessionId} {
-      allow read, write: if true;
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && sameTenant(request.resource.data.tenantId);
+      allow read: if platformAdmin() || (manager() && sameTenant(resource.data.tenantId));
+      allow update, delete: if false;
     }
 
-    match /auditoria/{auditId} {
-      allow read, write: if true;
+    match /auditoria/{eventId} {
+      allow create: if signedIn()
+        && request.resource.data.actorId == request.auth.uid
+        && (platformAdmin() || sameTenant(request.resource.data.tenantId));
+      allow read: if platformAdmin() || (manager() && sameTenant(resource.data.tenantId));
+      allow update, delete: if false;
     }
 
-    match /auditoria_electoral/{auditId} {
-      allow read, write: if true;
+    match /organizaciones/{tenantId} {
+      allow read: if platformAdmin() || sameTenant(resource.data.tenantId);
+      allow create: if platformAdmin() || (signedIn() && !profileExists()
+        && tenantId == 'org-' + request.auth.uid
+        && request.resource.data.tenantId == tenantId
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.active == true && request.resource.data.plan == 'Gratuito'
+        && getAfter(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.tenantId == tenantId
+        && getAfter(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'AdminTenant');
+      allow update: if platformAdmin() || (sameTenant(tenantId) && me().role == 'AdminTenant'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'logoUrl', 'primaryColor', 'secondaryColor', 'campaignDate', 'budgetCap', 'updatedAt', 'updatedBy']));
+      allow delete: if platformAdmin();
     }
 
-    match /eventos_workspace/{eventId} {
-      allow read, write: if true;
+    match /candidatos/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if canOperateTenant(request.resource.data.tenantId);
+      allow update: if canOperateTenant(resource.data.tenantId) && immutableTenant();
+      allow delete: if canManageTenant(resource.data.tenantId);
     }
 
-    // Reglas para Candidatos
-    match /candidatos/{candidateId} {
-      allow read, write: if true;
+    match /distritos/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if canManageTenant(request.resource.data.tenantId);
+      allow update: if canManageTenant(resource.data.tenantId) && immutableTenant();
+      allow delete: if canManageTenant(resource.data.tenantId);
     }
 
-    // Reglas para Gastos Electorales
-    match /gastos/{expenseId} {
-      allow read, write: if true;
+    match /lideres/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if canOperateTenant(request.resource.data.tenantId);
+      allow update: if canOperateTenant(resource.data.tenantId) && immutableTenant();
+      allow delete: if canManageTenant(resource.data.tenantId);
     }
 
-    // Reglas para Aportes y Donantes
-    match /aportes/{aporteId} {
-      allow read, write: if true;
+    match /votantes_rasos/{id} {
+      allow read: if platformAdmin()
+        || (sameTenant(resource.data.tenantId) && resource.data.get('createdBy', '') == request.auth.uid)
+        || (sameTenant(resource.data.tenantId) && manager() && me().role != 'Concejal')
+        || (sameTenant(resource.data.tenantId) && me().role == 'Concejal' && me().get('assignedCandidateId', '') != '' && me().assignedCandidateId == resource.data.candidateId)
+        || (sameTenant(resource.data.tenantId) && operator() && me().get('assignedLeaderId', '') != '' && me().assignedLeaderId == resource.data.leaderId);
+      allow create: if canOperateTenant(request.resource.data.tenantId)
+        && request.resource.data.consentGiven == true
+        && request.resource.data.documentNumber is string
+        && request.resource.data.documentNumber.size() > 0
+        && request.resource.data.createdBy == request.auth.uid
+        && (platformAdmin() || request.resource.data.createdBy == request.auth.uid || (manager() && me().role != 'Concejal')
+          || (me().role == 'Concejal' && me().get('assignedCandidateId', '') != '' && me().assignedCandidateId == request.resource.data.candidateId)
+          || (me().get('assignedLeaderId', '') != '' && me().assignedLeaderId == request.resource.data.leaderId));
+      allow update: if canOperateTenant(resource.data.tenantId)
+        && immutableTenant()
+        && request.resource.data.consentGiven == true
+        && request.resource.data.get('createdBy', '') == resource.data.get('createdBy', '')
+        && (platformAdmin() || resource.data.get('createdBy', '') == request.auth.uid || (manager() && me().role != 'Concejal')
+          || (me().role == 'Concejal' && me().get('assignedCandidateId', '') != '' && me().assignedCandidateId == resource.data.candidateId && me().assignedCandidateId == request.resource.data.candidateId)
+          || (me().get('assignedLeaderId', '') != '' && me().assignedLeaderId == resource.data.leaderId && me().assignedLeaderId == request.resource.data.leaderId));
+      allow delete: if canManageTenant(resource.data.tenantId);
     }
 
-    // Reglas para Líderes Territoriales
-    match /lideres/{leaderId} {
-      allow read, write: if true;
+    match /gastos/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if canOperateTenant(request.resource.data.tenantId);
+      allow update: if canOperateTenant(resource.data.tenantId) && immutableTenant();
+      allow delete: if platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager());
     }
 
-    // Reglas para Vehículos de Transporte
-    match /vehiculos/{vehicleId} {
-      allow read, write: if true;
+    match /aportes/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if canOperateTenant(request.resource.data.tenantId);
+      allow update: if canOperateTenant(resource.data.tenantId) && immutableTenant();
+      allow delete: if platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager());
     }
 
-    // Reglas para Propuestas Programáticas
-    match /propuestas/{propuestaId} {
-      allow read, write: if true;
+    // Datos 100% sintéticos para presentaciones. Se conservan aislados de las
+    // colecciones reales y pueden retirarse eliminando la colección `demo`.
+    match /demo/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if sameTenant(request.resource.data.tenantId)
+        && request.resource.data.isSynthetic == true
+        && request.resource.data.kind == 'presentation';
+      allow update: if canManageTenant(resource.data.tenantId)
+        && immutableTenant()
+        && request.resource.data.isSynthetic == true;
+      allow delete: if canManageTenant(resource.data.tenantId);
     }
 
-    // Reglas para Distritos Electorales
-    match /distritos/{distritoId} {
-      allow read, write: if true;
+    match /{collectionName}/{id} {
+      allow read: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace', 'simulaciones', 'fuentes_estadisticas', 'equipo_campana']
+        && canReadTenant(resource.data.tenantId);
+      allow create: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace', 'simulaciones', 'fuentes_estadisticas', 'equipo_campana']
+        && canOperateTenant(request.resource.data.tenantId);
+      allow update: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace', 'simulaciones', 'fuentes_estadisticas', 'equipo_campana']
+        && canOperateTenant(resource.data.tenantId)
+        && immutableTenant();
+      allow delete: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace', 'simulaciones', 'fuentes_estadisticas', 'equipo_campana']
+        && canOperateTenant(resource.data.tenantId);
     }
 
-    // Reglas para Archivos de Google Drive
-    match /archivos_drive/{fileId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Análisis de IA
-    match /analisis_ia/{analysisId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Votantes Rasos (Base de la Pirámide)
-    match /votantes_rasos/{voterId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Comités y Coordinaciones de Campaña
-    match /comites_coordinaciones/{coordinationId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Testigos Electorales Día D
-    match /testigos_electorales/{witnessId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Auditoría de Actas E-14
-    match /actas_e14/{auditId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Incidencias y Denuncias Electorales
-    match /incidencias_electorales/{incidentId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Eventos y Agenda de Campaña
-    match /eventos_agenda/{eventId} {
-      allow read, write: if true;
-    }
-
-    // Fallback general seguro para todas las subcolecciones
+    // Preserve the already published, verified owner access during migration.
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if platformAdmin();
     }
   }
 }
-

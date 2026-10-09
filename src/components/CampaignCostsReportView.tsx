@@ -1,3 +1,5 @@
+import { createRecordId } from '../lib/recordIds';
+import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
 import React, { useState, useMemo } from 'react';
 import {
   Tenant,
@@ -57,9 +59,9 @@ interface CampaignCostsReportViewProps {
   leaders?: Leader[];
   vehicles?: TransportVehicle[];
   donorContributions?: DonorContribution[];
-  onAddExpense: (expense: CampaignExpense) => void;
-  onUpdateExpense?: (expense: CampaignExpense) => void;
-  onDeleteExpense?: (expenseId: string) => void;
+  onAddExpense: (expense: CampaignExpense) => Promise<void>;
+  onUpdateExpense?: (expense: CampaignExpense) => Promise<void>;
+  onDeleteExpense?: (expenseId: string) => Promise<void>;
   onNavigateTab?: (tab: any) => void;
 }
 
@@ -76,6 +78,7 @@ export const CampaignCostsReportView: React.FC<CampaignCostsReportViewProps> = (
   onNavigateTab
 }) => {
   // Navigation & Sub-views
+  const { saving, saveError, submit, runSave } = useFirestoreForm();
   const [activeSubTab, setActiveSubTab] = useState<'gastos_list' | 'leaders_needs' | 'projection_planning'>('gastos_list');
 
   // Filters State
@@ -197,13 +200,13 @@ export const CampaignCostsReportView: React.FC<CampaignCostsReportViewProps> = (
     setShowExpenseModal(true);
   };
 
-  const handleSaveExpense = (e: React.FormEvent) => {
+  const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     const calculatedAmount = (formQuantity && formUnitCost) ? (formQuantity * formUnitCost) : formAmount;
     if (!formDescription.trim() || !Number.isFinite(calculatedAmount) || calculatedAmount <= 0) return;
     
     const expenseItem: CampaignExpense = {
-      id: editingExpense ? editingExpense.id : `gasto-${Date.now()}`,
+      id: editingExpense ? editingExpense.id : createRecordId(currentTenant.tenantId, 'gasto'),
       tenantId: currentTenant.tenantId,
       phase: formPhase,
       rubro: formRubro,
@@ -223,18 +226,18 @@ export const CampaignCostsReportView: React.FC<CampaignCostsReportViewProps> = (
     };
 
     if (editingExpense && onUpdateExpense) {
-      onUpdateExpense(expenseItem);
+      await onUpdateExpense(expenseItem);
     } else {
-      onAddExpense(expenseItem);
+      await onAddExpense(expenseItem);
     }
 
     setShowExpenseModal(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('¿Confirmas que deseas eliminar este registro de gasto de la campaña?')) {
       if (onDeleteExpense) {
-        onDeleteExpense(id);
+        await onDeleteExpense(id);
       }
     }
   };
@@ -305,6 +308,7 @@ export const CampaignCostsReportView: React.FC<CampaignCostsReportViewProps> = (
 
   return (
     <div className="space-y-6">
+      <FormSaveStatus saving={saving} error={saveError} />
       
       {/* AUTHOR HEADER */}
       <AuthorHeader 
@@ -546,7 +550,7 @@ export const CampaignCostsReportView: React.FC<CampaignCostsReportViewProps> = (
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => handleDelete(exp.id)}
+                            onClick={() => void runSave(() => handleDelete(exp.id))}
                             className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition"
                             title="Eliminar gasto"
                           >
@@ -716,7 +720,7 @@ export const CampaignCostsReportView: React.FC<CampaignCostsReportViewProps> = (
               </div>
             </div>
 
-            <form onSubmit={handleSaveExpense} className="space-y-4">
+            <form onSubmit={event => submit(event, handleSaveExpense)} className="space-y-4"><FormSaveStatus saving={saving} error={saveError} /><fieldset disabled={saving} className="contents">
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -901,7 +905,7 @@ export const CampaignCostsReportView: React.FC<CampaignCostsReportViewProps> = (
                 </button>
               </div>
 
-            </form>
+            </fieldset></form>
 
           </div>
         </div>

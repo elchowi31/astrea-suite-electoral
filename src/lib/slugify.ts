@@ -25,7 +25,7 @@ export function generarIdDocumentoLegible(
     .join('-');
 
   const sufijoContexto = partesContexto ? `-${partesContexto}` : '';
-  const hashAleatorio = Math.random().toString(36).substring(2, 6);
+  const hashAleatorio = crypto.randomUUID();
 
   return `${tipo}-${baseLimpia}${sufijoContexto}-${hashAleatorio}`;
 }

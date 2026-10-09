@@ -1,3 +1,4 @@
+import { createRecordId } from '../lib/recordIds';
 import React, { useState, useEffect } from 'react';
 import { Tenant, TransportVehicle, UserProfile, UserRole } from '../types';
 import { getTerritorialScope, filterVehiclesByScope } from '../lib/permissions';
@@ -139,7 +140,7 @@ export const TransportView: React.FC<TransportViewProps> = ({
     }
 
     const vehicle: TransportVehicle = {
-      id: generatedDocId || `veh-${Date.now()}`,
+      id: createRecordId(currentTenant.tenantId, generatedDocId || 'vehiculo'),
       tenantId: currentTenant.tenantId,
       vehicleType,
       licensePlate: licensePlate.trim().toUpperCase(),

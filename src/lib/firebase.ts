@@ -1,7 +1,8 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { connectAuthEmulator, getAuth } from 'firebase/auth';
 import {
   getFirestore,
+  connectFirestoreEmulator,
   doc,
   getDoc,
   getDocs,
@@ -11,6 +12,7 @@ import {
   onSnapshot,
   getDocFromServer,
   writeBatch,
+  runTransaction,
   query,
   where
 } from 'firebase/firestore';
@@ -27,16 +29,44 @@ import {
   TransportVehicle,
   DonorContribution
 } from '../types';
+import type { CampaignCoordination, CampaignTask } from '../types';
 import { buildDemoBundle, type DemoBundle } from '../data/demoSeed';
+import { omitUndefined } from './serialization';
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const emulatorMode = import.meta.env?.VITE_FIREBASE_EMULATORS === 'true';
+export const app = getApps().find(item => item.name === '[DEFAULT]') || initializeApp(emulatorMode ? { ...firebaseConfig, projectId: 'demo-astrea' } : firebaseConfig);
 
 // Use firestoreDatabaseId if specified, or default database
-export const db = (firebaseConfig as any).firestoreDatabaseId
+export const db = !emulatorMode && (firebaseConfig as any).firestoreDatabaseId
   ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
   : getFirestore(app);
 
 export const auth = getAuth(app);
+if (emulatorMode) {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9098', { disableWarnings: true });
+  connectFirestoreEmulator(db, '127.0.0.1', 8088);
+}
+
+/** Retry against the latest committee, preserving tasks saved by other members. */
+export async function saveCommitteeTask(tenantId: string, coordinationId: string, committeeId: string, task: CampaignTask): Promise<void> {
+  const actorId=auth.currentUser?.uid;
+  if (!actorId) throw new Error('Inicie sesión para guardar la tarea.');
+  const reference=doc(db,'comites_coordinaciones',coordinationId);
+  const auditId=crypto.randomUUID();
+  await runTransaction(db,async transaction=>{
+    const snapshot=await transaction.get(reference);
+    const coordination=snapshot.data() as CampaignCoordination | undefined;
+    if (!coordination || coordination.tenantId!==tenantId || !coordination.committees.some(item=>item.id===committeeId)) throw new Error('No se encontró el comité de esta organización.');
+    const committees=coordination.committees.map(committee=>{
+      if (committee.id!==committeeId) return committee;
+      const current=committee.tasks||[];
+      const tasks=current.some(item=>item.id===task.id) ? current.map(item=>item.id===task.id ? {...item,completed:task.completed} : item) : [...current,task];
+      return {...committee,tasks,tasksCount:tasks.length,completedTasksCount:tasks.filter(item=>item.completed).length};
+    });
+    transaction.update(reference,{committees,updatedBy:actorId});
+    transaction.set(doc(db,'auditoria',auditId),{id:auditId,tenantId,actorId,entity:'comites_coordinaciones',entityId:coordinationId,action:'update',createdAt:new Date().toISOString()});
+  });
+}
 
 export async function authenticatedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const user = auth.currentUser;
@@ -48,17 +78,21 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   return fetch(input, { ...init, headers });
 }
 
-async function persistEntity<T extends { tenantId: string }>(collectionName: string, entityId: string, data: T): Promise<void> {
+export async function persistEntity<T extends { tenantId: string }>(collectionName: string, entityId: string, data: T): Promise<void> {
   const actor = auth.currentUser;
+  if (!actor) throw new Error('Inicie sesión antes de guardar información.');
+  if (!data.tenantId || !entityId || entityId.includes('/')) throw new Error('El registro no tiene una organización o identificador válido.');
+  if (entityId.startsWith('demo-') && collectionName !== 'demo') throw new Error('Los registros de demostración son de solo lectura.');
   const now = new Date().toISOString();
   const batch = writeBatch(db);
   batch.set(doc(db, collectionName, entityId), {
-    ...data,
+    ...omitUndefined(data),
+    ...((data as any).createdBy || ['organizaciones','usuarios'].includes(collectionName) ? {} : { createdBy: actor.uid }),
     updatedAt: now,
     updatedBy: actor?.uid || 'unknown'
   }, { merge: true });
   if (actor) {
-    const auditId = `${now.replace(/[^0-9]/g, '')}-${actor.uid.slice(0, 8)}-${entityId.slice(0, 24)}`;
+    const auditId = crypto.randomUUID();
     batch.set(doc(db, 'auditoria', auditId), {
       id: auditId,
       tenantId: data.tenantId,
@@ -73,7 +107,7 @@ async function persistEntity<T extends { tenantId: string }>(collectionName: str
   await batch.commit();
 }
 
-async function removeEntity(collectionName: string, entityId: string, tenantId?: string): Promise<void> {
+export async function removeEntity(collectionName: string, entityId: string, tenantId?: string): Promise<void> {
   const actor = auth.currentUser;
   if (!tenantId) {
     const snapshot = await getDoc(doc(db, collectionName, entityId));
@@ -83,7 +117,7 @@ async function removeEntity(collectionName: string, entityId: string, tenantId?:
   batch.delete(doc(db, collectionName, entityId));
   if (actor && tenantId) {
     const now = new Date().toISOString();
-    const auditId = `${now.replace(/[^0-9]/g, '')}-${actor.uid.slice(0, 8)}-${entityId.slice(0, 24)}`;
+    const auditId = crypto.randomUUID();
     batch.set(doc(db, 'auditoria', auditId), { id: auditId, tenantId, actorId: actor.uid, actorEmail: actor.email || null, action: 'delete', entity: collectionName, entityId, createdAt: now });
   }
   await batch.commit();
@@ -398,7 +432,8 @@ export function subscribeToCollection<T>(
   onData: (items: T[]) => void,
   _fallbackData: T[],
   tenantId?: string,
-  additionalFilter?: { field: string; value: unknown }
+  additionalFilter?: { field: string; value: unknown },
+  globalOrganizations = false
 ): () => void {
   if (!tenantId) {
     onData([]);
@@ -406,7 +441,7 @@ export function subscribeToCollection<T>(
   }
 
   try {
-    const colRef = additionalFilter
+    const colRef = globalOrganizations && collectionName === 'organizaciones' ? collection(db, collectionName) : additionalFilter
       ? query(collection(db, collectionName), where('tenantId', '==', tenantId), where(additionalFilter.field, '==', additionalFilter.value))
       : query(collection(db, collectionName), where('tenantId', '==', tenantId));
     const unsubscribe = onSnapshot(
@@ -460,35 +495,12 @@ export async function saveAiAnalysisToFirestore(tenantId: string, analysis: { ty
 // colecciones operativas y se elimina borrando un único documento por tenant.
 export async function createDemoCollection(tenantId: string): Promise<DemoBundle> {
   const bundle = buildDemoBundle(tenantId);
-  try {
-    await persistEntity('demo', bundle.id, bundle);
-  } catch (primaryErr) {
-    console.warn('Persistencia en lote para demo tuvo advertencia, aplicando setDoc directo:', primaryErr);
-    try {
-      await setDoc(doc(db, 'demo', bundle.id), {
-        ...bundle,
-        updatedAt: new Date().toISOString(),
-        updatedBy: auth.currentUser?.uid || 'local'
-      }, { merge: true });
-    } catch (fallbackErr) {
-      console.warn('Advertencia secundaria en demo setDoc:', fallbackErr);
-    }
-  }
+  await persistEntity('demo', bundle.id, bundle);
   return bundle;
 }
 
 export async function deleteDemoCollection(tenantId: string): Promise<void> {
-  try {
-    await removeEntity('demo', `${tenantId}-presentacion`, tenantId);
-  } catch (primaryErr) {
-    console.warn('Borrado en lote de demo tuvo advertencia, aplicando deleteDoc directo:', primaryErr);
-    try {
-      await deleteDoc(doc(db, 'demo', `${tenantId}-presentacion`));
-    } catch (fallbackErr) {
-      console.warn('Advertencia secundaria al eliminar documento demo:', fallbackErr);
-      throw fallbackErr;
-    }
-  }
+  await removeEntity('demo', `${tenantId}-presentacion`, tenantId);
 }
 
 export function subscribeToDemoCollection(tenantId: string, onData: (bundle: DemoBundle | null) => void): () => void {

@@ -1,3 +1,5 @@
+import cesarStatistics from './cesarStatistics.json';
+
 export interface MunicipioData {
   nombre: string;
   subregion: string;
@@ -38,16 +40,16 @@ export const COLOMBIA_ELECTORAL_GEOGRAPHY: Record<string, DepartamentoData> = {
         metaConcejoSugerida: 1200,
         veredasYCorregimientos: [
           'Arjona (Corregimiento)',
-          'Santa Cecilia (Corregimiento)',
-          'Cascajal (Corregimiento)',
-          'La Ye (Corregimiento)',
           'San Isidro (Vereda)',
+          'La Ye (Vereda)',
+          'Santa Cecilia (Vereda)',
           'El Carmen (Vereda)',
           'San Pedro (Vereda)',
           'La Concordia (Vereda)',
           'San Carlos (Vereda)',
           'El Peligro (Vereda)',
           'El Brasil (Vereda)',
+          'Cascajal (Vereda)',
           'La Paz Rural (Vereda)'
         ],
         barriosYComunas: [
@@ -457,6 +459,18 @@ export const COLOMBIA_ELECTORAL_GEOGRAPHY: Record<string, DepartamentoData> = {
   }
 };
 
+// Census figures from the published Congress 2026 snapshot; other geographic
+// descriptions and vote targets in this legacy catalog remain unverified.
+for (const row of cesarStatistics.filter(row => row.metric === 'censo')) {
+  if (row.municipality === 'Cesar') {
+    COLOMBIA_ELECTORAL_GEOGRAPHY.Cesar.censoDepartamentalAprox = row.value;
+  } else {
+    const existing = COLOMBIA_ELECTORAL_GEOGRAPHY.Cesar.municipios[row.municipality];
+    COLOMBIA_ELECTORAL_GEOGRAPHY.Cesar.municipios[row.municipality] = existing
+      ? { ...existing, censoAproximado: row.value }
+      : { nombre: row.municipality, subregion: 'Sin clasificación verificada', censoAproximado: row.value, metaAlcaldiaSugerida: 0, metaConcejoSugerida: 0, veredasYCorregimientos: [], barriosYComunas: [], puestosVotacionPrincipales: [] };
+  }
+}
 export const DEPARTAMENTOS_COLOMBIA = Object.keys(COLOMBIA_ELECTORAL_GEOGRAPHY);
 
 export function getMunicipiosPorDepartamento(departamento: string): string[] {
@@ -636,7 +650,7 @@ export function calcularProyeccionReal2026(params: {
     ? dpto.municipios[params.municipio]
     : Object.values(dpto.municipios)[0];
 
-  const participacion = params.participacionEstimadaPct || 55.4;
+  const participacion = params.participacionEstimadaPct ?? 55.4;
   let censo = munData.censoAproximado;
   let escanos = params.curulesDisponibles || 13;
   let tipoEleccion = 'Uninominal';
@@ -674,13 +688,14 @@ export function calcularProyeccionReal2026(params: {
   const votosValidosProyectados = votantesEsperados - votosNulosYNoMarcados;
 
   // 3. Umbral Legal (3% de votos válidos según Ley 1475 de 2011)
-  const umbralLegal3Pct = Math.round(votosValidosProyectados * 0.03);
+  const umbralExacto = escanos === 1 ? 0 : params.nivel.includes('Senado') ? votosValidosProyectados * 0.03 : votosValidosProyectados / escanos * (escanos === 2 ? 0.3 : 0.5);
+  const umbralLegal3Pct = escanos === 1 ? 0 : Math.floor(umbralExacto) + 1;
 
   // 4. Cuociente Electoral
   const cuocienteElectoral = escanos > 1 ? Math.round(votosValidosProyectados / escanos) : votosValidosProyectados;
 
   // 5. Cifra Repartidora Estimada para asegurar 1 curul
-  const cifraRepartidoraEstimada = escanos > 1 ? Math.round(cuocienteElectoral * 0.62) : 0;
+  const cifraRepartidoraEstimada = 0; // Requires votes for every competing list.
 
   // 6. Meta de Victoria para cargos uninominales (Gobernación / Alcaldía)
   // En elecciones de 3-4 competidores, se proyecta ganar con el 41% al 45% de los votos válidos
@@ -705,76 +720,8 @@ export function calcularProyeccionReal2026(params: {
     metaVotoPreferente,
     escanosDisputados: escanos,
     tipoEleccion,
-    fuenteOficial: 'Registraduría Nacional del Estado Civil (RNEC) - Censo Electoral 2026 & Ley 1475 de 2011'
-  };
-}
-
-export interface RuralTerritoryItem {
-  name: string;
-  fullName: string;
-  type: 'Corregimiento' | 'Vereda';
-  municipality: string;
-  latitude?: number;
-  longitude?: number;
-}
-
-export const ASTREA_TERRITORY_COORDINATES: Record<string, { lat: number; lng: number }> = {
-  'Arjona': { lat: 9.5750, lng: -73.9180 },
-  'Santa Cecilia': { lat: 9.4890, lng: -74.0210 },
-  'Cascajal': { lat: 9.5920, lng: -73.8890 },
-  'La Ye': { lat: 9.5510, lng: -73.9420 },
-  'San Isidro': { lat: 9.5120, lng: -73.9850 },
-  'El Carmen': { lat: 9.4670, lng: -73.9550 },
-  'San Pedro': { lat: 9.5280, lng: -74.0150 },
-  'La Concordia': { lat: 9.4450, lng: -73.9900 },
-  'San Carlos': { lat: 9.5620, lng: -73.9980 },
-  'El Peligro': { lat: 9.4730, lng: -73.9310 },
-  'El Brasil': { lat: 9.5190, lng: -73.9120 },
-  'La Paz Rural': { lat: 9.5440, lng: -74.0450 }
-};
-
-export function getTerritoriosRurales(municipio: string = 'Astrea', departamento: string = 'Cesar'): {
-  corregimientos: RuralTerritoryItem[];
-  veredas: RuralTerritoryItem[];
-  todos: RuralTerritoryItem[];
-} {
-  const dpto = COLOMBIA_ELECTORAL_GEOGRAPHY[departamento] || COLOMBIA_ELECTORAL_GEOGRAPHY['Cesar'];
-  const munKey = Object.keys(dpto.municipios).find(
-    (k) => k.toLowerCase() === (municipio || 'Astrea').toLowerCase()
-  ) || 'Astrea';
-  const mun = dpto.municipios[munKey] || Object.values(dpto.municipios)[0];
-
-  const rawList = mun?.veredasYCorregimientos || [];
-  const corregimientos: RuralTerritoryItem[] = [];
-  const veredas: RuralTerritoryItem[] = [];
-
-  rawList.forEach((raw) => {
-    const isCorregimiento =
-      raw.toLowerCase().includes('corregimiento') ||
-      raw.toLowerCase().includes('resguardo') ||
-      raw.toLowerCase().includes('inspección');
-    const cleanName = raw.replace(/\s*\([^)]*\)/g, '').trim();
-    const coords = ASTREA_TERRITORY_COORDINATES[cleanName];
-
-    const item: RuralTerritoryItem = {
-      name: cleanName,
-      fullName: raw,
-      type: isCorregimiento ? 'Corregimiento' : 'Vereda',
-      municipality: mun.nombre,
-      latitude: coords?.lat,
-      longitude: coords?.lng
-    };
-
-    if (isCorregimiento) {
-      corregimientos.push(item);
-    } else {
-      veredas.push(item);
-    }
-  });
-
-  return {
-    corregimientos,
-    veredas,
-    todos: [...corregimientos, ...veredas]
+    fuenteOficial: params.departamento === 'Cesar' && !params.nivel.includes('Senado')
+      ? 'RNEC · Divipole definitiva Congreso 2026 (referencia: elección 08/03/2026; corte del censo no indicado). Participación, tasas y metas son supuestos.'
+      : 'Censo aproximado del catálogo local, sin fuente oficial verificada. Participación, tasas y metas son supuestos.'
   };
 }

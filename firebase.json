@@ -1,0 +1,21 @@
+{
+  "hosting": {
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "firestore": {
+    "database": "ai-studio-astreasuiteelect-5da3410d-4b0c-4301-8bd6-083fbb5c653b",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
