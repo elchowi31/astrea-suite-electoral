@@ -39,7 +39,7 @@ npm run dev
 
 `npm run check` valida TypeScript, pruebas de cálculo y API, arranque de API compilada y compilaciones. `npm run test:rules` ejecuta las pruebas de autorización con los emuladores de Firebase (requiere Java 21). Para la interfaz local con emuladores: `VITE_FIREBASE_EMULATORS=true`, Authentication 9098 y Firestore 8088, proyecto `demo-astrea`. Esa variable no se configura en producción.
 
-Consulte [.env.example](.env.example). `GEMINI_API_KEY` pertenece al servidor y nunca debe llevar prefijo `VITE_`. Las integraciones opcionales requieren credenciales y permisos del proveedor; los formularios y simulación no dependen de ellas.
+Consulte [.env.example](.env.example). `GEMINI_API_KEY` pertenece al servidor y nunca debe llevar prefijo `VITE_`. `GEMINI_MODEL` permite configurar el modelo; el valor inicial es [Gemini 3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash), tras comprobar que el proveedor ya no admitía 2.5 Flash para esta cuenta. Las integraciones opcionales requieren credenciales y permisos del proveedor; los formularios y simulación no dependen de ellas.
 
 ## Publicación
 

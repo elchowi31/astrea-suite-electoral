@@ -1,0 +1,30 @@
+{
+  "verifiedAt": "2026-10-09",
+  "url": "https://astrea-suite-electoral.vercel.app",
+  "integratedPullRequest": "https://github.com/elchowi31/astrea-suite-electoral/pull/1",
+  "coreCommit": "8fc52ebf9824837208857b89718e58bf73ba23bb",
+  "coreDeployment": "dpl_9qyB4XmHGHVhsfRoMUMaV3PwB95a",
+  "firestoreDatabase": "ai-studio-astreasuiteelect-5da3410d-4b0c-4301-8bd6-083fbb5c653b",
+  "ruleset": "f3914cbd-99f2-4378-b528-c5f4cd85bc88",
+  "automatedTests": {"passed": 26, "failed": 0, "skipped": 0},
+  "productionChecks": [
+    "Registration creates an owned organization and authorized profile",
+    "Creating a team account preserves the administrator session",
+    "Candidate, proposal, expense, contribution, leader, vehicle, consented voter, coordination, executive team and scenario forms persist in Firestore",
+    "Records and scenarios survive page reload",
+    "A second account retrieves shared statistics and scenarios",
+    "A saved scenario restores its source after deletion from the shared catalog",
+    "An operator creates and retrieves their own consented voter records",
+    "Committee tasks persist with completion status after reload",
+    "Mobile viewport and document width both equal 390 pixels",
+    "Two cross-organization operations are rejected by cloud rules",
+    "Public health returns 200 and unauthenticated AI returns 401"
+  ],
+  "temporaryTestData": "Isolated organizations and example.invalid accounts; removed after verification",
+  "aiModelCorrection": {
+    "reason": "Provider returned NOT_FOUND for gemini-2.5-flash with instruction to use gemini-3.8-flash",
+    "defaultModel": "gemini-3.8-flash",
+    "configurableVia": "GEMINI_MODEL",
+    "providerDocumentation": "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash"
+  }
+}

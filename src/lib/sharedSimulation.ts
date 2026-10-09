@@ -79,4 +79,3 @@ export async function deleteSharedScenario(tenantId:string,id:string):Promise<vo
   const auditId=crypto.randomUUID();batch.set(doc(db,'auditoria',auditId),{id:auditId,tenantId,actorId:auth.currentUser.uid,action:'delete',entity:'simulaciones',entityId:id,createdAt:new Date().toISOString()});
   await batch.commit();
 }
-
