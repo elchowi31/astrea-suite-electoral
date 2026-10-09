@@ -1,4 +1,6 @@
 import { createRecordId } from '../lib/recordIds';
+import { parseLocation } from '../lib/territorialMaps';
+import { LocationPicker } from './common/LocationPicker';
 import React, { useState, useEffect } from 'react';
 import { Tenant, Leader, UserProfile, UserRole } from '../types';
 import { getTerritorialScope, filterLeadersByScope } from '../lib/permissions';
@@ -135,10 +137,9 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
       setFormError('Los votos fidelizados deben estar entre cero y la meta.');
       return;
     }
-    if ((latitude && !longitude) || (!latitude && longitude)) {
-      setFormError('Para georreferenciar, complete latitud y longitud.');
-      return;
-    }
+    let location;
+    try { location = parseLocation(latitude, longitude); }
+    catch (error) { setFormError((error as Error).message); return; }
 
     const leader: Leader = {
       id: createRecordId(currentTenant.tenantId, generatedDocId || 'lider'),
@@ -156,7 +157,7 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
       email: email.trim().toLowerCase(),
       status: 'Activo',
       budgetAllocated: Math.max(0, Number(budgetAllocated || 0)),
-      ...(latitude && longitude ? { latitude: Number(latitude), longitude: Number(longitude) } : {}),
+      ...(location ? { ...location, locationCapturedAt: new Date().toISOString(), locationSource: 'Manual' as const } : {}),
     };
     setSaving(true);
     try {
@@ -585,16 +586,7 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Latitud (opcional)</label>
-                  <input type="number" min="-90" max="90" step="any" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="Ej: 9.4981" className="w-full bg-slate-800 border border-slate-700 text-slate-100 p-2.5 rounded-xl focus:outline-none font-mono" />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Longitud (opcional)</label>
-                  <input type="number" min="-180" max="180" step="any" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="Ej: -73.9785" className="w-full bg-slate-800 border border-slate-700 text-slate-100 p-2.5 rounded-xl focus:outline-none font-mono" />
-                </div>
-              </div>
+              <LocationPicker latitude={latitude} longitude={longitude} onChange={(lat, lng) => { setLatitude(lat); setLongitude(lng); }} />
 
               {formError && <p role="alert" className="rounded-xl border border-rose-800 bg-rose-950/40 p-3 text-xs text-rose-200">{formError}</p>}
 

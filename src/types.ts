@@ -281,6 +281,8 @@ export interface Leader {
   photoUrl?: string;
   latitude?: number;
   longitude?: number;
+  locationCapturedAt?: string;
+  locationSource?: 'GPS' | 'Mapa' | 'Manual';
 }
 
 export interface TransportVehicle {
@@ -299,6 +301,9 @@ export interface TransportVehicle {
   status: 'Operativo - Día D' | 'En Mantenimiento' | 'Reservado';
   latitude?: number;
   longitude?: number;
+  locationCapturedAt?: string;
+  locationSource?: 'GPS' | 'Mapa' | 'Manual';
+  plannedRoute?: import('./lib/territorialMaps').TerritorialRoute;
 }
 
 // ----------------------------------------------------
