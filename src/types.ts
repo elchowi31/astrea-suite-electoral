@@ -1,15 +1,15 @@
-export type UserRole = 
-  | 'AdminGlobal' 
+export type UserRole =
+  | 'AdminGlobal'
   | 'Alcalde'
   | 'Gobernador'
   | 'Concejal'
   | 'Diputado'
   | 'JefePolitico'
   | 'LiderVeredal'
-  | 'AdminTenant' 
-  | 'Supervisor' 
-  | 'Operador' 
-  | 'Consulta' 
+  | 'AdminTenant'
+  | 'Supervisor'
+  | 'Operador'
+  | 'Consulta'
   | 'Invitado';
 
 export interface Tenant {
@@ -18,7 +18,6 @@ export interface Tenant {
   primaryColor: string;
   secondaryColor: string;
   logoUrl?: string;
-  candidateName?: string;
   createdAt: string;
   active: boolean;
   plan?: 'Gratuito' | 'Profesional' | 'Institucional';
@@ -31,7 +30,6 @@ export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
-  fullName?: string;
   prefix?: string; // Dr., Dra., Ing., Lic., Abg., Sr., Sra.
   tenantId: string;
   role: UserRole;
@@ -51,10 +49,10 @@ export interface UserProfile {
 
 export type WorkspaceMode = 'operativo' | 'administrativo';
 
-export type ElectoralLevel = 
-  | 'Gobernación' 
-  | 'Alcaldía' 
-  | 'Asamblea / Diputación' 
+export type ElectoralLevel =
+  | 'Gobernación'
+  | 'Alcaldía'
+  | 'Asamblea / Diputación'
   | 'Concejo Municipal'
   | 'Cámara de Representantes'
   | 'Senado de la República';
@@ -128,13 +126,13 @@ export interface AiAnalysisItem {
   createdAt: string;
 }
 
-export type CampaignPhase = 
-  | 'Precampaña' 
-  | 'Campaña Oficial' 
-  | 'Día D (Electoral)' 
+export type CampaignPhase =
+  | 'Precampaña'
+  | 'Campaña Oficial'
+  | 'Día D (Electoral)'
   | 'Post-Electoral';
 
-export type FinancialRubro = 
+export type FinancialRubro =
   | 'Alimentación y Refrigerios'
   | 'Transporte y Movilización'
   | 'Combustible'
@@ -146,7 +144,7 @@ export type FinancialRubro =
   | 'Tecnología y Asesoría Jurídica'
   | 'Caja Menor e Imprevistos';
 
-export type ExpenseComponent = 
+export type ExpenseComponent =
   | 'Alimentación y Refrigerios'
   | 'Transporte y Movilización'
   | 'Combustible'
@@ -300,31 +298,6 @@ export interface TransportVehicle {
   status: 'Operativo - Día D' | 'En Mantenimiento' | 'Reservado';
   latitude?: number;
   longitude?: number;
-}
-
-export interface LiveTelemetryBeacon {
-  id: string;
-  tenantId: string;
-  userId?: string;
-  deviceId?: string;
-  driverName: string;
-  role: 'Conductor' | 'Supervisor Electoral' | 'Líder Territorial' | 'Coordinador Día D';
-  vehiclePlate?: string;
-  vehicleType?: string;
-  phone?: string;
-  assignedRoute?: string;
-  latitude: number;
-  longitude: number;
-  accuracy: number; // en metros
-  speed: number; // en km/h
-  heading?: number; // 0-360 grados
-  batteryLevel?: number; // 0-100%
-  status: 'En Movimiento' | 'Detenido en Puesto' | 'En Espera' | 'Alerta Desvío' | 'Desconectado / App Cerrada';
-  lastHeartbeat: number; // timestamp en ms
-  isScreenLocked?: boolean;
-  historyTrail?: { lat: number; lng: number; time: number }[];
-  sosAlert?: boolean;
-  sosMessage?: string;
 }
 
 // ----------------------------------------------------
@@ -481,12 +454,12 @@ export interface DhondtSimulationResult {
 // ----------------------------------------------------
 // TESTIGOS ELECTORALES & AUDITORÍA DÍA D (ACTAS E-14)
 // ----------------------------------------------------
-export type WitnessStatus = 
-  | 'Acreditado CNE' 
-  | 'Mesa Instalada' 
-  | 'En Votación' 
-  | 'Mesa Cerrada' 
-  | 'E-14 Transmitido' 
+export type WitnessStatus =
+  | 'Acreditado CNE'
+  | 'Mesa Instalada'
+  | 'En Votación'
+  | 'Mesa Cerrada'
+  | 'E-14 Transmitido'
   | 'Incidencia Reportada';
 
 export interface ElectoralWitness {
@@ -522,7 +495,7 @@ export interface E14FormAudit {
   tableNumber: number;
   totalCensusInTable: number;
   totalVotersInTable: number; // Total sufragantes
-  
+
   // Conteo de Votos
   votesOurCandidate: number;
   votesOurPartyList: number;
@@ -534,7 +507,7 @@ export interface E14FormAudit {
   votesNull: number;
   votesUnmarked: number;
   totalVotesReported: number; // Suma total
-  
+
   // Auditoría y Transmisión
   e14PhotoUrl?: string;
   hasDiscrepancy: boolean;
@@ -557,13 +530,13 @@ export interface ElectoralIncident {
   municipality: string;
   pollingStation: string;
   tableNumber?: number;
-  incidentType: 
-    | 'Impedimento a Testigo' 
-    | 'Apertura Tardía de Mesa' 
-    | 'Compra de Votos / Proselitismo' 
-    | 'Tachadura / Enmendadura en E-14' 
-    | 'Faltante de Tarjetones' 
-    | 'Alteración de Urnas' 
+  incidentType:
+    | 'Impedimento a Testigo'
+    | 'Apertura Tardía de Mesa'
+    | 'Compra de Votos / Proselitismo'
+    | 'Tachadura / Enmendadura en E-14'
+    | 'Faltante de Tarjetones'
+    | 'Alteración de Urnas'
     | 'Discrepancia en Preconteo'
     | 'Otro';
   severity: IncidentSeverity;
@@ -573,41 +546,4 @@ export interface ElectoralIncident {
   reportedAt: string;
   resolvedAt?: string;
   legalResolutionNotes?: string;
-}
-
-// ----------------------------------------------------
-// EMPRENDIMIENTOS & PROSPECTOS ELECTORALES (LÍDERES EN POTENCIA)
-// ----------------------------------------------------
-export type ProspectElectoralRole =
-  | 'Líder de Equipo en Potencia'
-  | 'Votante Comprometido'
-  | 'Punto de Encuentro / Logístico'
-  | 'Multiplicador Territorial'
-  | 'Prospecto Sin Contactar';
-
-export interface EntrepreneurProspect {
-  id: string;
-  tenantId: string;
-  wkt?: string;
-  documentId: string;
-  fullName: string;
-  locationCategory: 'Casco Urbano Astrea' | 'Corregimiento' | 'Vereda' | 'Finca' | string;
-  veredaOrBarrio?: string;
-  latitude: number;
-  longitude: number;
-  isViolenceVictim: boolean;
-  gender: 'Hombre' | 'Mujer' | 'LBTIQ+' | string;
-  economicActivity: string;
-  subActivity?: string;
-  phone: string;
-  electoralRole: ProspectElectoralRole;
-  assignedGroupId?: string;
-  assignedGroupName?: string;
-  assignedLeaderId?: string;
-  assignedLeaderName?: string;
-  conversionStatus: 'Prospecto' | 'Promovido a Líder' | 'Registrado como Votante' | 'Descartado';
-  potentialVotes: number;
-  notes?: string;
-  createdAt?: string;
-  updatedAt?: string;
 }

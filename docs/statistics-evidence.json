@@ -1,0 +1,27 @@
+{
+  "sources": [
+    {
+      "url": "https://wapp.registraduria.gov.co/electoral/2026/congreso-de-la-republica/IMG/pdf/Divipole_definitiva_%20Elecciones_Congreso_2026_GEO_CITREP_Exterior_L_V_v5.pdf",
+      "sha256": "90dbd2571cc19a9293e1ba67d1a41c8d565714d398fe20babbeb3b15e2773ba1"
+    },
+    {
+      "url": "https://www.dane.gov.co/files/censo2018/proyecciones-de-poblacion/Municipal/PPED-AreaMun-2018-2042_VP.xlsx",
+      "sha256": "1ea83594ad308becff39934a3977c102919c25740f60439be95d797396d11283"
+    }
+  ],
+  "censusPages": [
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97
+  ],
+  "stations": 300,
+  "municipalities": 25,
+  "rows": 338,
+  "astreaCensus": 17189,
+  "cesarCensus": 931353
+}

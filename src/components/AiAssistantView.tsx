@@ -67,6 +67,7 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenantName: currentTenant.name,
+          tenantId: currentTenant.tenantId,
           candidateName: candidate?.fullName || 'Candidato Parlamentario',
           district: candidate?.district || 'Distrito Central',
           chamber: candidate?.chamber || 'Cámara de Diputados',
@@ -98,6 +99,7 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenantName: currentTenant.name,
+          tenantId: currentTenant.tenantId,
           fileName: file?.name || 'Documento de Campaña',
           category: file?.category || 'Estrategia',
           promptText: docPrompt,
@@ -127,6 +129,7 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenantName: currentTenant.name,
+          tenantId: currentTenant.tenantId,
           districtName: dist?.name || 'Distrito 10',
           keyIssues: dist?.keyIssues || ['Seguridad', 'Empleo'],
           competitorStrength: 'Alta competencia'
@@ -161,6 +164,7 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenantName: currentTenant.name,
+          tenantId: currentTenant.tenantId,
           fileName: 'Consulta General Campaña 2026',
           category: 'Asistencia Estratégica',
           promptText: userMsg
@@ -188,7 +192,7 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
 
   return (
     <div className="space-y-6">
-      
+
       {/* Top Banner */}
       <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

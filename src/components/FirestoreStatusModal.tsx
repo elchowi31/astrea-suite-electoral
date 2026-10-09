@@ -25,6 +25,7 @@ export const FirestoreStatusModal: React.FC<FirestoreStatusModalProps> = ({ isOp
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const projectId = firebaseConfig.projectId;
+  const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
 
   const loadStats = async () => {
     setLoading(true);
@@ -90,7 +91,7 @@ export const FirestoreStatusModal: React.FC<FirestoreStatusModalProps> = ({ isOp
         </section>
 
         <footer className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-4 sm:flex-row sm:justify-between">
-          <a href={`https://console.firebase.google.com/project/${projectId}/firestore/databases/(default)/data`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">
+          <a href={`https://console.firebase.google.com/project/${projectId}/firestore/databases/${encodeURIComponent(databaseId)}/data`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">
             Consola Firebase <ExternalLink className="h-3.5 w-3.5" />
           </a>
           <button type="button" onClick={onClose} className="rounded-xl bg-slate-800 px-5 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700">Cerrar</button>

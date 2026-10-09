@@ -28,6 +28,7 @@ import {
   DonorContribution
 } from '../types';
 import { buildDemoBundle, type DemoBundle } from '../data/demoSeed';
+import { omitUndefined } from './serialization';
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
@@ -50,15 +51,18 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
 
 async function persistEntity<T extends { tenantId: string }>(collectionName: string, entityId: string, data: T): Promise<void> {
   const actor = auth.currentUser;
+  if (!actor) throw new Error('Inicie sesión antes de guardar información.');
+  if (!data.tenantId || !entityId || entityId.includes('/')) throw new Error('El registro no tiene una organización o identificador válido.');
+  if (entityId.startsWith('demo-') && collectionName !== 'demo') throw new Error('Los registros de demostración son de solo lectura.');
   const now = new Date().toISOString();
   const batch = writeBatch(db);
   batch.set(doc(db, collectionName, entityId), {
-    ...data,
+    ...omitUndefined(data),
     updatedAt: now,
     updatedBy: actor?.uid || 'unknown'
   }, { merge: true });
   if (actor) {
-    const auditId = `${now.replace(/[^0-9]/g, '')}-${actor.uid.slice(0, 8)}-${entityId.slice(0, 24)}`;
+    const auditId = crypto.randomUUID();
     batch.set(doc(db, 'auditoria', auditId), {
       id: auditId,
       tenantId: data.tenantId,
@@ -83,7 +87,7 @@ async function removeEntity(collectionName: string, entityId: string, tenantId?:
   batch.delete(doc(db, collectionName, entityId));
   if (actor && tenantId) {
     const now = new Date().toISOString();
-    const auditId = `${now.replace(/[^0-9]/g, '')}-${actor.uid.slice(0, 8)}-${entityId.slice(0, 24)}`;
+    const auditId = crypto.randomUUID();
     batch.set(doc(db, 'auditoria', auditId), { id: auditId, tenantId, actorId: actor.uid, actorEmail: actor.email || null, action: 'delete', entity: collectionName, entityId, createdAt: now });
   }
   await batch.commit();
@@ -398,7 +402,8 @@ export function subscribeToCollection<T>(
   onData: (items: T[]) => void,
   _fallbackData: T[],
   tenantId?: string,
-  additionalFilter?: { field: string; value: unknown }
+  additionalFilter?: { field: string; value: unknown },
+  globalOrganizations = false
 ): () => void {
   if (!tenantId) {
     onData([]);
@@ -406,7 +411,7 @@ export function subscribeToCollection<T>(
   }
 
   try {
-    const colRef = additionalFilter
+    const colRef = globalOrganizations && collectionName === 'organizaciones' ? collection(db, collectionName) : additionalFilter
       ? query(collection(db, collectionName), where('tenantId', '==', tenantId), where(additionalFilter.field, '==', additionalFilter.value))
       : query(collection(db, collectionName), where('tenantId', '==', tenantId));
     const unsubscribe = onSnapshot(
@@ -460,35 +465,12 @@ export async function saveAiAnalysisToFirestore(tenantId: string, analysis: { ty
 // colecciones operativas y se elimina borrando un único documento por tenant.
 export async function createDemoCollection(tenantId: string): Promise<DemoBundle> {
   const bundle = buildDemoBundle(tenantId);
-  try {
-    await persistEntity('demo', bundle.id, bundle);
-  } catch (primaryErr) {
-    console.warn('Persistencia en lote para demo tuvo advertencia, aplicando setDoc directo:', primaryErr);
-    try {
-      await setDoc(doc(db, 'demo', bundle.id), {
-        ...bundle,
-        updatedAt: new Date().toISOString(),
-        updatedBy: auth.currentUser?.uid || 'local'
-      }, { merge: true });
-    } catch (fallbackErr) {
-      console.warn('Advertencia secundaria en demo setDoc:', fallbackErr);
-    }
-  }
+  await persistEntity('demo', bundle.id, bundle);
   return bundle;
 }
 
 export async function deleteDemoCollection(tenantId: string): Promise<void> {
-  try {
-    await removeEntity('demo', `${tenantId}-presentacion`, tenantId);
-  } catch (primaryErr) {
-    console.warn('Borrado en lote de demo tuvo advertencia, aplicando deleteDoc directo:', primaryErr);
-    try {
-      await deleteDoc(doc(db, 'demo', `${tenantId}-presentacion`));
-    } catch (fallbackErr) {
-      console.warn('Advertencia secundaria al eliminar documento demo:', fallbackErr);
-      throw fallbackErr;
-    }
-  }
+  await removeEntity('demo', `${tenantId}-presentacion`, tenantId);
 }
 
 export function subscribeToDemoCollection(tenantId: string, onData: (bundle: DemoBundle | null) => void): () => void {

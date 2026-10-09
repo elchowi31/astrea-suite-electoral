@@ -1,15 +1,15 @@
-import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
-import { 
-  Tenant, 
-  UserRole, 
-  Candidate, 
-  District, 
-  Proposal, 
-  DriveFileItem, 
-  UserProfile, 
-  CampaignExpense, 
-  Leader, 
-  TransportVehicle, 
+import React, { lazy, Suspense, useState, useEffect } from 'react';
+import {
+  Tenant,
+  UserRole,
+  Candidate,
+  District,
+  Proposal,
+  DriveFileItem,
+  UserProfile,
+  CampaignExpense,
+  Leader,
+  TransportVehicle,
   DonorContribution,
   CampaignCoordination,
   GrassrootsVoter
@@ -29,11 +29,11 @@ import {
   saveUserToFirestore,
   saveGrassrootsVoterToFirestore,
   saveCoordinationToFirestore,
+  createDemoCollection,
   deleteDemoCollection,
   subscribeToDemoCollection
 } from './lib/firebase';
 import { buildDemoBundle, type DemoBundle } from './data/demoSeed';
-import { savePresentation, DemoCloudError } from './lib/demoPersistence';
 import { logoutFirebaseAuth, observeAuthenticatedProfile } from './lib/firebaseAuth';
 import { Header } from './components/Header';
 import { Sidebar, ActiveTab } from './components/Sidebar';
@@ -41,13 +41,12 @@ import { FirestoreStatusModal } from './components/FirestoreStatusModal';
 import { AuthModal } from './components/AuthModal';
 import { LoginView } from './components/LoginView';
 import { LandingPage } from './components/LandingPage';
-import { UserGreetingBanner } from './components/UserGreetingBanner';
 import { SynapticNeuralBackground } from './components/SynapticNeuralBackground';
-import { ArrowLeft, LogIn, Sparkles, CheckCircle2, AlertCircle, RefreshCw, Database, LayoutDashboard, MapPinned } from 'lucide-react';
+import { UserGreetingBanner } from './components/UserGreetingBanner';
+import { ArrowLeft, LogIn, Sparkles, CheckCircle2, AlertCircle, RefreshCw, Database } from 'lucide-react';
 
-const DemoDataModal = lazy(() => import('./components/DemoDataModal').then(module => ({ default: module.DemoDataModal })));
-const AdministrativeOverview = React.lazy(() => import('./components/AdministrativeOverview').then(module => ({ default: module.AdministrativeOverview })));
 const DashboardView = lazy(() => import('./components/DashboardView').then(module => ({ default: module.DashboardView })));
+const AdministrativeOverview = lazy(() => import('./components/AdministrativeOverview').then(module => ({ default: module.AdministrativeOverview })));
 const CampaignStructureView = lazy(() => import('./components/CampaignStructureView').then(module => ({ default: module.CampaignStructureView })));
 const ElectoralHierarchyRollupView = lazy(() => import('./components/ElectoralHierarchyRollupView').then(module => ({ default: module.ElectoralHierarchyRollupView })));
 const ElectoralSimulatorView = lazy(() => import('./components/ElectoralSimulatorView').then(module => ({ default: module.ElectoralSimulatorView })));
@@ -55,7 +54,6 @@ const CampaignCostsReportView = lazy(() => import('./components/CampaignCostsRep
 const ZoneElectoralProjectionView = lazy(() => import('./components/ZoneElectoralProjectionView').then(module => ({ default: module.ZoneElectoralProjectionView })));
 const FinancesView = lazy(() => import('./components/FinancesView').then(module => ({ default: module.FinancesView })));
 const LeadersView = lazy(() => import('./components/LeadersView').then(module => ({ default: module.LeadersView })));
-const UniversalDataIngestionView = lazy(() => import('./components/UniversalDataIngestionView').then(module => ({ default: module.UniversalDataIngestionView })));
 const TransportView = lazy(() => import('./components/TransportView').then(module => ({ default: module.TransportView })));
 const CandidatesView = lazy(() => import('./components/CandidatesView').then(module => ({ default: module.CandidatesView })));
 const DistrictsView = lazy(() => import('./components/DistrictsView').then(module => ({ default: module.DistrictsView })));
@@ -78,25 +76,24 @@ const EMPTY_TENANT: Tenant = {
 };
 const PUBLIC_DEMO_TENANT: Tenant = { ...EMPTY_TENANT, tenantId: 'tenant-demo-publico', name: 'Astrea — Presentación Demo', active: true, createdAt: '2026-08-15T12:00:00.000Z', plan: 'Gratuito' };
 const PUBLIC_DEMO_DATA = buildDemoBundle(PUBLIC_DEMO_TENANT.tenantId);
-const PUBLIC_DEMO_USER: UserProfile = { uid: 'demo-publico', email: 'presentacion@demo.invalid', displayName: 'Visitante Demo', tenantId: PUBLIC_DEMO_TENANT.tenantId, role: 'Consulta', municipality: 'Astrea', department: 'Cesar', createdAt: '2026-08-15T12:00:00.000Z', active: true };
+const PUBLIC_DEMO_USER: UserProfile = { uid: 'demo-publico', email: 'presentacion@demo.invalid', displayName: 'Visitante Demo', tenantId: PUBLIC_DEMO_TENANT.tenantId, role: 'Consulta', municipality: 'Cesar', department: 'Cesar', createdAt: '2026-08-15T12:00:00.000Z', active: true };
 
 export default function App() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [currentTenant, setCurrentTenant] = useState<Tenant>(EMPTY_TENANT);
   const [users, setUsers] = useState<UserProfile[]>([]);
-  
+
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [userRole, setUserRole] = useState<UserRole>('Consulta');
+  const userRole: UserRole = currentUser?.role || 'Consulta';
+  const selectedTenantId = currentUser?.role === 'AdminGlobal' ? currentTenant.tenantId : currentUser?.tenantId;
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
 
   // Auth modal state
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showPublicDemo, setShowPublicDemo] = useState<boolean>(false);
-  const [publicDemoView, setPublicDemoView] = useState<'dashboard' | 'map'>('dashboard');
 
   // Firestore modal state
-  const [showDemoData, setShowDemoData] = useState(false);
   const [showFirestoreModal, setShowFirestoreModal] = useState<boolean>(false);
   const [firestoreSyncNotice, setFirestoreSyncNotice] = useState<string | null>(null);
 
@@ -114,13 +111,6 @@ export default function App() {
   const [coordinations, setCoordinations] = useState<CampaignCoordination[]>([]);
   const [grassrootsVoters, setGrassrootsVoters] = useState<GrassrootsVoter[]>([]);
   const [demoBundle, setDemoBundle] = useState<DemoBundle | null>(null);
-  const localDemoRef = useRef<DemoBundle | null>(null);
-  const [demoCloudError, setDemoCloudError] = useState('');
-  useEffect(() => {
-    localDemoRef.current = null;
-    setDemoCloudError('');
-    setDemoBundle(null);
-  }, [currentUser?.uid, currentTenant.tenantId]);
   const [demoBusy, setDemoBusy] = useState(false);
   const [demoError, setDemoError] = useState<string | null>(null);
 
@@ -137,7 +127,6 @@ export default function App() {
   useEffect(() => {
     return observeAuthenticatedProfile((profile) => {
       setCurrentUser(profile);
-      setUserRole(profile?.role || 'Consulta');
       if (profile?.tenantId) {
         setCurrentTenant((tenant) => tenant.tenantId === profile.tenantId ? tenant : { ...EMPTY_TENANT, tenantId: profile.tenantId });
       }
@@ -152,67 +141,57 @@ export default function App() {
         // Ensure current tenant remains valid
         setCurrentTenant((prev) => data.find((t) => t.tenantId === prev.tenantId) || data[0]);
       }
-    }, [], currentUser?.tenantId);
+    }, [], currentUser?.tenantId, undefined, currentUser?.role === 'AdminGlobal');
 
-    const unsubUsers = subscribeToCollection<UserProfile>('usuarios', (data) => {
-      if (data && data.length > 0) {
-        setUsers(data);
-        // Keep the authenticated profile synchronized with Firestore.
-        setCurrentUser((prev) => {
-          if (!prev) return null;
-          const updated = data.find((u) => u.uid === prev.uid || u.email.toLowerCase() === prev.email.toLowerCase());
-          if (updated) {
-            return updated;
-          }
-          return prev;
-        });
-      }
-    }, [], currentUser?.tenantId);
+    const managers: UserRole[] = ['AdminGlobal', 'AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'Concejal', 'JefePolitico'];
+    const unsubUsers = currentUser && managers.includes(currentUser.role)
+      ? subscribeToCollection<UserProfile>('usuarios', setUsers, [], selectedTenantId)
+      : (() => { setUsers(currentUser ? [currentUser] : []); return () => {}; })();
 
     const unsubCandidates = subscribeToCollection<Candidate>('candidatos', (data) => {
       setCandidates(data);
-    }, [], currentUser?.tenantId);
+    }, [], selectedTenantId);
 
     const unsubDistricts = subscribeToCollection<District>('distritos', (data) => {
       setDistricts(data);
-    }, [], currentUser?.tenantId);
+    }, [], selectedTenantId);
 
     const unsubProposals = subscribeToCollection<Proposal>('propuestas', (data) => {
       setProposals(data);
-    }, [], currentUser?.tenantId);
+    }, [], selectedTenantId);
 
     const unsubExpenses = subscribeToCollection<CampaignExpense>('gastos', (data) => {
       setExpenses(data);
-    }, [], currentUser?.tenantId);
+    }, [], selectedTenantId);
 
     const unsubAportes = subscribeToCollection<DonorContribution>('aportes', (data) => {
       setDonorContributions(data);
-    }, [], currentUser?.tenantId);
+    }, [], selectedTenantId);
 
     const unsubLeaders = subscribeToCollection<Leader>('lideres', (data) => {
       setLeaders(data);
-    }, [], currentUser?.tenantId);
+    }, [], selectedTenantId);
 
     const unsubVehicles = subscribeToCollection<TransportVehicle>('vehiculos', (data) => {
       setVehicles(data);
-    }, [], currentUser?.tenantId);
+    }, [], selectedTenantId);
 
     const unsubDriveFiles = subscribeToCollection<DriveFileItem>('archivos_drive', (data) => {
       setDriveFiles(data);
-    }, [], currentUser?.tenantId);
+    }, [], selectedTenantId);
 
     const unsubCoordinations = subscribeToCollection<CampaignCoordination>('comites_coordinaciones', (data) => {
       setCoordinations(data);
-    }, [], currentUser?.tenantId);
+    }, [], selectedTenantId);
 
-    const unsubDemo = currentUser?.tenantId
-      ? subscribeToDemoCollection(currentUser.tenantId, (bundle) => setDemoBundle(localDemoRef.current?.tenantId === currentUser.tenantId ? localDemoRef.current : bundle))
+    const unsubDemo = selectedTenantId
+      ? subscribeToDemoCollection(selectedTenantId, setDemoBundle)
       : (() => { setDemoBundle(null); return () => {}; })();
 
-    const voterManagers: UserRole[] = ['AdminGlobal', 'AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'Concejal', 'JefePolitico'];
-    const canReadVoters = currentUser && (voterManagers.includes(currentUser.role) || Boolean(currentUser.assignedLeaderId));
+    const voterManagers: UserRole[] = ['AdminGlobal', 'AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'JefePolitico'];
+    const canReadVoters = currentUser && (voterManagers.includes(currentUser.role) || Boolean(currentUser.assignedLeaderId) || (currentUser.role === 'Concejal' && Boolean(currentUser.assignedCandidateId)));
     const unsubGrassrootsVoters = canReadVoters
-      ? subscribeToCollection<GrassrootsVoter>('votantes_rasos', (data) => setGrassrootsVoters(data), [], currentUser?.tenantId, voterManagers.includes(currentUser!.role) ? undefined : { field: 'leaderId', value: currentUser!.assignedLeaderId })
+      ? subscribeToCollection<GrassrootsVoter>('votantes_rasos', setGrassrootsVoters, [], selectedTenantId, voterManagers.includes(currentUser!.role) ? undefined : currentUser!.role === 'Concejal' ? { field: 'candidateId', value: currentUser!.assignedCandidateId } : { field: 'leaderId', value: currentUser!.assignedLeaderId })
       : (() => { setGrassrootsVoters([]); return () => {}; })();
 
     return () => {
@@ -230,13 +209,12 @@ export default function App() {
       unsubDemo();
       unsubGrassrootsVoters();
     };
-  }, [currentUser?.tenantId]);
+  }, [currentUser?.uid, currentUser?.role, currentUser?.assignedLeaderId, currentUser?.assignedCandidateId, selectedTenantId]);
 
   // Auth Handlers
   const handleLogin = (user: UserProfile) => {
     setCurrentUser(user);
-    setUserRole(user.role);
-    
+
     // Automatically isolate and switch tenant to the user's tenantId
     if (user.tenantId) {
       const foundTenant = tenants.find((t) => t.tenantId === user.tenantId);
@@ -260,13 +238,6 @@ export default function App() {
     } catch (e) {
       console.error('Error saving user to Firestore:', e);
     }
-  };
-
-  const handleUpdateProfile = async (updatedUser: UserProfile) => {
-    await saveUserToFirestore(updatedUser);
-    setCurrentUser(updatedUser);
-    setUsers((current) => current.map((user) => user.uid === updatedUser.uid ? updatedUser : user));
-    notifyFirestoreSave(`Perfil de ${updatedUser.displayName} actualizado correctamente.`);
   };
 
   const handleLogout = async () => {
@@ -434,32 +405,22 @@ export default function App() {
     }
   };
 
-  const handleSavePresentation = async (bundle: DemoBundle) => {
-    if (realDataCount > 0) throw new Error('Ya existen registros reales en esta organización.');
+  const handleCreateDemo = async () => {
+    setDemoBusy(true);
+    setDemoError(null);
     try {
-      await savePresentation(bundle);
-      localDemoRef.current = null;
-      setDemoCloudError('');
+      const bundle = await createDemoCollection(currentTenant.tenantId);
       setDemoBundle(bundle);
-      notifyFirestoreSave('Datos ficticios guardados en Firestore.');
-      return 'cloud' as const;
+      notifyFirestoreSave('Colección demo creada en Firestore. Todos los registros mostrados son ficticios.');
     } catch (error) {
-      if (!(error instanceof DemoCloudError)) throw error;
-      // Generated fixtures are only an in-memory preview, never operational data.
-      localDemoRef.current = bundle;
-      setDemoBundle(bundle);
-      setDemoCloudError(error.message);
-      return 'session' as const;
+      const message = error instanceof Error ? error.message : 'No fue posible crear la colección demo.';
+      setDemoError(message);
+    } finally {
+      setDemoBusy(false);
     }
   };
 
   const handleDeleteDemo = async () => {
-    if (localDemoRef.current) {
-      localDemoRef.current = null;
-      setDemoBundle(null);
-      setDemoCloudError('');
-      return;
-    }
     setDemoBusy(true);
     setDemoError(null);
     try {
@@ -469,7 +430,6 @@ export default function App() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No fue posible eliminar la colección demo.';
       setDemoError(message);
-      throw error;
     } finally {
       setDemoBusy(false);
     }
@@ -492,8 +452,10 @@ export default function App() {
     setActiveTab('ai');
   };
 
-  const realDataCount = [candidates, districts, proposals, driveFiles, expenses, donorContributions, leaders, vehicles, coordinations, grassrootsVoters].reduce((sum, items) => sum + items.filter(item => item.tenantId === currentTenant.tenantId).length, 0);
-  const demoActive = realDataCount === 0 && demoBundle?.tenantId === currentTenant.tenantId;
+  const realDataCount = candidates.length + districts.length + proposals.length + driveFiles.length
+    + expenses.length + donorContributions.length + leaders.length + vehicles.length
+    + coordinations.length + grassrootsVoters.length;
+  const demoActive = realDataCount === 0 && Boolean(demoBundle);
   const visibleCandidates = demoActive ? demoBundle!.candidates : candidates;
   const visibleDistricts = demoActive ? demoBundle!.districts : districts;
   const visibleProposals = demoActive ? demoBundle!.proposals : proposals;
@@ -510,32 +472,19 @@ export default function App() {
     if (showPublicDemo) {
       return (
         <div className="min-h-screen bg-[#030712] text-slate-100 relative isolate overflow-x-hidden">
-          {/* Living Interactive Synaptic Neural Background */}
-          <SynapticNeuralBackground interactive={true} />
-
-          <header className="sticky top-0 z-20 border-b border-cyan-500/20 bg-slate-950/90 px-4 py-3 backdrop-blur-xl shadow-lg">
+          <SynapticNeuralBackground interactive />
+          <header className="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 px-4 py-3 backdrop-blur">
             <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-cyan-300">Presentación interactiva</p>
-                  <span className="text-[10px] bg-slate-900 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full font-mono">Modo Auditoría</span>
-                </div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-300">Presentación interactiva</p>
                 <h1 className="text-lg font-black text-white">Astrea Suite Electoral</h1>
                 <p className="text-xs text-slate-400">Todos los nombres, documentos y valores de esta vista son ficticios.</p>
               </div>
               <div className="flex gap-2">
-                <div className="flex rounded-xl border border-cyan-500/25 bg-slate-950/80 p-1">
-                  <button type="button" onClick={() => setPublicDemoView('dashboard')} className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${publicDemoView === 'dashboard' ? 'bg-cyan-500/20 text-cyan-200' : 'text-slate-400 hover:text-white'}`}>
-                    <LayoutDashboard className="h-3.5 w-3.5" /> Tablero
-                  </button>
-                  <button type="button" onClick={() => setPublicDemoView('map')} className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${publicDemoView === 'map' ? 'bg-cyan-500/20 text-cyan-200' : 'text-slate-400 hover:text-white'}`}>
-                    <MapPinned className="h-3.5 w-3.5" /> Mapa
-                  </button>
-                </div>
-                <button type="button" onClick={() => setShowPublicDemo(false)} className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800 transition cursor-pointer">
+                <button type="button" onClick={() => setShowPublicDemo(false)} className="flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-xs font-bold text-slate-200 hover:bg-slate-900">
                   <ArrowLeft className="h-4 w-4" /> Inicio
                 </button>
-                <button type="button" onClick={() => { setShowPublicDemo(false); setActiveTab('login'); }} className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 px-4 py-2 text-xs font-black text-white shadow-lg shadow-cyan-950/50 transition cursor-pointer">
+                <button type="button" onClick={() => { setShowPublicDemo(false); setActiveTab('login'); }} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white hover:bg-blue-500">
                   <LogIn className="h-4 w-4" /> Iniciar sesión
                 </button>
               </div>
@@ -543,35 +492,22 @@ export default function App() {
           </header>
           <main className="mx-auto max-w-7xl p-3 sm:p-6 lg:p-8">
             <Suspense fallback={<div className="p-10 text-center text-sm text-slate-400">Cargando presentación…</div>}>
-              {publicDemoView === 'dashboard' ? (
-            <div className="space-y-4"><AdministrativeOverview tenantId={PUBLIC_DEMO_TENANT.tenantId} expenses={PUBLIC_DEMO_DATA.expenses} /><details className="rounded-xl border border-slate-800 p-3"><summary className="cursor-pointer text-sm font-bold text-cyan-300">Otros indicadores</summary><div className="mt-3">
-                <DashboardView
-                  currentTenant={PUBLIC_DEMO_TENANT}
-                  currentUser={PUBLIC_DEMO_USER}
-                  userRole="Consulta"
-                  candidates={PUBLIC_DEMO_DATA.candidates}
-                  districts={PUBLIC_DEMO_DATA.districts}
-                  proposals={PUBLIC_DEMO_DATA.proposals}
-                  driveFiles={PUBLIC_DEMO_DATA.driveFiles}
-                  expenses={PUBLIC_DEMO_DATA.expenses}
-                  contributions={PUBLIC_DEMO_DATA.contributions}
-                  leaders={PUBLIC_DEMO_DATA.leaders}
-                  vehicles={PUBLIC_DEMO_DATA.vehicles}
-                  voters={PUBLIC_DEMO_DATA.voters}
-                  onNavigateTab={() => {}}
-                />
-
-            </div></details></div>
-              ) : (
-                <TerritorialMapView
-                  leaders={PUBLIC_DEMO_DATA.leaders}
-                  vehicles={PUBLIC_DEMO_DATA.vehicles}
-                  tenantName={PUBLIC_DEMO_TENANT.name}
-                  currentTenant={PUBLIC_DEMO_TENANT}
-                  currentUser={PUBLIC_DEMO_USER}
-                  userRole="Consulta"
-                />
-              )}
+              <AdministrativeOverview tenantId={PUBLIC_DEMO_TENANT.tenantId} expenses={PUBLIC_DEMO_DATA.expenses} />
+              <DashboardView
+                currentTenant={PUBLIC_DEMO_TENANT}
+                currentUser={PUBLIC_DEMO_USER}
+                userRole="Consulta"
+                candidates={PUBLIC_DEMO_DATA.candidates}
+                districts={PUBLIC_DEMO_DATA.districts}
+                proposals={PUBLIC_DEMO_DATA.proposals}
+                driveFiles={PUBLIC_DEMO_DATA.driveFiles}
+                expenses={PUBLIC_DEMO_DATA.expenses}
+                contributions={PUBLIC_DEMO_DATA.contributions}
+                leaders={PUBLIC_DEMO_DATA.leaders}
+                vehicles={PUBLIC_DEMO_DATA.vehicles}
+                voters={PUBLIC_DEMO_DATA.voters}
+                onNavigateTab={() => {}}
+              />
             </Suspense>
           </main>
         </div>
@@ -580,29 +516,12 @@ export default function App() {
     if (activeTab !== 'login') {
       return <LandingPage onEnterLogin={() => setActiveTab('login')} onOpenDemo={() => setShowPublicDemo(true)} tenantName={currentTenant.name || 'Astrea'} />;
     }
-    return (
-      <LoginView 
-        users={users} 
-        currentUser={null} 
-        tenants={tenants} 
-        currentTenant={currentTenant} 
-        onLogin={handleLogin} 
-        onRegister={handleRegisterUser} 
-        onLogout={handleLogout} 
-        onContinueToApp={() => setActiveTab('dashboard')} 
-        onBackToLanding={() => setActiveTab('dashboard')}
-      />
-    );
+    return <LoginView users={users} currentUser={null} tenants={tenants} currentTenant={currentTenant} onLogin={handleLogin} onRegister={handleRegisterUser} onLogout={handleLogout} onContinueToApp={() => setActiveTab('dashboard')} onBackToLanding={() => setActiveTab('dashboard')} />;
   }
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-cyan-500 selection:text-white relative isolate overflow-x-hidden">
-      
-      {/* Living Interactive Synaptic Neural Background with Fluid Physics */}
-      <SynapticNeuralBackground interactive={true} />
-
-      {/* Cybernetic Dot Grid Background */}
-      <div className="absolute inset-0 -z-10 opacity-30 [background-size:40px_40px] [background-image:linear-gradient(rgba(34,211,238,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,.04)_1px,transparent_1px)] pointer-events-none" />
+    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-500 selection:text-white relative isolate overflow-x-hidden">
+      <SynapticNeuralBackground interactive={false} />
 
       {/* Top Navigation Header with Streamlined Toolbar & Profile Pill */}
       <Header
@@ -613,12 +532,12 @@ export default function App() {
         currentUser={currentUser}
         onOpenAuthModal={() => setShowAuthModal(true)}
         userRole={userRole}
-        onSelectRole={setUserRole}
+        onSelectRole={() => {}}
       />
 
       {/* Main Body Layout */}
       <div className="flex-1 flex flex-col md:flex-row">
-        
+
         {/* Sidebar */}
         <Sidebar
           activeTab={activeTab}
@@ -634,89 +553,77 @@ export default function App() {
         />
 
         {/* Content Area */}
-        <main className="min-w-0 flex-1 p-3 pb-24 md:pb-6 sm:p-4 lg:p-5 mx-auto w-full space-y-3">
-          
+        <main className="flex-1 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+
           {/* Personalized User Recognition & Salutation Banner */}
           {currentUser && activeTab !== 'login' && (
             <UserGreetingBanner
               currentUser={currentUser}
               currentTenant={currentTenant}
               onOpenAuthModal={() => setShowAuthModal(true)}
-              onUpdateUserName={(newName) => {
-                setCurrentUser((user) => user ? { ...user, displayName: newName, fullName: newName } : null);
-                setUsers((current) => current.map((user) => user.uid === currentUser.uid ? { ...user, displayName: newName, fullName: newName } : user));
-              }}
             />
+          )}
+
+          {currentUser && activeTab !== 'login' && (realDataCount === 0 || demoBundle) && (
+            <section className={`rounded-2xl border p-4 ${demoActive ? 'border-amber-400/40 bg-amber-950/30' : 'border-blue-500/30 bg-blue-950/20'}`} aria-label="Control de datos de demostración">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className={`text-sm font-black ${demoActive ? 'text-amber-200' : 'text-blue-200'}`}>
+                    {demoActive ? 'Modo presentación — datos 100% ficticios' : demoBundle ? 'Colección demo disponible, no mezclada con datos reales' : 'Espacio real vacío'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {demoActive
+                      ? 'La vista usa exclusivamente el documento aislado en Firestore /demo. Ninguna cifra representa personas o transacciones reales.'
+                      : demoBundle
+                        ? 'Al existir información operativa real, Astrea desactiva automáticamente la demostración.'
+                        : 'Cree una presentación completa en la colección /demo sin contaminar las colecciones operativas.'}
+                  </p>
+                  {demoError && <p className="mt-2 text-xs font-semibold text-rose-300">{demoError}</p>}
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  {!demoBundle && (
+                    <button type="button" disabled={demoBusy} onClick={handleCreateDemo} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white transition hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60">
+                      {demoBusy ? 'Creando…' : 'Crear colección demo'}
+                    </button>
+                  )}
+                  {demoBundle && canManageDemo && (
+                    <button type="button" disabled={demoBusy} onClick={handleDeleteDemo} className="rounded-xl border border-rose-500/40 bg-rose-950/30 px-4 py-2 text-xs font-black text-rose-200 transition hover:bg-rose-900/40 disabled:cursor-wait disabled:opacity-60">
+                      {demoBusy ? 'Eliminando…' : 'Eliminar demo'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </section>
           )}
 
           {/* Real-time Save Toast Notification */}
           {firestoreSyncNotice && (
-            <div className="bg-slate-950/95 border border-cyan-500/40 rounded-2xl px-5 py-3.5 flex items-center justify-between text-xs text-cyan-200 shadow-2xl shadow-cyan-950/50 backdrop-blur-xl animate-fade-in">
+            <div className="bg-emerald-950/90 border border-emerald-500/50 rounded-2xl px-4 py-3 flex items-center justify-between text-xs text-emerald-200 shadow-xl shadow-emerald-950/40 animate-fade-in">
               <div className="flex items-center gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 animate-pulse" />
-                <span className="font-semibold text-white">{firestoreSyncNotice}</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="font-semibold">{firestoreSyncNotice}</span>
               </div>
-              <span className="text-[10px] text-cyan-400 font-mono bg-cyan-950/70 border border-cyan-500/30 px-2 py-0.5 rounded-md">
-                Firestore Cloud Sincronizado
-              </span>
+              <span className="text-[10px] text-emerald-400/80 font-mono">Firestore Cloud • Escrito</span>
             </div>
           )}
 
           {/* Clean Organization Status Bar */}
           {activeTab !== 'login' && (
-            <div className="bg-slate-950/80 border border-cyan-500/20 rounded-2xl px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-slate-400 shadow-md backdrop-blur-md">
-              <div className="flex items-center gap-2.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                <span className="font-bold text-slate-200"><strong className="text-white">{currentTenant.name}</strong>{demoActive && <span className="ml-2 text-[10px] text-amber-300">{demoCloudError ? 'DEMO LOCAL · no guardada' : 'DEMO · cifras ficticias'}</span>}</span>
+            <div className="bg-slate-900/80 border border-slate-800/80 rounded-xl px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                <span className="font-medium text-slate-300">Tenant Activo: {currentTenant.name}</span>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setShowDemoData(true)}
-                  className="flex items-center gap-1.5 text-cyan-300 hover:text-white bg-cyan-500/10 hover:bg-cyan-500/20 px-3 py-1 rounded-xl border border-cyan-500/30 font-bold transition cursor-pointer shadow-sm"
+                  onClick={() => setShowFirestoreModal(true)}
+                  className="flex items-center gap-1.5 text-amber-300 hover:text-amber-200 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 font-medium transition cursor-pointer"
                 >
-                  <Database className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Datos</span>
+                  <Database className="w-3 h-3 text-amber-400" />
+                  <span>Verificar Firestore</span>
                 </button>
-                
-              </div>
-            </div>
-          )}
-
-          {/* Quick Universal Return / Navigation Bar when in Sub-Views */}
-          {currentUser && activeTab !== 'dashboard' && activeTab !== 'login' && (
-            <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-3 sm:px-4 sm:py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-md animate-fade-in">
-              <button
-                type="button"
-                id="global-back-to-dashboard-btn"
-                onClick={() => setActiveTab('dashboard')}
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 hover:text-blue-300 border border-blue-500/30 font-bold text-xs transition cursor-pointer shadow-sm w-fit"
-                title="Regresar a la pantalla principal del Centro de Control"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>← Volver al Centro de Control (Dashboard)</span>
-              </button>
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <span className="text-[11px] text-slate-400">Módulo actual:</span>
-                <span className="text-white font-bold bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 text-[11px]">
-                  {activeTab === 'campaign_structure' ? 'Estructura & Comités' :
-                   activeTab === 'hierarchy_pyramid' ? 'Base Territorial & Votantes' :
-                   activeTab === 'leaders' ? 'Líderes y Metas' :
-                   activeTab === 'ingestion' ? 'Ingesta Masiva & Audio IA' :
-                   activeTab === 'map' ? 'Mapa Territorial' :
-                   activeTab === 'transport' ? 'Logística Día D' :
-                   activeTab === 'finances' ? 'Finanzas y Aportes' :
-                   activeTab === 'costs_report' ? 'Control de Gastos' :
-                   activeTab === 'candidates' ? 'Candidaturas' :
-                   activeTab === 'districts' ? 'Territorios y Censo' :
-                   activeTab === 'proposals' ? 'Programa de Gobierno' :
-                   activeTab === 'workspace' ? 'Google Workspace' :
-                   activeTab === 'drive' ? 'Archivo Documental' :
-                   activeTab === 'zone_projections' ? 'Proyección Territorial' :
-                   activeTab === 'simulator' ? 'Simulador Electoral' :
-                   activeTab === 'ai' ? 'Asistente IA' :
-                   activeTab === 'tenants' ? 'Organizaciones' : activeTab}
-                </span>
+                <span className="hidden md:inline font-mono text-slate-400">{lastSyncStatus}</span>
               </div>
             </div>
           )}
@@ -745,7 +652,8 @@ export default function App() {
             </div>
           )}>
           {currentUser && activeTab === 'dashboard' && (
-            <div className="space-y-4"><AdministrativeOverview tenantId={currentTenant.tenantId} expenses={visibleExpenses} /><details className="rounded-xl border border-slate-800 p-3"><summary className="cursor-pointer text-sm font-bold text-cyan-300">Otros indicadores</summary><div className="mt-3">
+            <div className="space-y-4">
+            <AdministrativeOverview tenantId={currentTenant.tenantId} expenses={visibleExpenses} />
             <DashboardView
               currentTenant={currentTenant}
               currentUser={currentUser}
@@ -761,8 +669,7 @@ export default function App() {
               voters={visibleVoters}
               onNavigateTab={setActiveTab}
             />
-
-            </div></details></div>
+            </div>
           )}
 
           {currentUser && activeTab === 'campaign_structure' && (
@@ -778,7 +685,6 @@ export default function App() {
 
           {currentUser && activeTab === 'hierarchy_pyramid' && (
             <ElectoralHierarchyRollupView
-              currentTenant={currentTenant}
               currentUser={currentUser}
               userRole={userRole}
               grassrootsVoters={visibleVoters}
@@ -790,6 +696,7 @@ export default function App() {
 
           {currentUser && activeTab === 'simulator' && (
             <ElectoralSimulatorView
+              key={currentTenant.tenantId}
               currentTenant={currentTenant}
               candidates={visibleCandidates}
               onNavigateTab={setActiveTab}
@@ -839,9 +746,6 @@ export default function App() {
               leaders={visibleLeaders.filter((l) => l.tenantId === currentTenant.tenantId)}
               vehicles={visibleVehicles.filter((v) => v.tenantId === currentTenant.tenantId)}
               tenantName={currentTenant.name}
-              currentTenant={currentTenant}
-              currentUser={currentUser}
-              userRole={userRole}
             />
           )}
 
@@ -865,18 +769,6 @@ export default function App() {
               userRole={userRole}
               leaders={visibleLeaders}
               onAddLeader={handleAddLeader}
-            />
-          )}
-
-          {currentUser && activeTab === 'ingestion' && (
-            <UniversalDataIngestionView
-              currentTenant={currentTenant}
-              currentUser={currentUser}
-              onLeaderAdded={handleAddLeader}
-              onExpenseAdded={handleAddExpense}
-              onBatchIngested={(entity, count) => {
-                notifyFirestoreSave(`Sincronizados ${count} registros de ${entity} en Firestore.`);
-              }}
             />
           )}
 
@@ -970,25 +862,8 @@ export default function App() {
         tenants={tenants}
         onLogin={handleLogin}
         onRegister={handleRegisterUser}
-        onUpdateProfile={handleUpdateProfile}
         onLogout={handleLogout}
       />
-
-      {showDemoData && currentUser && <Suspense fallback={<div role="status" className="fixed inset-0 z-50 grid place-items-center bg-black/70 text-white">Cargando datos…</div>}><DemoDataModal
-        key={currentTenant.tenantId}
-        tenantId={currentTenant.tenantId}
-        tenantName={currentTenant.name}
-        municipality={currentTenant.tenantId.toLowerCase().includes('astrea') ? 'Astrea' : ['AdminGlobal', 'Gobernador', 'Diputado'].includes(currentUser.role) ? '' : currentUser.municipality || ''}
-        allowDepartment={['AdminGlobal', 'Gobernador', 'Diputado'].includes(currentUser.role)}
-        canManage={canManageDemo}
-        realCount={realDataCount}
-        bundle={demoBundle}
-        cloudError={demoCloudError}
-        onClose={() => setShowDemoData(false)}
-        onAudit={() => { setShowDemoData(false); setShowFirestoreModal(true); }}
-        onSave={handleSavePresentation}
-        onDelete={handleDeleteDemo}
-      /></Suspense>}
 
       {/* Firestore Verification & Seeding Modal */}
       <FirestoreStatusModal

@@ -54,20 +54,17 @@ export function buildDemoBundle(tenantId: string): DemoBundle {
   const leaders: Leader[] = [
     ['01', 'Zona Norte', 'Comuna 1', 'Valledupar', 'Barrio Demo Norte', 1200, 810, 24, 10.486, -73.253, 'Destacado'],
     ['02', 'Zona Centro', 'Comuna 3', 'Valledupar', 'Barrio Demo Centro', 950, 570, 18, 10.469, -73.251, 'Activo'],
-    ['03', 'Corregimiento Arjona', 'Rural', 'Astrea', 'Arjona (Corregimiento)', 520, 345, 12, 9.575, -73.918, 'Activo'],
-    ['04', 'Vereda San Isidro', 'Rural', 'Astrea', 'San Isidro (Vereda)', 480, 218, 9, 9.512, -73.985, 'En Riesgo'],
+    ['03', 'Zona Rural', 'Rural', 'Astrea', 'Vereda Demo Uno', 520, 345, 12, 9.499, -73.978, 'Activo'],
+    ['04', 'Zona Rural', 'Rural', 'Astrea', 'Vereda Demo Dos', 480, 218, 9, 9.507, -73.965, 'En Riesgo'],
     ['05', 'Zona Occidente', 'Urbana', 'Bosconia', 'Sector Demo Occidental', 760, 492, 15, 9.971, -73.89, 'Activo'],
-    ['06', 'Zona Sur', 'Urbana', 'Chiriguaná', 'Sector Demo Sur', 680, 501, 17, 9.363, -73.603, 'Destacado'],
-    ['07', 'Corregimiento Santa Cecilia', 'Rural', 'Astrea', 'Santa Cecilia (Corregimiento)', 610, 420, 14, 9.489, -74.021, 'Destacado'],
-    ['08', 'Vereda La Ye', 'Rural', 'Astrea', 'La Ye (Vereda)', 390, 260, 8, 9.551, -73.942, 'Activo']
+    ['06', 'Zona Sur', 'Urbana', 'Chiriguaná', 'Sector Demo Sur', 680, 501, 17, 9.363, -73.603, 'Destacado']
   ].map((row) => ({ id: `demo-lider-${row[0]}`, tenantId, fullName: `Líder Demo ${row[0]}`, zoneOrDistrict: String(row[1]), commune: String(row[2]), department: 'Cesar', municipality: String(row[3]), veredaOrBarrio: String(row[4]), assignedCandidateId: 'demo-candidato-01', voteTarget: Number(row[5]), votesCommitted: Number(row[6]), activistsCount: Number(row[7]), phone: `00000000${row[0]}`, email: `lider${row[0]}@demo.invalid`, status: row[10] as Leader['status'], budgetAllocated: Number(row[5]) * 18500, refrigeriosNeeded: Number(row[7]) * 8, fuelGallonsNeeded: Number(row[7]) * 2, vehiclesNeeded: Math.max(1, Math.round(Number(row[7]) / 8)), witnessesCount: Math.max(2, Math.round(Number(row[7]) / 3)), latitude: Number(row[8]), longitude: Number(row[9]) }));
 
   const vehicles: TransportVehicle[] = [
     { id: 'demo-vehiculo-01', tenantId, vehicleType: 'Bus Gran Capacidad (45 pas)', licensePlate: 'DEM-001', driverName: 'Conductor Demo 01', driverPhone: '0000000101', assignedZone: 'Valledupar Norte', department: 'Cesar', municipality: 'Valledupar', capacity: 45, dailyCost: 780000, fuelBudget: 260000, status: 'Operativo - Día D', latitude: 10.481, longitude: -73.252 },
-    { id: 'demo-vehiculo-02', tenantId, vehicleType: 'Microbús / Van (19 pas)', licensePlate: 'DEM-002', driverName: 'Conductor Demo 02', driverPhone: '0000000102', assignedZone: 'Corregimiento Arjona', department: 'Cesar', municipality: 'Astrea', capacity: 19, dailyCost: 420000, fuelBudget: 180000, status: 'Reservado', latitude: 9.574, longitude: -73.919 },
+    { id: 'demo-vehiculo-02', tenantId, vehicleType: 'Microbús / Van (19 pas)', licensePlate: 'DEM-002', driverName: 'Conductor Demo 02', driverPhone: '0000000102', assignedZone: 'Astrea Rural', department: 'Cesar', municipality: 'Astrea', capacity: 19, dailyCost: 420000, fuelBudget: 180000, status: 'Reservado', latitude: 9.501, longitude: -73.976 },
     { id: 'demo-vehiculo-03', tenantId, vehicleType: 'Camioneta 4x4 Rural (5 pas)', licensePlate: 'DEM-003', driverName: 'Conductor Demo 03', driverPhone: '0000000103', assignedZone: 'Bosconia', department: 'Cesar', municipality: 'Bosconia', capacity: 5, dailyCost: 350000, fuelBudget: 210000, status: 'Operativo - Día D', latitude: 9.973, longitude: -73.887 },
-    { id: 'demo-vehiculo-04', tenantId, vehicleType: 'Moto Enlace', licensePlate: 'DEM-004', driverName: 'Conductor Demo 04', driverPhone: '0000000104', assignedZone: 'Chiriguaná', department: 'Cesar', municipality: 'Chiriguaná', capacity: 2, dailyCost: 110000, fuelBudget: 60000, status: 'En Mantenimiento', latitude: 9.362, longitude: -73.604 },
-    { id: 'demo-vehiculo-05', tenantId, vehicleType: 'Camioneta 4x4 Rural (5 pas)', licensePlate: 'DEM-005', driverName: 'Conductor Demo 05', driverPhone: '0000000105', assignedZone: 'Vereda San Isidro', department: 'Cesar', municipality: 'Astrea', capacity: 5, dailyCost: 380000, fuelBudget: 190000, status: 'Operativo - Día D', latitude: 9.513, longitude: -73.984 }
+    { id: 'demo-vehiculo-04', tenantId, vehicleType: 'Moto Enlace', licensePlate: 'DEM-004', driverName: 'Conductor Demo 04', driverPhone: '0000000104', assignedZone: 'Chiriguaná', department: 'Cesar', municipality: 'Chiriguaná', capacity: 2, dailyCost: 110000, fuelBudget: 60000, status: 'En Mantenimiento', latitude: 9.362, longitude: -73.604 }
   ];
 
   const expenses: CampaignExpense[] = [

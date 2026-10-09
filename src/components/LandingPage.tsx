@@ -1,18 +1,18 @@
 import React from 'react';
-import { 
-  BarChart3, 
-  Lock, 
-  ShieldCheck, 
-  TrendingUp, 
-  ArrowRight, 
-  Sparkles, 
-  Layers3, 
-  Cpu, 
-  Building2, 
-  Vote, 
-  Award, 
-  Users, 
-  Radio, 
+import {
+  BarChart3,
+  Lock,
+  ShieldCheck,
+  TrendingUp,
+  ArrowRight,
+  Sparkles,
+  Layers3,
+  Cpu,
+  Building2,
+  Vote,
+  Award,
+  Users,
+  Radio,
   CheckCircle2,
   ChevronRight,
   Database,
@@ -87,7 +87,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterLogin, onOpenDe
 
   return (
     <div className="min-h-screen bg-[#030712] text-white flex flex-col font-sans relative isolate overflow-hidden">
-      
+
       {/* Living Interactive Synaptic Neural Background with Fluid Physics */}
       <SynapticNeuralBackground interactive={true} />
 
@@ -121,12 +121,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterLogin, onOpenDe
         <style>
           {`
             @keyframes pulseTravelLanding {
-              0% { stroke-dashoffset: 1400; }
-              100% { stroke-dashoffset: 0; }
+              0%, 100% { transform: translateX(0); opacity: 0.7; }
+              50% { transform: translateX(-1%); opacity: 1; }
             }
             @keyframes nodePulseLanding {
-              0%, 100% { r: 4px; opacity: 0.7; }
-              50% { r: 7.5px; opacity: 1; }
+              0%, 100% { transform: scale(1); opacity: 0.7; }
+              50% { transform: scale(1.35); opacity: 1; }
             }
             .landing-wave-1 {
               stroke-dasharray: 24 10 4 10;
@@ -137,7 +137,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterLogin, onOpenDe
               animation: pulseTravelLanding 38s linear infinite reverse;
             }
             .landing-node {
-              animation: nodePulseLanding 3.8s ease-in-out infinite;
+              transform-box: fill-box;
+              transform-origin: center;
+              animation: nodePulseLanding 3.8s var(--ease-in-out) infinite;
             }
           `}
         </style>
@@ -158,7 +160,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterLogin, onOpenDe
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-12 py-10 relative z-10">
         <div className="max-w-6xl mx-auto text-center space-y-8 animate-fade-in">
-          
+
           {/* Top Verification Pill */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/90 border border-cyan-500/40 text-xs font-black text-cyan-300 tracking-wide shadow-xl shadow-cyan-950/50 backdrop-blur-md">
             <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
@@ -206,15 +208,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterLogin, onOpenDe
               {architecturalHierarchyNodes.map((node, index) => {
                 const Icon = node.icon;
                 return (
-                  <div 
+                  <div
                     key={node.id}
-                    className={`relative group rounded-2xl border p-3.5 text-left shadow-xl backdrop-blur-md transition-all duration-300 hover:-translate-y-1 ${node.glow}`}
+                    className={`landing-card animate-fade-in relative group rounded-2xl border p-3.5 text-left shadow-xl backdrop-blur-md ${node.glow}`}
+                    style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
                       <span className="text-[10px] font-mono font-bold text-slate-400">
                         {node.step}
                       </span>
-                      <Icon className="w-4 h-4 opacity-80 group-hover:scale-110 transition-transform" />
+                      <Icon className="w-4 h-4 opacity-80" />
                     </div>
 
                     <div className="pt-2">
@@ -245,16 +248,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterLogin, onOpenDe
             <button
               type="button"
               onClick={onEnterLogin}
-              className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:via-blue-500 hover:to-indigo-500 text-white font-black rounded-2xl text-sm tracking-wide shadow-2xl shadow-cyan-950/70 border border-cyan-400/30 transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center gap-2.5 cursor-pointer"
+              className="presentation-button w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:via-blue-500 hover:to-indigo-500 text-white font-black rounded-2xl text-sm tracking-wide shadow-2xl shadow-cyan-950/70 border border-cyan-400/30 flex items-center justify-center gap-2.5 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300"
             >
               <span>Acceder al Centro de Mando</span>
               <ArrowRight className="w-4 h-4 text-cyan-100" />
             </button>
-            
+
             <button
               type="button"
               onClick={onOpenDemo}
-              className="w-full sm:w-auto px-8 py-4 bg-slate-900/90 hover:bg-slate-800/90 border border-cyan-500/30 text-white font-bold rounded-2xl text-sm tracking-wide shadow-xl backdrop-blur-md transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
+              className="presentation-button w-full sm:w-auto px-8 py-4 bg-slate-900/90 hover:bg-slate-800/90 border border-cyan-500/30 text-white font-bold rounded-2xl text-sm tracking-wide shadow-xl backdrop-blur-md flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300"
             >
               <BarChart3 className="w-4 h-4 text-amber-300" />
               <span>Ver Presentación Interactiva Demo</span>

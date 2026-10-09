@@ -1,28 +1,28 @@
 import React, { useState } from 'react';
-import { 
-  CampaignCoordination, 
-  CampaignCommittee, 
+import {
+  CampaignCoordination,
+  CampaignCommittee,
   CampaignTask,
-  UserProfile, 
-  UserRole 
+  UserProfile,
+  UserRole
 } from '../types';
-import { 
-  Users, 
-  Target, 
-  MessageSquare, 
-  Scale, 
-  DollarSign, 
-  HeartHandshake, 
-  Truck, 
+import {
+  Users,
+  Target,
+  MessageSquare,
+  Scale,
+  DollarSign,
+  HeartHandshake,
+  Truck,
   Sparkles,
-  CheckCircle2, 
-  Clock, 
-  Plus, 
-  Search, 
-  FileText, 
-  ShieldCheck, 
-  Phone, 
-  Mail, 
+  CheckCircle2,
+  Clock,
+  Plus,
+  Search,
+  FileText,
+  ShieldCheck,
+  Phone,
+  Mail,
   ChevronRight,
   UserCheck,
   Award,
@@ -115,11 +115,11 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     if (selectedCoordId !== 'all' && coord.id !== selectedCoordId) return false;
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
-    const matchCoord = 
+    const matchCoord =
       coord.title.toLowerCase().includes(query) ||
       coord.coordinatorName.toLowerCase().includes(query) ||
       coord.summary.toLowerCase().includes(query);
-    const matchCommittees = coord.committees.some(c => 
+    const matchCommittees = coord.committees.some(c =>
       c.name.toLowerCase().includes(query) ||
       c.responsibilities.some(r => r.toLowerCase().includes(query)) ||
       (c.leadPerson && c.leadPerson.toLowerCase().includes(query))
@@ -241,7 +241,7 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
         {/* Visual Organigram Tree */}
         <div className="flex flex-col items-center space-y-6">
-          
+
           {/* TOP NODE: CANDIDATO */}
           <div className="w-full max-w-xl bg-gradient-to-r from-blue-900/60 via-indigo-900/80 to-blue-900/60 border-2 border-blue-500/50 rounded-2xl p-4 shadow-xl text-center relative hover:border-blue-400 transition-all">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-3 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-md">
@@ -260,10 +260,10 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
           {/* EXECUTIVE LEVEL: COORDINADOR GENERAL (IZQUIERDA) Y GERENTE (DERECHA / AL LADO) */}
           <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6 relative">
-            
+
             {/* Horizontal Line joining Coordinador General and Gerente */}
             <div className="hidden md:block absolute -top-3 left-1/4 right-1/4 h-0.5 bg-indigo-500/60"></div>
-            
+
             {/* Vertical connector down to Coordinador */}
             <div className="hidden md:block absolute -top-3 left-1/4 w-0.5 h-3 bg-indigo-500/60"></div>
 
@@ -307,14 +307,14 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
               {/* Direct Contact Bar */}
               <div className="mt-4 pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
-                <a 
+                <a
                   href={`tel:${generalCoordinator.phone}`}
                   className="flex items-center gap-1.5 hover:text-blue-400 transition cursor-pointer"
                 >
                   <Phone className="w-3.5 h-3.5 text-blue-400" />
                   <span>{generalCoordinator.phone}</span>
                 </a>
-                <a 
+                <a
                   href={`mailto:${generalCoordinator.email}`}
                   className="flex items-center gap-1.5 hover:text-blue-400 transition cursor-pointer"
                 >
@@ -361,14 +361,14 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
               {/* Direct Contact Bar */}
               <div className="mt-4 pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
-                <a 
+                <a
                   href={`tel:${campaignManager.phone}`}
                   className="flex items-center gap-1.5 hover:text-emerald-400 transition cursor-pointer"
                 >
                   <Phone className="w-3.5 h-3.5 text-emerald-400" />
                   <span>{campaignManager.phone}</span>
                 </a>
-                <a 
+                <a
                   href={`mailto:${campaignManager.email}`}
                   className="flex items-center gap-1.5 hover:text-emerald-400 transition cursor-pointer"
                 >
@@ -440,7 +440,7 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           const coordProgress = coordTasks > 0 ? Math.round((coordCompleted / coordTasks) * 100) : 0;
 
           return (
-            <div 
+            <div
               key={coord.id}
               className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-slate-700 transition-all duration-300 shadow-lg flex flex-col justify-between"
             >
@@ -448,7 +448,7 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
               <div className="p-5 border-b border-slate-800 bg-slate-800/30">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div 
+                    <div
                       className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-md shrink-0"
                       style={{ backgroundColor: coord.color }}
                     >
@@ -508,12 +508,12 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
                 <div className="space-y-2.5">
                   {coord.committees.map((committee) => {
-                    const taskPct = committee.tasksCount > 0 
-                      ? Math.round((committee.completedTasksCount / committee.tasksCount) * 100) 
+                    const taskPct = committee.tasksCount > 0
+                      ? Math.round((committee.completedTasksCount / committee.tasksCount) * 100)
                       : 0;
 
                     return (
-                      <div 
+                      <div
                         key={committee.id}
                         onClick={() => setActiveCommitteeModal({ coordination: coord, committee })}
                         className="p-3.5 bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-500/50 rounded-xl transition-all cursor-pointer group"
@@ -543,7 +543,7 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
                             {committee.leadPerson && (
                               <p className="text-[11px] text-slate-400 flex items-center gap-1">
-                                <span className="text-slate-500">Líder asignado:</span> 
+                                <span className="text-slate-500">Líder asignado:</span>
                                 <strong className="text-slate-300">{committee.leadPerson}</strong>
                               </p>
                             )}
@@ -568,8 +568,8 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                           <div className="text-right shrink-0">
                             <span className="text-xs font-bold text-slate-300">{committee.completedTasksCount}/{committee.tasksCount}</span>
                             <div className="w-16 bg-slate-800 rounded-full h-1.5 mt-1 overflow-hidden">
-                              <div 
-                                className="bg-indigo-500 h-1.5 rounded-full" 
+                              <div
+                                className="bg-indigo-500 h-1.5 rounded-full"
                                 style={{ width: `${taskPct}%` }}
                               ></div>
                             </div>
@@ -622,7 +622,7 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
             {/* Modal Form */}
             <form onSubmit={handleSaveExecutiveLeaders} className="p-6 space-y-6 overflow-y-auto flex-1">
-              
+
               {/* Sección Candidato */}
               <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-400">
@@ -702,8 +702,6 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                     <label className="block text-[11px] font-semibold text-slate-300 mb-1">Correo Electrónico</label>
                     <input
                       type="email"
-                      name="coordinator_email"
-                      autoComplete="email"
                       value={tempCoordinator.email}
                       onChange={(e) => setTempCoordinator({ ...tempCoordinator, email: e.target.value })}
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
@@ -761,8 +759,6 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                     <label className="block text-[11px] font-semibold text-slate-300 mb-1">Correo Electrónico</label>
                     <input
                       type="email"
-                      name="manager_email"
-                      autoComplete="email"
                       value={tempManager.email}
                       onChange={(e) => setTempManager({ ...tempManager, email: e.target.value })}
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
@@ -810,7 +806,7 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
             {/* Modal Header */}
             <div className="p-6 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div 
+                <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md"
                   style={{ backgroundColor: activeCommitteeModal.coordination.color }}
                 >
@@ -835,7 +831,7 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
             {/* Modal Body */}
             <div className="p-6 space-y-6 overflow-y-auto flex-1">
-              
+
               {/* Leader & Status Info */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
                 <div>

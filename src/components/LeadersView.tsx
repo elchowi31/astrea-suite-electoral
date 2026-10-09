@@ -179,7 +179,7 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
 
   return (
     <div className="space-y-6">
-      
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
@@ -252,8 +252,8 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Votos Fidelizados</span>
           <div className="text-2xl font-extrabold text-emerald-400 font-mono">{totalVotesCommitted.toLocaleString('es-CO')}</div>
           <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-            <div 
-              className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
+            <div
+              className="bg-emerald-500 h-full rounded-full transition-all duration-500"
               style={{ width: `${overallProgress}%` }}
             />
           </div>
@@ -293,7 +293,7 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
             const progress = lead.voteTarget > 0 ? (lead.votesCommitted / lead.voteTarget) * 100 : 0;
 
             return (
-              <div 
+              <div
                 key={lead.id}
                 className="bg-slate-950/80 border border-slate-800 hover:border-slate-700 rounded-xl p-4 space-y-3 transition flex flex-col justify-between"
               >
@@ -301,8 +301,8 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
                   {/* Leader top info */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <img 
-                        src={lead.photoUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'} 
+                      <img
+                        src={lead.photoUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'}
                         alt={lead.fullName}
                         className="w-12 h-12 rounded-full object-cover border border-slate-700"
                       />
@@ -316,8 +316,8 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
                     </div>
 
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                      lead.status === 'Destacado' 
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                      lead.status === 'Destacado'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         : lead.status === 'En Riesgo'
                         ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                         : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
@@ -339,7 +339,7 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
                       <span className="font-bold text-emerald-400">{lead.votesCommitted.toLocaleString('es-CO')} votos ({progress.toFixed(0)}%)</span>
                     </div>
                     <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className={`h-full rounded-full transition-all duration-300 ${
                           progress >= 80 ? 'bg-emerald-500' : progress >= 50 ? 'bg-blue-500' : 'bg-amber-500'
                         }`}
@@ -378,7 +378,7 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            
+
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2.5">
@@ -394,7 +394,7 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
                   </p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setShowModal(false)}
                 className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
               >
@@ -419,7 +419,7 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
             </div>
 
             <form onSubmit={handleCreate} className="space-y-4 text-xs">
-              
+
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">
                   Nombre Completo del Coordinador(a) <span className="text-rose-400">*</span>
@@ -549,8 +549,6 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
                   </label>
                   <input
                     type="tel"
-                    name="phone"
-                    autoComplete="tel"
                     required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
@@ -563,8 +561,6 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
                   <label className="block text-slate-300 font-semibold mb-1">Correo electrónico</label>
                   <input
                     type="email"
-                    name="email"
-                    autoComplete="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}

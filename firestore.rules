@@ -1,123 +1,186 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions for security and tenant isolation
-    function isAuthenticated() {
+    function signedIn() {
       return request.auth != null;
     }
 
-    // Reglas para Organizaciones / Tenants
-    match /organizaciones/{tenantId} {
-      allow read, write: if true;
+    function profileExists() {
+      return signedIn() && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
     }
 
-    // Reglas para Usuarios y Perfiles Políticos
+    function me() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function platformAdmin() {
+      // `admin` is an optional custom claim. Access it with get() so a normal
+      // Firebase user without that claim is evaluated as false instead of
+      // producing a rules error that denies an otherwise valid request.
+      return signedIn() && request.auth.token.get('admin', false) == true;
+    }
+
+    function sameTenant(tenantId) {
+      return profileExists()
+        && me().get('active', true) == true
+        && me().get('tenantId', '') == tenantId
+        && exists(/databases/$(database)/documents/organizaciones/$(tenantId))
+        && get(/databases/$(database)/documents/organizaciones/$(tenantId)).data.active == true;
+    }
+
+    function manager() {
+      return profileExists() && me().get('role', 'Consulta') in ['AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'Concejal', 'JefePolitico'];
+    }
+
+    function operator() {
+      return manager() || (profileExists() && me().get('role', 'Consulta') in ['Supervisor', 'Operador', 'LiderVeredal']);
+    }
+
+    function financialManager() {
+      return profileExists() && me().get('role', 'Consulta') in ['AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'JefePolitico'];
+    }
+
+    function canReadTenant(tenantId) {
+      return platformAdmin() || sameTenant(tenantId);
+    }
+
+    function canOperateTenant(tenantId) {
+      return platformAdmin() || (sameTenant(tenantId) && operator());
+    }
+
+    function canManageTenant(tenantId) {
+      return platformAdmin() || (sameTenant(tenantId) && manager());
+    }
+
+    function immutableTenant() {
+      return request.resource.data.tenantId == resource.data.tenantId;
+    }
+
     match /usuarios/{userId} {
-      allow read, write: if true;
+      // User provisioning is performed only by a trusted Firebase Admin or
+      // invitation service. A tenant value supplied by a browser is not proof
+      // that the user belongs to that organization.
+      allow create: if platformAdmin()
+        && request.resource.data.uid == userId
+        && request.resource.data.tenantId is string;
+      allow read: if signedIn() && (
+        request.auth.uid == userId
+        || platformAdmin()
+        || (manager() && sameTenant(resource.data.tenantId))
+      );
+      allow update: if platformAdmin()
+        || (request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'phone', 'avatarUrl', 'lastLoginAt', 'updatedAt', 'updatedBy']))
+        || (profileExists() && me().role == 'AdminTenant'
+          && sameTenant(resource.data.tenantId)
+          && request.resource.data.tenantId == resource.data.tenantId
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && !(resource.data.role in ['AdminGlobal', 'AdminTenant'])
+          && request.resource.data.role in ['Gobernador', 'Diputado', 'Alcalde', 'Concejal', 'JefePolitico', 'Supervisor', 'Operador', 'LiderVeredal', 'Consulta', 'Invitado']);
+      allow delete: if platformAdmin();
     }
 
-    // Reglas para Colección de Demostración Ficticia Aislada
-    match /demo/{demoId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Sesiones y Auditoría
     match /sesiones_usuarios/{sessionId} {
-      allow read, write: if true;
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && sameTenant(request.resource.data.tenantId);
+      allow read: if platformAdmin() || (manager() && sameTenant(resource.data.tenantId));
+      allow update, delete: if false;
     }
 
-    match /auditoria/{auditId} {
-      allow read, write: if true;
+    match /auditoria/{eventId} {
+      allow create: if signedIn()
+        && request.resource.data.actorId == request.auth.uid
+        && (platformAdmin() || sameTenant(request.resource.data.tenantId));
+      allow read: if platformAdmin() || (manager() && sameTenant(resource.data.tenantId));
+      allow update, delete: if false;
     }
 
-    match /auditoria_electoral/{auditId} {
-      allow read, write: if true;
+    match /organizaciones/{tenantId} {
+      allow read: if platformAdmin() || sameTenant(tenantId);
+      allow create, update, delete: if platformAdmin();
     }
 
-    match /eventos_workspace/{eventId} {
-      allow read, write: if true;
+    match /candidatos/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if canManageTenant(request.resource.data.tenantId);
+      allow update: if canManageTenant(resource.data.tenantId) && immutableTenant();
+      allow delete: if canManageTenant(resource.data.tenantId);
     }
 
-    // Reglas para Candidatos
-    match /candidatos/{candidateId} {
-      allow read, write: if true;
+    match /distritos/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if canManageTenant(request.resource.data.tenantId);
+      allow update: if canManageTenant(resource.data.tenantId) && immutableTenant();
+      allow delete: if canManageTenant(resource.data.tenantId);
     }
 
-    // Reglas para Gastos Electorales
-    match /gastos/{expenseId} {
-      allow read, write: if true;
+    match /lideres/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if canOperateTenant(request.resource.data.tenantId);
+      allow update: if canOperateTenant(resource.data.tenantId) && immutableTenant();
+      allow delete: if canManageTenant(resource.data.tenantId);
     }
 
-    // Reglas para Aportes y Donantes
-    match /aportes/{aporteId} {
-      allow read, write: if true;
+    match /votantes_rasos/{id} {
+      allow read: if platformAdmin()
+        || (sameTenant(resource.data.tenantId) && manager() && me().role != 'Concejal')
+        || (sameTenant(resource.data.tenantId) && me().role == 'Concejal' && me().get('assignedCandidateId', '') != '' && me().assignedCandidateId == resource.data.candidateId)
+        || (sameTenant(resource.data.tenantId) && operator() && me().get('assignedLeaderId', '') != '' && me().assignedLeaderId == resource.data.leaderId);
+      allow create: if canOperateTenant(request.resource.data.tenantId)
+        && request.resource.data.consentGiven == true
+        && request.resource.data.documentNumber is string
+        && request.resource.data.documentNumber.size() > 0
+        && (platformAdmin() || (manager() && me().role != 'Concejal')
+          || (me().role == 'Concejal' && me().get('assignedCandidateId', '') != '' && me().assignedCandidateId == request.resource.data.candidateId)
+          || (me().get('assignedLeaderId', '') != '' && me().assignedLeaderId == request.resource.data.leaderId));
+      allow update: if canOperateTenant(resource.data.tenantId)
+        && immutableTenant()
+        && request.resource.data.consentGiven == true
+        && (platformAdmin() || (manager() && me().role != 'Concejal')
+          || (me().role == 'Concejal' && me().get('assignedCandidateId', '') != '' && me().assignedCandidateId == resource.data.candidateId && me().assignedCandidateId == request.resource.data.candidateId)
+          || (me().get('assignedLeaderId', '') != '' && me().assignedLeaderId == resource.data.leaderId && me().assignedLeaderId == request.resource.data.leaderId));
+      allow delete: if canManageTenant(resource.data.tenantId);
     }
 
-    // Reglas para Líderes Territoriales
-    match /lideres/{leaderId} {
-      allow read, write: if true;
+    match /gastos/{id} {
+      allow read: if platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager());
+      allow create: if platformAdmin() || (sameTenant(request.resource.data.tenantId) && financialManager());
+      allow update: if (platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager())) && immutableTenant();
+      allow delete: if platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager());
     }
 
-    // Reglas para Vehículos de Transporte
-    match /vehiculos/{vehicleId} {
-      allow read, write: if true;
+    match /aportes/{id} {
+      allow read: if platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager());
+      allow create: if platformAdmin() || (sameTenant(request.resource.data.tenantId) && financialManager());
+      allow update: if (platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager())) && immutableTenant();
+      allow delete: if platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager());
     }
 
-    // Reglas para Propuestas Programáticas
-    match /propuestas/{propuestaId} {
-      allow read, write: if true;
+    // Datos 100% sintéticos para presentaciones. Se conservan aislados de las
+    // colecciones reales y pueden retirarse eliminando la colección `demo`.
+    match /demo/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if sameTenant(request.resource.data.tenantId)
+        && request.resource.data.isSynthetic == true
+        && request.resource.data.kind == 'presentation';
+      allow update: if canManageTenant(resource.data.tenantId)
+        && immutableTenant()
+        && request.resource.data.isSynthetic == true;
+      allow delete: if canManageTenant(resource.data.tenantId);
     }
 
-    // Reglas para Distritos Electorales
-    match /distritos/{distritoId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Archivos de Google Drive
-    match /archivos_drive/{fileId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Análisis de IA
-    match /analisis_ia/{analysisId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Votantes Rasos (Base de la Pirámide)
-    match /votantes_rasos/{voterId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Comités y Coordinaciones de Campaña
-    match /comites_coordinaciones/{coordinationId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Testigos Electorales Día D
-    match /testigos_electorales/{witnessId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Auditoría de Actas E-14
-    match /actas_e14/{auditId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Incidencias y Denuncias Electorales
-    match /incidencias_electorales/{incidentId} {
-      allow read, write: if true;
-    }
-
-    // Reglas para Eventos y Agenda de Campaña
-    match /eventos_agenda/{eventId} {
-      allow read, write: if true;
-    }
-
-    // Fallback general seguro para todas las subcolecciones
-    match /{document=**} {
-      allow read, write: if true;
+    match /{collectionName}/{id} {
+      allow read: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace']
+        && canReadTenant(resource.data.tenantId);
+      allow create: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace']
+        && canOperateTenant(request.resource.data.tenantId);
+      allow update: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace']
+        && canOperateTenant(resource.data.tenantId)
+        && immutableTenant();
+      allow delete: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace']
+        && canManageTenant(resource.data.tenantId);
     }
   }
 }
-

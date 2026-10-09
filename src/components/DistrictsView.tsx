@@ -66,9 +66,9 @@ export const DistrictsView: React.FC<DistrictsViewProps> = ({
 
   return (
     <div className="space-y-6">
-      
+
       {/* AUTHOR HEADER */}
-      <AuthorHeader 
+      <AuthorHeader
         title="Modelo de censo y proyección electoral"
         subtitle="Escenarios editables • Umbral de referencia • Cuociente y cifra repartidora"
       />
@@ -107,7 +107,7 @@ export const DistrictsView: React.FC<DistrictsViewProps> = ({
                 Simulador de Umbral, Cifra Repartidora & Meta de Victoria 2026
               </h3>
               <p className="text-xs text-slate-400">
-                Selecciona departamento, municipio y cargo para calcular la meta científica de votos.
+                Selecciona territorio y cargo para explorar supuestos de participación y metas.
               </p>
             </div>
           </div>
@@ -177,7 +177,7 @@ export const DistrictsView: React.FC<DistrictsViewProps> = ({
         {/* Projection Mathematical Outputs */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <div className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 space-y-1">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Censo Oficial</span>
+            <span className="text-[10px] uppercase font-bold text-slate-400 block">Censo de referencia</span>
             <div className="text-lg font-black text-white font-mono">{proyeccion2026.censoElectoralOficial2026.toLocaleString()}</div>
             <span className="text-[10px] text-slate-500">votantes habilitados</span>
           </div>
@@ -191,13 +191,13 @@ export const DistrictsView: React.FC<DistrictsViewProps> = ({
           <div className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 space-y-1">
             <span className="text-[10px] uppercase font-bold text-slate-400 block">Votos Válidos</span>
             <div className="text-lg font-black text-indigo-300 font-mono">{proyeccion2026.votosValidosProyectados.toLocaleString()}</div>
-            <span className="text-[10px] text-slate-500">descontando nulos/blancos</span>
+            <span className="text-[10px] text-slate-500">descontando nulos/no marcados</span>
           </div>
 
           <div className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 space-y-1">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Umbral Legal (3%)</span>
+            <span className="text-[10px] uppercase font-bold text-slate-400 block">Mínimo según cargo</span>
             <div className="text-lg font-black text-amber-300 font-mono">{proyeccion2026.umbralLegal3Pct.toLocaleString()}</div>
-            <span className="text-[10px] text-slate-500">piso Ley 1475/2011</span>
+            <span className="text-[10px] text-slate-500">no aplica a alcaldía/gobernación</span>
           </div>
 
           <div className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 space-y-1">
@@ -205,18 +205,18 @@ export const DistrictsView: React.FC<DistrictsViewProps> = ({
             <div className="text-lg font-black text-purple-300 font-mono">
               {proyeccion2026.cifraRepartidoraEstimada > 0 ? proyeccion2026.cifraRepartidoraEstimada.toLocaleString() : 'N/A'}
             </div>
-            <span className="text-[10px] text-slate-500">{proyeccion2026.escanosDisputados} curules</span>
+            <span className="text-[10px] text-slate-500">requiere votos por lista</span>
           </div>
 
           <div className="bg-slate-900 p-3.5 rounded-2xl border border-emerald-500/40 bg-emerald-950/20 space-y-1">
             <span className="text-[10px] uppercase font-bold text-emerald-400 block flex items-center gap-1">
               <Award className="w-3 h-3 text-emerald-400" />
-              Meta de Victoria
+              Meta supuesta (43,5%)
             </span>
             <div className="text-lg font-black text-emerald-400 font-mono">
               {proyeccion2026.metaVictoriaUninominal.toLocaleString()}
             </div>
-            <span className="text-[10px] text-emerald-400/80 font-semibold">Votos para ganar</span>
+            <span className="text-[10px] text-emerald-400/80 font-semibold">no garantiza victoria</span>
           </div>
         </div>
 
@@ -233,7 +233,7 @@ export const DistrictsView: React.FC<DistrictsViewProps> = ({
 
       {/* District Priority Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* District list */}
         <div className="space-y-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">Distritos & Subregiones Estratégicas</h3>
@@ -279,7 +279,7 @@ export const DistrictsView: React.FC<DistrictsViewProps> = ({
         {/* Selected District Detail & AI Strategy Panel */}
         {selectedDistrict ? (
           <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-6">
-            
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-blue-400">{selectedDistrict.region}</span>

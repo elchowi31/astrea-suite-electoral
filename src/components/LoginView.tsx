@@ -2,29 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, UserRole, ElectoralLevel, Tenant } from '../types';
 import { CESAR_MUNICIPALITIES } from '../data/geography';
 import { generarIdDocumentoLegible } from '../lib/slugify';
-import { 
-  loginWithEmailPassword, 
-  registerWithEmailPassword, 
+import {
+  loginWithEmailPassword,
+  registerWithEmailPassword,
   loginWithGoogle,
   logSessionToFirestore,
   sendPasswordReset
 } from '../lib/firebaseAuth';
 import { filterUsersByScope, getRoleHierarchyLevel } from '../lib/permissions';
 import { SynapticNeuralBackground } from './SynapticNeuralBackground';
-import { 
-  User, 
-  Lock, 
-  Mail, 
-  UserCheck, 
-  UserPlus, 
-  Building2, 
-  MapPin, 
-  Flag, 
-  Award, 
-  CheckCircle2, 
-  Sparkles, 
-  Shield, 
-  LogOut, 
+import {
+  User,
+  Lock,
+  Mail,
+  UserCheck,
+  UserPlus,
+  Building2,
+  MapPin,
+  Flag,
+  Award,
+  CheckCircle2,
+  Sparkles,
+  Shield,
+  LogOut,
   KeyRound,
   Phone,
   ExternalLink,
@@ -112,18 +112,18 @@ export const LoginView: React.FC<LoginViewProps> = ({
       const result = await loginWithEmailPassword(cleanEmail, loginPassword);
 
       if (result.success && result.user) {
-        setFeedbackMsg({ 
-          type: 'success', 
-          text: `¡Bienvenido(a)! Sesión autenticada en Firebase y registrada en Firestore para ${result.user.displayName}.` 
+        setFeedbackMsg({
+          type: 'success',
+          text: `¡Bienvenido(a)! Sesión autenticada en Firebase y registrada en Firestore para ${result.user.displayName}.`
         });
         onLogin(result.user);
         if (onContinueToApp) {
           setTimeout(() => onContinueToApp(), 700);
         }
       } else {
-        setFeedbackMsg({ 
-          type: 'error', 
-          text: result.error || 'Error al autenticar con Firebase.' 
+        setFeedbackMsg({
+          type: 'error',
+          text: result.error || 'Error al autenticar con Firebase.'
         });
       }
     } catch (err: any) {
@@ -140,18 +140,18 @@ export const LoginView: React.FC<LoginViewProps> = ({
     try {
       const result = await loginWithGoogle(currentTenant.tenantId);
       if (result.success && result.user) {
-        setFeedbackMsg({ 
-          type: 'success', 
-          text: `Autenticación Google exitosa. Sesión iniciada como ${result.user.displayName}.` 
+        setFeedbackMsg({
+          type: 'success',
+          text: `Autenticación Google exitosa. Sesión iniciada como ${result.user.displayName}.`
         });
         onLogin(result.user);
         if (onContinueToApp) {
           setTimeout(() => onContinueToApp(), 700);
         }
       } else {
-        setFeedbackMsg({ 
-          type: 'error', 
-          text: result.error || 'No se pudo completar la autenticación con Google.' 
+        setFeedbackMsg({
+          type: 'error',
+          text: result.error || 'No se pudo completar la autenticación con Google.'
         });
       }
     } catch (err: any) {
@@ -265,12 +265,12 @@ export const LoginView: React.FC<LoginViewProps> = ({
         <style>
           {`
             @keyframes pulseTravel {
-              0% { stroke-dashoffset: 1200; }
-              100% { stroke-dashoffset: 0; }
+              0%, 100% { transform: translateX(0); opacity: 0.7; }
+              50% { transform: translateX(-1%); opacity: 1; }
             }
             @keyframes synapticPulse {
-              0%, 100% { r: 4px; opacity: 0.7; filter: drop-shadow(0 0 4px #22d3ee); }
-              50% { r: 7.5px; opacity: 1; filter: drop-shadow(0 0 12px #67e8f9); }
+              0%, 100% { transform: scale(1); opacity: 0.7; }
+              50% { transform: scale(1.35); opacity: 1; }
             }
             @keyframes synapticWaveFloat {
               0%, 100% { transform: translateY(0px) scaleY(1); }
@@ -288,13 +288,15 @@ export const LoginView: React.FC<LoginViewProps> = ({
               animation: pulseTravel 22s linear infinite;
             }
             .synaptic-node {
-              animation: synapticPulse 3.5s ease-in-out infinite;
+              transform-box: fill-box;
+              transform-origin: center;
+              animation: synapticPulse 3.5s var(--ease-in-out) infinite;
             }
           `}
         </style>
 
         {/* Primary Synaptic Axon Waves */}
-        <g className="synaptic-wave-float" style={{ animation: 'synapticWaveFloat 8s ease-in-out infinite' }}>
+        <g className="synaptic-wave-float" style={{ animation: 'synapticWaveFloat 8s var(--ease-in-out) infinite' }}>
           <path d="M-80 570 C180 440 230 740 450 510 S760 250 1280 390" fill="none" stroke="url(#synapseGrad1)" strokeWidth="2" filter="url(#glow-synapse)" className="synaptic-wave-1" />
           <path d="M-60 260 C240 360 300 70 570 240 S970 540 1260 130" fill="none" stroke="url(#synapseGrad2)" strokeWidth="1.8" filter="url(#glow-synapse)" className="synaptic-wave-2" />
           <path d="M0 400 Q300 620 600 380 T1200 420" fill="none" stroke="rgba(45,212,191,0.3)" strokeWidth="1.2" className="synaptic-wave-3" />
@@ -313,13 +315,13 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
       {/* Top Navigation: Return to Landing Page */}
       {onBackToLanding && (
-        <div className="w-full max-w-2xl flex items-center justify-between mb-4 animate-[fade-in_500ms_ease-out]">
+        <div className="w-full max-w-2xl flex items-center justify-between mb-4 animate-fade-in">
           <button
             type="button"
             onClick={onBackToLanding}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-cyan-300 hover:text-white border border-cyan-500/30 text-xs font-bold shadow-xl shadow-cyan-950/40 backdrop-blur-md transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer group"
+            className="presentation-button inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-cyan-300 hover:text-white border border-cyan-500/30 text-xs font-bold shadow-xl shadow-cyan-950/40 backdrop-blur-md cursor-pointer focus-visible:outline-2 focus-visible:outline-cyan-300"
           >
-            <ArrowLeft className="w-4 h-4 text-cyan-400 group-hover:-translate-x-1 transition-transform" />
+            <ArrowLeft className="w-4 h-4 text-cyan-400" />
             <span>Volver a la Página Principal</span>
           </button>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-slate-400 font-mono">
@@ -329,7 +331,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
         </div>
       )}
 
-      <div className="w-full max-w-2xl mb-7 text-center animate-[fade-in_700ms_ease-out]">
+      <div className="w-full max-w-2xl mb-7 text-center animate-fade-in">
         <p className="text-cyan-300 text-xs tracking-[.32em] font-bold uppercase mb-3">Inteligencia territorial conectada</p>
         <h1 className="text-4xl sm:text-6xl font-black leading-[.92] tracking-tight">
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-sky-200 to-indigo-300 drop-shadow-lg">
@@ -338,13 +340,13 @@ export const LoginView: React.FC<LoginViewProps> = ({
         </h1>
         <p className="mt-4 text-sm sm:text-base text-slate-300 max-w-xl mx-auto">La plataforma que transforma operación territorial en decisiones de campaña precisas, seguras y medibles.</p>
       </div>
-      
+
       {/* Container Card */}
-      <div 
+      <div
         id="login-main-card"
         className="w-full max-w-2xl bg-slate-950/80 backdrop-blur-xl border border-cyan-300/20 rounded-[2rem] p-6 sm:p-8 shadow-2xl shadow-cyan-950/30 space-y-6 relative overflow-hidden"
       >
-        
+
         {/* Background ambient accents */}
         <div className="absolute -top-24 -right-24 w-72 h-72 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -352,7 +354,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
         {/* Top Brand & Hierarchy Header */}
         <div id="login-header-section" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
           <div className="flex items-center gap-3.5">
-            <div 
+            <div
               id="login-tenant-badge"
               className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-xl shadow-lg border border-white/20 shrink-0"
               style={{ backgroundColor: currentTenant.primaryColor || '#2563eb' }}
@@ -361,7 +363,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </div>
             <div>
               <h1 id="login-title" className="text-xl font-black text-white tracking-tight flex items-center gap-2">
-                Acceso al Comando Electoral Territorial
+                Acceso al Comando Electoral 2026
                 <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-mono">
                   Multi-Tenant
                 </span>
@@ -400,11 +402,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
         {/* Feedback Messages */}
         {feedbackMsg && (
-          <div 
+          <div
             id="login-feedback-alert"
             className={`p-3.5 rounded-2xl text-xs flex items-center gap-2.5 border ${
-              feedbackMsg.type === 'success' 
-                ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200' 
+              feedbackMsg.type === 'success'
+                ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200'
                 : 'bg-rose-950/80 border-rose-500/50 text-rose-200'
             }`}
           >
@@ -436,15 +438,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
           <button
             id="tab-btn-register"
             type="button"
-            onClick={() => { setActiveTab('register'); setFeedbackMsg(null); }}
-            className={`flex-1 py-2.5 font-bold rounded-xl flex items-center justify-center gap-2 transition cursor-pointer ${
-              activeTab === 'register'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
+            onClick={() => setFeedbackMsg({ type: 'error', text: 'El acceso es administrado. Solicite a un administrador autorizado que cree su perfil e invitación.' })}
+            className="flex-1 py-2.5 font-bold rounded-xl flex items-center justify-center gap-2 transition cursor-pointer text-slate-400 hover:text-slate-200"
           >
             <UserPlus className="w-4 h-4" />
-            <span>Registrar Nuevo Aspirante</span>
+            <span>Solicitar acceso</span>
           </button>
 
           {currentUser && (
@@ -467,7 +465,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
         {/* TAB 1: DIRECT LOGIN (Email & Password + Google) */}
         {activeTab === 'direct' && (
           <form id="form-direct-login" autoComplete="on" onSubmit={handleDirectLogin} className="space-y-4">
-            
+
             <div className="space-y-3">
               <div>
                 <label id="lbl-login-email" className="block text-xs font-bold text-slate-300 mb-1">
@@ -580,7 +578,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
         {/* TAB 2: REGISTER NEW CANDIDATE / USER */}
         {activeTab === 'register' && (
           <form id="form-register-user" autoComplete="on" onSubmit={handleRegister} className="space-y-4 text-xs">
-            
+
             {/* Predictive Firestore ID */}
             <div id="register-firestore-id-badge" className="bg-slate-950 border border-blue-500/30 p-2.5 rounded-xl flex items-center justify-between text-xs">
               <div className="space-y-0.5">
@@ -733,7 +731,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               <span className="text-[10px] text-slate-400">
                 Se sincronizará en Firebase Authentication y colección <code className="text-blue-300 font-mono">/usuarios</code> en Firestore.
               </span>
-              
+
               <button
                 id="btn-submit-register"
                 type="submit"
