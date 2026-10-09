@@ -21,7 +21,7 @@ El simulador muestra fuente, fecha y territorio. Permite importar CSV de estadí
 
 ## Arquitectura y acceso
 
-React 19, TypeScript, Vite, Firebase Authentication y Cloud Firestore. La API de Vercel verifica el token Firebase y el perfil antes de utilizar Gemini. Google Workspace utiliza OAuth individual; Google Maps muestra coordenadas registradas.
+React 19, TypeScript, Vite, Firebase Authentication y Cloud Firestore. La API de Vercel verifica el token Firebase y el perfil antes de utilizar Gemini. Google Workspace utiliza OAuth individual. [Mapa territorial](docs/MAPAS-Y-RUTAS.md) ofrece Satelital HD, Calles y Google Maps, ubicación desde formularios o GPS, filtros y rutas por carretera guardadas en los vehículos. El mapa permanece visible aun sin registros georreferenciados.
 
 Proyecto Firebase: `gen-lang-client-0498782352`. Base **nombrada**: `ai-studio-astreasuiteelect-5da3410d-4b0c-4301-8bd6-083fbb5c653b`. Interfaz, API y `firebase.json` usan la misma base. Publicar reglas de `(default)` no cambia el acceso de esta plataforma.
 

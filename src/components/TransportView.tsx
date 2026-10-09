@@ -1,4 +1,6 @@
 import { createRecordId } from '../lib/recordIds';
+import { parseLocation, googleDirectionsUrl, googleLocationUrl, validLocation } from '../lib/territorialMaps';
+import { LocationPicker } from './common/LocationPicker';
 import React, { useState, useEffect } from 'react';
 import { Tenant, TransportVehicle, UserProfile, UserRole } from '../types';
 import { getTerritorialScope, filterVehiclesByScope } from '../lib/permissions';
@@ -134,10 +136,9 @@ export const TransportView: React.FC<TransportViewProps> = ({
       setFormError('Complete placa, conductor y teléfono.');
       return;
     }
-    if ((latitude && !longitude) || (!latitude && longitude)) {
-      setFormError('Para georreferenciar, complete latitud y longitud.');
-      return;
-    }
+    let location;
+    try { location = parseLocation(latitude, longitude); }
+    catch (error) { setFormError((error as Error).message); return; }
 
     const vehicle: TransportVehicle = {
       id: createRecordId(currentTenant.tenantId, generatedDocId || 'vehiculo'),
@@ -153,7 +154,7 @@ export const TransportView: React.FC<TransportViewProps> = ({
       dailyCost: Math.max(0, Number(dailyCost || 0)),
       fuelBudget: Math.max(0, Number(fuelBudget || 0)),
       status: 'Operativo - Día D',
-      ...(latitude && longitude ? { latitude: Number(latitude), longitude: Number(longitude) } : {}),
+      ...(location ? { ...location, locationCapturedAt: new Date().toISOString(), locationSource: 'Manual' as const } : {}),
     };
     setSaving(true);
     try {
@@ -315,6 +316,9 @@ export const TransportView: React.FC<TransportViewProps> = ({
                     <span>{veh.municipality} • {veh.assignedZone}</span>
                   </p>
                 </div>
+
+                {validLocation(veh) && <a href={googleLocationUrl({ latitude: veh.latitude!, longitude: veh.longitude! })} target="_blank" rel="noreferrer" className="inline-block text-xs text-cyan-300 underline">Ver ubicación en Google Maps ↗</a>}
+                {veh.plannedRoute && <div className="rounded-lg border border-cyan-800 bg-cyan-950/30 p-3 text-xs text-cyan-200"><p className="font-semibold">Ruta: {veh.plannedRoute.name}</p><p className="mt-1">{(veh.plannedRoute.distanceMeters / 1000).toFixed(1)} km · {Math.round(veh.plannedRoute.durationSeconds / 60)} min aproximados</p><a className="mt-2 inline-block underline" href={googleDirectionsUrl(veh.plannedRoute.stops)} target="_blank" rel="noreferrer">Navegar ruta en Google Maps ↗</a></div>}
 
                 {/* Capacity & Fuel */}
                 <div className="flex items-center justify-between text-xs pt-1">
@@ -496,16 +500,7 @@ export const TransportView: React.FC<TransportViewProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Latitud (opcional)</label>
-                  <input type="number" min="-90" max="90" step="any" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="Ej: 9.4981" className="w-full bg-slate-800 border border-slate-700 text-slate-100 p-2.5 rounded-xl focus:outline-none font-mono" />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Longitud (opcional)</label>
-                  <input type="number" min="-180" max="180" step="any" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="Ej: -73.9785" className="w-full bg-slate-800 border border-slate-700 text-slate-100 p-2.5 rounded-xl focus:outline-none font-mono" />
-                </div>
-              </div>
+              <LocationPicker latitude={latitude} longitude={longitude} onChange={(lat, lng) => { setLatitude(lat); setLongitude(lng); }} />
 
               {/* Tarifas en COP */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

@@ -742,6 +742,11 @@ export default function App() {
 
           {currentUser && activeTab === 'map' && (
             <TerritorialMapView
+              key={`${currentTenant.tenantId}-${demoActive ? 'demo' : 'real'}`}
+              tenantId={currentTenant.tenantId}
+              currentUser={currentUser}
+              userRole={userRole}
+              readOnly={demoActive}
               leaders={visibleLeaders.filter((l) => l.tenantId === currentTenant.tenantId)}
               vehicles={visibleVehicles.filter((v) => v.tenantId === currentTenant.tenantId)}
               tenantName={currentTenant.name}
