@@ -1,3 +1,5 @@
+import { createRecordId } from '../lib/recordIds';
+import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
 import React, { useState, useMemo } from 'react';
 import {
   Candidate,
@@ -36,8 +38,8 @@ interface ElectoralHierarchyRollupViewProps {
   grassrootsVoters: GrassrootsVoter[];
   currentUser?: UserProfile | null;
   userRole?: UserRole;
-  onAddVoter: (voter: GrassrootsVoter) => void;
-  onAddLeader?: (leader: Leader) => void;
+  onAddVoter: (voter: GrassrootsVoter) => Promise<void>;
+  onAddLeader?: (leader: Leader) => Promise<void>;
 }
 
 export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupViewProps> = ({
@@ -50,6 +52,7 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
   onAddLeader
 }) => {
   // Navigation & Drilldown States
+  const { saving, saveError, submit, runSave } = useFirestoreForm();
   const [selectedHierarchyTier, setSelectedHierarchyTier] = useState<
     'all' | 'Gobernacion' | 'Asamblea' | 'Alcaldia' | 'Concejo' | 'Lideres' | 'Votantes'
   >('all');
@@ -234,7 +237,7 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
   }, [grassrootsVoters, selectedMunicipality, selectedCandidateId, selectedLeaderId, searchQuery]);
 
   // Handle Submit New Voter
-  const handleCreateVoter = (e: React.FormEvent) => {
+  const handleCreateVoter = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVoterName.trim() || !newVoterDoc.trim() || !newVoterSector.trim() || !newVoterConsent) {
       alert('Complete los datos obligatorios y confirme la autorización para el tratamiento de datos.');
@@ -245,7 +248,7 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
     const assignedCandidate = candidates.find(c => c.id === newVoterCandidateId);
 
     const newVoter: GrassrootsVoter = {
-      id: `votante-${Date.now()}`,
+      id: createRecordId(currentUser?.tenantId || '', 'votante'),
       tenantId: currentUser?.tenantId || '',
       fullName: newVoterName.trim(),
       documentNumber: newVoterDoc.trim(),
@@ -269,7 +272,7 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
       dataSource: 'Directo'
     };
 
-    onAddVoter(newVoter);
+    await onAddVoter(newVoter);
     setIsRegisterVoterOpen(false);
 
     // Reset fields
@@ -858,7 +861,7 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
               </button>
             </div>
 
-            <form onSubmit={handleCreateVoter} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={event => submit(event, handleCreateVoter)} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto"><FormSaveStatus saving={saving} error={saveError} /><fieldset disabled={saving} className="contents">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-slate-300">Nombre Completo *</label>
@@ -1045,7 +1048,7 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
                   Guardar en Pirámide
                 </button>
               </div>
-            </form>
+            </fieldset></form>
           </div>
         </div>
       )}

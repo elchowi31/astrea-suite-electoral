@@ -8,13 +8,14 @@ interface Props {
   level: ElectoralLevel;
   rows: StatisticalRow[];
   imported: StatisticalRow[];
-  onImport: (rows: StatisticalRow[]) => void;
-  onRemoveSource: (source: string) => void;
+  onImport: (rows: StatisticalRow[]) => Promise<void>;
+  onRemoveSource: (source: string) => Promise<void>;
   onYearChange: (year: number) => void;
   onApplyCensus: (row: StatisticalRow) => void;
   onApplyHistory: (history: ReturnType<typeof historicalBaseline>) => void;
 }
 export function StatisticalDataPanel({ scope, year, level, rows, imported, onImport, onRemoveSource, onYearChange, onApplyCensus, onApplyHistory }: Props) {
+  const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<StatisticalRow[]>([]);
   const [message, setMessage] = useState('');
   const [historyChoice, setHistoryChoice] = useState('');
@@ -24,7 +25,8 @@ export function StatisticalDataPanel({ scope, year, level, rows, imported, onImp
   const populationSource = population ? selected.filter(row => sourceIdentity(row) === sourceIdentity(population)) : [];
   const urban = referenceRow(populationSource, scope, 'poblacion_urbana', year);
   const rural = referenceRow(populationSource, scope, 'poblacion_rural', year);
-  const histories = [...new Map(selected.filter(row => row.level === level).map(row => [historyKey(row), row])).entries()];
+  const seats = referenceRow(selected.filter(row=>row.level===level && row.year<=year),scope,'curules');
+  const histories = [...new Map(selected.filter(row => row.level === level && row.metric === 'sufragantes').map(row => [historyKey(row), row])).entries()];
   const sources = useMemo(() => [...new Map(selected.map(row => [sourceIdentity(row), row])).entries()], [rows, scope]);
   const years = [...new Set([2023, 2026, 2027, ...selected.filter(row => row.metric === 'poblacion').map(row => row.year)])].sort();
   const inputStyle = 'rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm text-slate-100';
@@ -46,7 +48,7 @@ export function StatisticalDataPanel({ scope, year, level, rows, imported, onImp
       <label className="flex items-center gap-2 text-xs">Año de población<select aria-label="Año de población" className={inputStyle} value={year} onChange={event => onYearChange(Number(event.target.value))}>{years.map(value => <option key={value}>{value}</option>)}</select></label>
     </div>
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {[['Censo de referencia', census], [`Población proyectada ${year}`, population], ['Cabecera municipal', urban], ['Rural y centros poblados', rural]].map(([label, item]) => {
+      {[['Censo de referencia', census], [`Población proyectada ${year}`, population], ['Cabecera municipal', urban], ['Rural y centros poblados', rural], ['Curules de referencia', seats]].map(([label, item]) => {
         const row = item as StatisticalRow | undefined;
         return <div key={String(label)} className="rounded-xl border border-slate-700 bg-slate-950 p-3"><p className="text-xs text-slate-400">{String(label)}</p><p className="mt-1 text-xl font-bold text-cyan-200">{row ? row.value.toLocaleString('es-CO') : 'Sin dato'}</p>{row && <p className="mt-1 text-[11px] text-slate-400">Referencia: {row.referenceDate} · {row.provenance === 'oficial' ? 'Fuente oficial' : 'Fuente aportada'}</p>}</div>;
       })}
@@ -68,8 +70,8 @@ export function StatisticalDataPanel({ scope, year, level, rows, imported, onImp
           <button className={buttonStyle} onClick={() => downloadText(`estadisticas-${scope}-${year}.csv`, exportStatisticalCsv(selected))}>Exportar datos del territorio</button>
         </div>
         <p className="text-xs text-slate-400">Indicadores admitidos: {Object.keys(METRICS).join(', ')}. Cargo histórico: {level}. Fecha: AAAA-MM-DD. Números sin separadores de miles.</p>
-        {pending.length > 0 && <div className="space-y-2"><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr>{['Municipio', 'Año', 'Indicador', 'Grupo', 'Valor', 'Fuente'].map(label => <th key={label} className="p-2">{label}</th>)}</tr></thead><tbody>{pending.slice(0, 5).map((row, index) => <tr key={index} className="border-t border-slate-700"><td className="p-2">{row.municipality}</td><td>{row.year}</td><td>{METRICS[row.metric]}</td><td>{row.group || 'Total'}</td><td>{row.value.toLocaleString('es-CO')}</td><td>{row.source}</td></tr>)}</tbody></table></div><button className={buttonStyle} onClick={() => { onImport(pending); setPending([]); setMessage('Datos incorporados en este navegador. Exporte el escenario para trasladarlos a otro equipo.'); }}>Incorporar {pending.length} filas</button><button className="ml-2 text-xs text-slate-400" onClick={() => setPending([])}>Descartar</button></div>}
-        <div className="space-y-2">{sources.map(([key, row]) => <div key={key} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-950 p-3 text-xs"><div><a href={safeSourceUrl(row.url)} target="_blank" rel="noreferrer" className="text-cyan-300 underline">{row.source}</a><p className="mt-1 text-slate-400">Referencia: {row.referenceDate} · {row.provenance === 'oficial' ? 'Documento oficial incorporado' : 'Aportada por el usuario; pendiente de verificación'}</p></div>{imported.some(item => sourceIdentity(item) === key) && <button onClick={() => onRemoveSource(key)} className="text-rose-300">Eliminar fuente importada</button>}</div>)}</div>
+        {pending.length > 0 && <div className="space-y-2"><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr>{['Municipio', 'Año', 'Indicador', 'Grupo', 'Valor', 'Fuente'].map(label => <th key={label} className="p-2">{label}</th>)}</tr></thead><tbody>{pending.slice(0, 5).map((row, index) => <tr key={index} className="border-t border-slate-700"><td className="p-2">{row.municipality}</td><td>{row.year}</td><td>{METRICS[row.metric]}</td><td>{row.group || 'Total'}</td><td>{row.value.toLocaleString('es-CO')}</td><td>{row.source}</td></tr>)}</tbody></table></div><button className={buttonStyle} disabled={busy} onClick={async () => { if (busy) return; setBusy(true); try { await onImport(pending); setPending([]); setMessage('Datos incorporados y guardados.'); } catch(error) { setMessage((error as Error).message); } finally { setBusy(false); } }}>Incorporar {pending.length} filas</button><button className="ml-2 text-xs text-slate-400" onClick={() => setPending([])}>Descartar</button></div>}
+        <div className="space-y-2">{sources.map(([key, row]) => <div key={key} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-950 p-3 text-xs"><div><a href={safeSourceUrl(row.url)} target="_blank" rel="noreferrer" className="text-cyan-300 underline">{row.source}</a><p className="mt-1 text-slate-400">Referencia: {row.referenceDate} · {row.provenance === 'oficial' ? 'Documento oficial incorporado' : 'Aportada por el usuario; pendiente de verificación'}</p></div>{imported.some(item => sourceIdentity(item) === key) && <button disabled={busy} onClick={async () => { if (busy) return; setBusy(true); try { await onRemoveSource(key); setMessage('Fuente retirada del catálogo compartido.'); } catch(error) { setMessage((error as Error).message); } finally { setBusy(false); } }} className="text-rose-300">Eliminar fuente importada</button>}</div>)}</div>
         {selected.filter(row => ['poblacion_edad', 'pobreza_pct', 'desempleo_pct', 'electoras', 'electores', 'mesas'].includes(row.metric)).length > 0 && <div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr><th className="p-2">Indicador</th><th>Grupo</th><th>Año</th><th>Valor</th><th>Referencia</th></tr></thead><tbody>{selected.filter(row => ['poblacion_edad', 'pobreza_pct', 'desempleo_pct', 'electoras', 'electores', 'mesas'].includes(row.metric) && row.year === year).map((row, index) => <tr key={index} className="border-t border-slate-800"><td className="p-2">{METRICS[row.metric]}</td><td>{row.group || 'Total'}</td><td>{row.year}</td><td>{row.value.toLocaleString('es-CO')}</td><td><a className="text-cyan-300 underline" href={row.url} target="_blank" rel="noreferrer">{row.referenceDate}</a></td></tr>)}</tbody></table></div>}
       </div>
     </details>

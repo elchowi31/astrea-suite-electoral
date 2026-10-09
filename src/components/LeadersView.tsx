@@ -1,3 +1,4 @@
+import { createRecordId } from '../lib/recordIds';
 import React, { useState, useEffect } from 'react';
 import { Tenant, Leader, UserProfile, UserRole } from '../types';
 import { getTerritorialScope, filterLeadersByScope } from '../lib/permissions';
@@ -140,7 +141,7 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
     }
 
     const leader: Leader = {
-      id: generatedDocId || `lider-${Date.now()}`,
+      id: createRecordId(currentTenant.tenantId, generatedDocId || 'lider'),
       tenantId: currentTenant.tenantId,
       fullName: fullName.trim(),
       zoneOrDistrict,

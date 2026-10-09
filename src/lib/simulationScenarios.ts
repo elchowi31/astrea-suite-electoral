@@ -13,7 +13,7 @@ export interface SimulatorSnapshot {
   historicalOrigin: string;
   imported: StatisticalRow[];
 }
-export interface SavedScenario { id: string; name: string; savedAt: string; snapshot: SimulatorSnapshot }
+export interface SavedScenario { id: string; name: string; savedAt: string; snapshot: SimulatorSnapshot; sourceDatasetId?: string }
 
 export function validateSnapshot(input: unknown, tenantId: string): SimulatorSnapshot {
   const snapshot = input as SimulatorSnapshot;

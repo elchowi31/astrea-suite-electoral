@@ -199,14 +199,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <UserCheck className="w-4 h-4" />
             <span>Ingreso & Perfiles Autorizados</span>
           </button>}
-          <button
+          {!currentUser && <button
             id="auth-modal-tab-register"
-            onClick={() => setErrorMsg('El acceso es administrado. Solicite a un administrador autorizado que cree su perfil e invitación.')}
+            onClick={() => { setActiveTab('register'); setErrorMsg(null); }}
             className="flex-1 py-2 font-bold rounded-xl flex items-center justify-center gap-2 transition cursor-pointer text-slate-400 hover:text-slate-200"
           >
             <UserPlus className="w-4 h-4" />
-            <span>Solicitar acceso</span>
-          </button>
+            <span>Crear cuenta y organización</span>
+          </button>}
         </div>
 
         {/* TAB 1: LOGIN */}
@@ -287,7 +287,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* TAB 2: REGISTER */}
         {activeTab === 'register' && (
-          <form onSubmit={handleRegisterSubmit} className="space-y-3 text-xs">
+          <form onSubmit={handleRegisterSubmit} className="space-y-3 text-xs"><p className="text-slate-300">Creará una organización propia. Para ingresar a un equipo existente, use la cuenta creada por su administrador.</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div>
                 <label className="block text-slate-300 font-bold mb-1">Tratamiento</label>

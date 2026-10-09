@@ -4,6 +4,7 @@ import type { ElectoralLevel } from '../types';
 export const METRICS = {
   censo: 'Censo electoral', poblacion: 'Población proyectada', poblacion_urbana: 'Población en cabecera', poblacion_rural: 'Población rural y centros poblados',
   electoras: 'Mujeres en el censo electoral', electores: 'Hombres en el censo electoral', mesas: 'Mesas de votación',
+  curules: 'Curules de referencia',
   sufragantes: 'Sufragantes históricos', blancos: 'Votos en blanco', nulos: 'Votos nulos', no_marcados: 'Votos no marcados', votos_partido: 'Votos por lista o candidatura',
   poblacion_edad: 'Población por grupo de edad', pobreza_pct: 'Pobreza (%)', desempleo_pct: 'Desempleo (%)',
 } as const;
@@ -91,7 +92,7 @@ export function exportStatisticalCsv(rows: StatisticalRow[]) {
 }
 
 export function referenceRow(rows: StatisticalRow[], municipality: string, metric: Metric, year?: number) {
-  return rows.filter(row => row.municipality === municipality && row.metric === metric && !row.level && (year === undefined || row.year === year))
+  return rows.filter(row => row.municipality === municipality && row.metric === metric && (!row.level || metric === 'curules') && (year === undefined || row.year === year))
     .sort((a, b) => b.year - a.year || b.referenceDate.localeCompare(a.referenceDate) || Number(b.provenance === 'aportada') - Number(a.provenance === 'aportada'))[0];
 }
 

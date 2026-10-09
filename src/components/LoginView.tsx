@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { UserProfile, UserRole, ElectoralLevel, Tenant } from '../types';
 import { CESAR_MUNICIPALITIES } from '../data/geography';
-import { generarIdDocumentoLegible } from '../lib/slugify';
 import {
   loginWithEmailPassword,
   registerWithEmailPassword,
@@ -78,17 +77,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [party, setParty] = useState('');
   const [tenantId, setTenantId] = useState(currentTenant.tenantId || tenants[0]?.tenantId);
   const [phone, setPhone] = useState('');
-  const [generatedUid, setGeneratedUid] = useState('');
-
-  // Auto-generate predictive clean UID
-  useEffect(() => {
-    if (fullName) {
-      const clean = `${prefix} ${fullName}`.trim();
-      setGeneratedUid(generarIdDocumentoLegible('usuario', clean));
-    } else {
-      setGeneratedUid('usuario-nuevo-perfil');
-    }
-  }, [prefix, fullName]);
 
   // Role changes never overwrite organization data entered by the user.
   const handleRoleChange = (newRole: UserRole) => {
@@ -117,9 +105,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
           text: `¡Bienvenido(a)! Sesión autenticada en Firebase y registrada en Firestore para ${result.user.displayName}.`
         });
         onLogin(result.user);
-        if (onContinueToApp) {
-          setTimeout(() => onContinueToApp(), 700);
-        }
       } else {
         setFeedbackMsg({
           type: 'error',
@@ -145,9 +130,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
           text: `Autenticación Google exitosa. Sesión iniciada como ${result.user.displayName}.`
         });
         onLogin(result.user);
-        if (onContinueToApp) {
-          setTimeout(() => onContinueToApp(), 700);
-        }
       } else {
         setFeedbackMsg({
           type: 'error',
@@ -208,13 +190,10 @@ export const LoginView: React.FC<LoginViewProps> = ({
       if (result.success && result.user) {
         setFeedbackMsg({
           type: 'success',
-          text: 'Solicitud creada. El perfil inicia con acceso de consulta hasta que un administrador valide el rol solicitado.'
+          text: 'Cuenta creada. Su organización está lista; puede crear los accesos de su equipo desde Usuarios y accesos.'
         });
         onRegister(result.user);
         onLogin(result.user);
-        if (onContinueToApp) {
-          setTimeout(() => onContinueToApp(), 900);
-        }
       } else {
         setFeedbackMsg({
           type: 'error',
@@ -438,11 +417,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
           <button
             id="tab-btn-register"
             type="button"
-            onClick={() => setFeedbackMsg({ type: 'error', text: 'El acceso es administrado. Solicite a un administrador autorizado que cree su perfil e invitación.' })}
+            onClick={() => { setActiveTab('register'); setFeedbackMsg(null); }}
             className="flex-1 py-2.5 font-bold rounded-xl flex items-center justify-center gap-2 transition cursor-pointer text-slate-400 hover:text-slate-200"
           >
             <UserPlus className="w-4 h-4" />
-            <span>Solicitar acceso</span>
+            <span>Crear cuenta</span>
           </button>
 
           {currentUser && (
@@ -579,18 +558,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
         {activeTab === 'register' && (
           <form id="form-register-user" autoComplete="on" onSubmit={handleRegister} className="space-y-4 text-xs">
 
-            {/* Predictive Firestore ID */}
-            <div id="register-firestore-id-badge" className="bg-slate-950 border border-blue-500/30 p-2.5 rounded-xl flex items-center justify-between text-xs">
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-bold text-blue-400 tracking-wider block">
-                  Documento Firestore Destino:
-                </span>
-                <span className="font-mono font-bold text-white text-xs">/usuarios/{generatedUid}</span>
-              </div>
-              <span className="text-[9px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-md font-bold">
-                Auto-sincronizado
-              </span>
-            </div>
+            <p className="rounded-xl bg-slate-950 p-3 text-slate-300">Creará una organización propia para su equipo. Si ya le crearon una cuenta, use Ingreso directo con esas credenciales.</p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Prefix */}
@@ -615,7 +583,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
               {/* Full Name */}
               <div className="sm:col-span-2">
-                <label id="lbl-reg-fullname" className="block text-slate-300 font-bold mb-1">Nombre Completo del Aspirante *</label>
+                <label id="lbl-reg-fullname" className="block text-slate-300 font-bold mb-1">Nombre completo *</label>
                 <input
                   id="input-reg-fullname"
                   type="text"
@@ -645,7 +613,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   <option value="Diputado">🏛️ Candidato Asamblea Departamental</option>
                   <option value="JefePolitico">👔 Jefe Político / Estratega</option>
                   <option value="LiderVeredal">📍 Líder Territorial / Veredal</option>
-                  <option value="AdminGlobal">👑 Administrador Global</option>
                 </select>
               </div>
 
@@ -670,7 +637,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Email */}
               <div>
-                <label id="lbl-reg-email" className="block text-slate-300 font-bold mb-1">Correo Electrónico (Firebase Auth) *</label>
+                <label id="lbl-reg-email" className="block text-slate-300 font-bold mb-1">Correo electrónico *</label>
                 <input
                   id="input-reg-email"
                   type="email"
@@ -729,7 +696,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
             <div className="pt-2 flex items-center justify-between border-t border-slate-800">
               <span className="text-[10px] text-slate-400">
-                Se sincronizará en Firebase Authentication y colección <code className="text-blue-300 font-mono">/usuarios</code> en Firestore.
+                Su cuenta y organización se guardan antes de ingresar.
               </span>
 
               <button
@@ -746,7 +713,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 ) : (
                   <>
                     <UserPlus className="w-4 h-4" />
-                    <span>Crear Perfil & Registrar Inicio de Sesión</span>
+                    <span>Crear cuenta y organización</span>
                   </>
                 )}
               </button>

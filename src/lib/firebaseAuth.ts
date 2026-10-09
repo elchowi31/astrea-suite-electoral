@@ -10,6 +10,8 @@ import {
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { UserProfile } from '../types';
+import { accountError, createPersonalOrganization } from './userProvisioning';
+import { isPlatformAdminClaims } from './accessPolicy';
 
 // Real Firebase Auth Provider
 const googleProvider = new GoogleAuthProvider();
@@ -98,8 +100,8 @@ export async function loginWithEmailPassword(
     }
     const claims = await fbUser.getIdTokenResult();
     const profile = { ...docSnap.data(), uid: fbUser.uid } as UserProfile;
-    profile.role = claims.claims.admin === true ? 'AdminGlobal' : profile.role === 'AdminGlobal' ? 'Consulta' : profile.role;
-    if (profile.active === false) {
+    profile.role = isPlatformAdminClaims(claims.claims) ? 'AdminGlobal' : profile.role === 'AdminGlobal' ? 'Consulta' : profile.role;
+    if (!isPlatformAdminClaims(claims.claims) && (profile.active !== true || profile.accessVersion !== 2)) {
       await signOut(auth);
       throw new Error('Este acceso se encuentra inactivo. Contacte al administrador de su organización.');
     }
@@ -131,17 +133,14 @@ export async function loginWithEmailPassword(
  * Register a new user in Firebase Auth and Firestore with strict role & hierarchy
  */
 export async function registerWithEmailPassword(
-  _profileData: Omit<UserProfile, 'uid' | 'createdAt'> & { createdAt?: string },
-  _password?: string
+  profileData: Omit<UserProfile, 'uid' | 'createdAt'> & { createdAt?: string },
+  password?: string
 ): Promise<AuthResult> {
-  // A tenant identifier in the URL is not authorization. Creating Firebase
-  // accounts from the browser would let anyone join an organization as a
-  // read-only user. Accounts must be provisioned by an administrator through
-  // a trusted Firebase Admin / invitation workflow.
-  return {
-    success: false,
-    error: 'El acceso es administrado. Solicite a un administrador autorizado que cree su perfil e invitación.'
-  };
+  try {
+    const user = await createPersonalOrganization(profileData, password || '');
+    await logSessionToFirestore(user, 'registro_correo');
+    return { success: true, user, firebaseUser: auth.currentUser! };
+  } catch (error) { return { success: false, error: accountError(error) }; }
 }
 
 /**
@@ -166,8 +165,8 @@ export async function loginWithGoogle(_currentTenantId: string = 'tenant-astrea-
 
     const claims = await fbUser.getIdTokenResult();
     const profile = { ...snap.data(), uid: fbUser.uid } as UserProfile;
-    profile.role = claims.claims.admin === true ? 'AdminGlobal' : profile.role === 'AdminGlobal' ? 'Consulta' : profile.role;
-    if (profile.active === false) {
+    profile.role = isPlatformAdminClaims(claims.claims) ? 'AdminGlobal' : profile.role === 'AdminGlobal' ? 'Consulta' : profile.role;
+    if (!isPlatformAdminClaims(claims.claims) && (profile.active !== true || profile.accessVersion !== 2)) {
       await signOut(auth);
       return { success: false, error: 'Este acceso se encuentra inactivo. Contacte al administrador de su organización.' };
     }
@@ -201,12 +200,13 @@ export function observeAuthenticatedProfile(callback: (profile: UserProfile | nu
     try {
       const token = await firebaseUser.getIdTokenResult();
       if (version !== observedVersion) return;
-      unsubscribeProfile = onSnapshot(doc(db, 'usuarios', firebaseUser.uid), snapshot => {
+      unsubscribeProfile = onSnapshot(doc(db, 'usuarios', firebaseUser.uid), { includeMetadataChanges: true }, snapshot => {
         if (version !== observedVersion) return;
+        if (snapshot.metadata.hasPendingWrites) return;
         if (!snapshot.exists()) { callback(null); return; }
         const profile = { ...snapshot.data(), uid: firebaseUser.uid } as UserProfile;
-        profile.role = token.claims.admin === true ? 'AdminGlobal' : profile.role === 'AdminGlobal' ? 'Consulta' : profile.role;
-        callback(profile.active === false ? null : profile);
+        profile.role = isPlatformAdminClaims(token.claims) ? 'AdminGlobal' : profile.role === 'AdminGlobal' ? 'Consulta' : profile.role;
+        callback(isPlatformAdminClaims(token.claims) || (profile.active === true && profile.accessVersion === 2) ? profile : null);
       }, () => { if (version === observedVersion) callback(null); });
     } catch {
       if (version === observedVersion) callback(null);

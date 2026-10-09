@@ -1,3 +1,4 @@
+import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Tenant,
@@ -49,9 +50,9 @@ interface TenantsViewProps {
   tenants: Tenant[];
   currentTenant: Tenant;
   onSelectTenant: (tenant: Tenant) => void;
-  onAddTenant: (tenant: Tenant) => void;
-  onUpdateTenant?: (tenant: Tenant) => void;
-  onDeleteTenant?: (tenantId: string) => void;
+  onAddTenant: (tenant: Tenant) => Promise<void>;
+  onUpdateTenant?: (tenant: Tenant) => Promise<void>;
+  onDeleteTenant?: (tenantId: string) => Promise<void>;
   userRole: UserRole;
   users?: UserProfile[];
   candidates?: Candidate[];
@@ -76,6 +77,7 @@ export const TenantsView: React.FC<TenantsViewProps> = ({
   vehicles = [],
   donorContributions = [],
 }) => {
+  const { saving, saveError, submit, runSave } = useFirestoreForm();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
@@ -122,7 +124,7 @@ export const TenantsView: React.FC<TenantsViewProps> = ({
     });
   }, [tenants, candidates, expenses, leaders, vehicles, donorContributions]);
 
-  const handleCreateTenant = (e: React.FormEvent) => {
+  const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tenantName.trim()) return;
 
@@ -136,7 +138,7 @@ export const TenantsView: React.FC<TenantsViewProps> = ({
       active: true,
     };
 
-    onAddTenant(newTenant);
+    await onAddTenant(newTenant);
     setShowCreateModal(false);
     setTenantName('');
     setLogoUrl('');
@@ -151,7 +153,7 @@ export const TenantsView: React.FC<TenantsViewProps> = ({
     setShowEditModal(true);
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTenant || !tenantName.trim()) return;
 
@@ -164,13 +166,13 @@ export const TenantsView: React.FC<TenantsViewProps> = ({
     };
 
     if (onUpdateTenant) {
-      onUpdateTenant(updated);
+      await onUpdateTenant(updated);
     }
     setShowEditModal(false);
     setEditingTenant(null);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!tenantToDelete) return;
     if (tenants.length <= 1) {
       alert('Debe existir al menos un partido u organización activa en el sistema.');
@@ -178,7 +180,7 @@ export const TenantsView: React.FC<TenantsViewProps> = ({
       return;
     }
     if (onDeleteTenant) {
-      onDeleteTenant(tenantToDelete.tenantId);
+      await onDeleteTenant(tenantToDelete.tenantId);
     }
     setTenantToDelete(null);
   };
@@ -187,6 +189,7 @@ export const TenantsView: React.FC<TenantsViewProps> = ({
 
   return (
     <div className="space-y-6">
+      <FormSaveStatus saving={saving} error={saveError} />
       
       {/* AUTHOR HEADER */}
       <AuthorHeader
@@ -510,7 +513,7 @@ export const TenantsView: React.FC<TenantsViewProps> = ({
               </span>
             </div>
 
-            <form onSubmit={handleCreateTenant} className="space-y-4 text-xs">
+            <form onSubmit={event => submit(event, handleCreateTenant)} className="space-y-4 text-xs"><FormSaveStatus saving={saving} error={saveError} /><fieldset disabled={saving} className="contents">
               <div>
                 <label className="block font-bold text-slate-300 mb-1">Nombre de la Organización / Comando *</label>
                 <input
@@ -587,7 +590,7 @@ export const TenantsView: React.FC<TenantsViewProps> = ({
                   Guardar & Aprovisionar en Firestore
                 </button>
               </div>
-            </form>
+            </fieldset></form>
           </div>
         </div>
       )}
@@ -616,7 +619,7 @@ export const TenantsView: React.FC<TenantsViewProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
+            <form onSubmit={event => submit(event, handleSaveEdit)} className="space-y-4 text-xs"><FormSaveStatus saving={saving} error={saveError} /><fieldset disabled={saving} className="contents">
               <div>
                 <label className="block font-bold text-slate-300 mb-1">Nombre de la Organización *</label>
                 <input
@@ -681,7 +684,7 @@ export const TenantsView: React.FC<TenantsViewProps> = ({
                   Guardar Cambios
                 </button>
               </div>
-            </form>
+            </fieldset></form>
           </div>
         </div>
       )}
@@ -719,7 +722,7 @@ export const TenantsView: React.FC<TenantsViewProps> = ({
               </button>
               <button
                 type="button"
-                onClick={handleConfirmDelete}
+                onClick={() => void runSave(handleConfirmDelete)}
                 className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-rose-600/30 cursor-pointer"
               >
                 Sí, Eliminar Partido

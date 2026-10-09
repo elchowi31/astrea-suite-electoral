@@ -1,139 +1,45 @@
-# Revisión de archivos y simulación · 9 de octubre de 2026
+# Revisión y simulación · 9 de octubre de 2026
 
 ## Por qué GitHub conservaba una versión antigua
 
-La carpeta de trabajo no tenía `.git`, historial ni remoto. GitHub mantenía
-`main` en `82bda51b2930ac55411fee67d134cf8ca2423682`, del 15 de septiembre de
-2026. La documentación local registra despliegues directos a Vercel de una
-versión posterior. Publicar archivos a Vercel no crea commits en GitHub.
+La carpeta no tenía `.git`, historial ni remoto. GitHub mantenía `main` en `82bda51b2930ac55411fee67d134cf8ca2423682`, del 15 de septiembre de 2026. Había despliegues directos a Vercel posteriores: publicar en Vercel no crea commits en GitHub. Se recuperaron el historial y remoto conservando los archivos locales y se incorporó la actualización mediante [PR 1](https://github.com/elchowi31/astrea-suite-electoral/pull/1).
 
-Antes de esta revisión había 42 archivos modificados o ausentes respecto de
-GitHub, además de archivos nuevos de API, despliegue y pruebas. Se recuperó
-el historial y el remoto sin sobrescribir los archivos de trabajo. Los cambios
-se preparan en `codex/cesar-data-simulation` para revisión; no se reemplaza
-automáticamente `main` ni se publica producción.
+Había 42 archivos modificados o ausentes respecto de GitHub y nuevos archivos de API, publicación y pruebas. Diez módulos históricos ya no tenían uso en la versión local: verificador de paquetes demo, DemoDataModal, DriverBeaconModal, ProspectsElectoralView, SatelliteRadarCanvas, UniversalDataIngestionView, astreaEntrepreneursData, demoPackages, demoPersistence y telemetryService. Siguen recuperables en el historial; no se presentan como funciones activas. La aplicación actual ofrece estadísticas importables, demo aislada, formularios, equipo y escenarios compartidos. La compilación verifica que los imports actuales se resuelvan.
 
-## Archivos presentes y módulos ausentes
+## Fuentes incorporadas
 
-La versión local pasó inicialmente TypeScript y sus nueve pruebas existentes.
-Esto confirma que sus imports actuales se resuelven; no confirma que conserve
-todas las funciones históricas ni los flujos externos autenticados.
+1. [RNEC · Divipole Congreso 2026](https://wapp.registraduria.gov.co/electoral/2026/congreso-de-la-republica/IMG/pdf/Divipole_definitiva_%20Elecciones_Congreso_2026_GEO_CITREP_Exterior_L_V_v5.pdf): 300 puestos, páginas 90–97, agregados para 25 municipios. Censo, electoras, electores y mesas. Astrea: **17.189 electores**; Cesar: **931.353**. Corresponde a la elección del 8 de marzo de 2026, no a una elección futura.
+2. [DANE · Proyecciones municipales por área 2018–2042](https://www.dane.gov.co/files/censo2018/proyecciones-de-poblacion/Municipal/PPED-AreaMun-2018-2042_VP.xlsx): años 2023, 2026 y 2027, municipios y agregado departamental, basadas en CNPV 2018 con actualización demográfica. Astrea 2026: **22.306 habitantes**, 11.731 en cabecera y 10.575 rurales/centros poblados. Son proyecciones oficiales.
+3. [RNEC · Preconteo territorial 2023](https://resultadosprec2023.registraduria.gov.co/): 52 boletines de alcaldías y concejos de los 25 municipios, gobernación y asamblea del Cesar. Se concilian censo, sufragantes, blancos, nulos, no marcados y votos por todas las listas. Astrea Alcaldía 2023: censo **16.558**, sufragantes **11.819**. Es preconteo informativo, no escrutinio definitivo. Gamarra corresponde a octubre de 2023, cuando ganó el voto en blanco, no a la repetición posterior.
+4. [RNEC · Curules de concejos 2023](https://www.registraduria.gov.co/IMG/pdf/20230719_curules-concejo.pdf), páginas 11–12, y [curules de asambleas 2023](https://www.registraduria.gov.co/IMG/pdf/20230719_curules-asamblea.pdf), página 1: los 25 concejos y Asamblea del Cesar. Astrea usa **11** curules de referencia, editables para otra elección.
 
-Diez archivos presentes en GitHub ya estaban ausentes de la carpeta:
+Son **1.073 filas agregadas**, sin cédulas de candidatos ni datos personales. `statistics-evidence.json`, `election-history-evidence.json` y `seats-evidence.json` registran procedencia y controles. La huella de curules corresponde a la transcripción revisada del PDF, no al PDF original. Los scripts `prepare-cesar-statistics.py`, `prepare-cesar-election-history.ts` y `prepare-cesar-seats.py` reconstruyen los catálogos y rechazan cobertura o totales incompletos.
 
-| Archivo | Función histórica |
-| --- | --- |
-| `scripts/verify-demo-packages.ts` | Verificación de paquetes demo |
-| `src/components/DemoDataModal.tsx` | Gestión histórica de paquetes demo |
-| `src/components/DriverBeaconModal.tsx` | Seguimiento de conductores |
-| `src/components/ProspectsElectoralView.tsx` | Prospectos |
-| `src/components/SatelliteRadarCanvas.tsx` | Radar visual |
-| `src/components/UniversalDataIngestionView.tsx` | Importación universal |
-| `src/data/astreaEntrepreneursData.ts` | Catálogo histórico de emprendedores |
-| `src/data/demoPackages.ts` | Paquetes demo |
-| `src/lib/demoPersistence.ts` | Persistencia histórica de demo |
-| `src/lib/telemetryService.ts` | Telemetría |
+## Gestionar simulaciones
 
-Permanecen recuperables en el historial de Git. Esta actualización añade
-importación de estadísticas agregadas y escenarios; no declara restaurados
-prospectos, telemetría ni la importación histórica de datos personales.
+1. Abra **Simulador electoral** y seleccione municipio y cargo. Gobernación, Asamblea y Cámara usan el agregado del Cesar; Alcaldía y Concejo usan el municipio.
+2. Revise **Datos reales y fuentes**. Las tasas y listas iniciales proceden del histórico 2023 disponible y se proyectan sobre el censo de referencia 2026. Cámara no tiene histórico cargado: sus supuestos se editan explícitamente.
+3. Abra **Gestionar estadísticas, fuentes e importaciones**, descargue la plantilla, cargue CSV, revise la vista previa e incorpore las filas. El catálogo se comparte en Firestore.
+4. Otro histórico requiere censo, sufragantes, blancos, nulos, no marcados y votos por todas las listas del mismo territorio, año, cargo y fuente. Los totales deben conciliar. Use municipio `Cesar` para corporaciones departamentales.
+5. Marque **Nuestra lista**, ajuste supuestos y pulse **Fijar como escenario base**. Conservador y optimista parten de la misma base: pulsarlos varias veces no acumula multiplicadores.
+6. Guarde con nombre. Otro integrante del mismo equipo puede recuperar parámetros y fuentes. Exporte JSON para trasladarlo a otro navegador de la misma organización.
 
-## Fuentes realmente incorporadas
+Las fuentes extensas se dividen en documentos pequeños. Las cargas simultáneas usan identificadores distintos. Retirar una fuente del catálogo no borra las copias conservadas por escenarios guardados.
 
-1. [RNEC · Divipole definitiva Congreso 2026](https://wapp.registraduria.gov.co/electoral/2026/congreso-de-la-republica/IMG/pdf/Divipole_definitiva_%20Elecciones_Congreso_2026_GEO_CITREP_Exterior_L_V_v5.pdf).
-   Se sumaron 300 puestos del Cesar, páginas 90–97, para 25 municipios.
-   Incluye censo, electoras, electores y mesas. Astrea: **17.189 electores**;
-   Cesar: **931.353**. El documento corresponde a la elección del 8 de marzo
-   de 2026; su tabla no declara una fecha adicional de corte. No se presenta
-   como censo vigente para una elección futura.
-2. [DANE · Proyecciones municipales de población por área 2018–2042](https://www.dane.gov.co/files/censo2018/proyecciones-de-poblacion/Municipal/PPED-AreaMun-2018-2042_VP.xlsx),
-   publicado en la página de proyecciones el 8 de agosto de 2025, basado en
-   CNPV 2018 con actualización demográfica. Se incorporaron 2023, 2026 y
-   2027 para los 25 municipios y el agregado departamental. Astrea 2026:
-   **22.306 habitantes**, 11.731 en cabecera y 10.575 rurales/centros poblados.
-   Son proyecciones oficiales de población, no conteos del censo electoral.
-
-El archivo `statistics-evidence.json` conserva las huellas SHA-256 de los
-documentos y los controles de extracción. `scripts/prepare-cesar-statistics.py`
-permite reconstruir el catálogo con Python, `pypdf` y `openpyxl`. Los originales
-y la caché quedan excluidos de Git. Si cambia el formato del PDF, la extracción
-debe revisarse; las comprobaciones impiden aceptar una cobertura incompleta.
-
-## Cómo gestionar la simulación
-
-1. Abra **Simulador electoral** y seleccione municipio y cargo. Gobernación,
-   Asamblea y Cámara utilizan el agregado del Cesar; Alcaldía y Concejo usan
-   el municipio.
-2. Revise **Datos reales y fuentes** y pulse **Usar censo de referencia**.
-   Cambiar el año de población no cambia silenciosamente el censo ya aplicado.
-3. Abra **Gestionar estadísticas, fuentes e importaciones**. Descargue la
-   plantilla, cargue el CSV y revise sus primeras filas antes de incorporarlo.
-4. Para usar un histórico, cargue censo, sufragantes, blancos, nulos, no
-   marcados y votos por lista/candidatura del mismo territorio, año, cargo y
-   fuente. El sistema exige que todos los totales concilien. Use una fila con
-   municipio `Cesar` cuando el resultado sea departamental.
-5. Aplique el histórico como base. Sus tasas de participación y proporciones
-   de votos se proyectan sobre el censo de referencia disponible. Seleccione
-   **Nuestra lista**, ajuste parámetros y pulse **Fijar como escenario base**.
-6. Compare escenarios. Conservador y optimista usan supuestos explícitos
-   desde la misma base; pulsar varias veces no acumula multiplicadores.
-7. Guarde un nombre y recupere el escenario después. Exporte JSON para
-   trasladar parámetros y fuentes a otro navegador de la misma organización.
-
-## Formato CSV
-
-Columnas obligatorias, en este orden:
+## CSV
 
 ```text
 municipio,anio,indicador,grupo,valor,cargo,fuente,url,fecha_corte
 ```
 
-Se admiten coma o punto y coma como delimitadores y campos entre comillas.
-Los valores de conteo son enteros sin separadores de miles. Los porcentajes
-usan punto decimal o coma dentro de un campo entre comillas.
+Admite coma o punto y coma y campos entre comillas. Conteos enteros sin separadores de miles; porcentajes con punto decimal o coma entre comillas. `fecha_corte`: `AAAA-MM-DD`; `url`: HTTPS. `grupo` identifica partido/candidatura o edad. `cargo` queda vacío para contexto demográfico o censo general y usa el nombre del selector para históricos.
 
-Indicadores: `censo`, `poblacion`, `poblacion_urbana`, `poblacion_rural`,
-`electoras`, `electores`, `mesas`, `sufragantes`, `blancos`, `nulos`,
-`no_marcados`, `votos_partido`, `poblacion_edad`, `pobreza_pct`, `desempleo_pct`.
-El campo `grupo` se usa para partidos/candidaturas o grupos de edad; los otros
-indicadores requieren un total. `cargo` queda vacío para contexto demográfico
-o censo general y usa el nombre del selector para resultados históricos.
-`fecha_corte` usa `AAAA-MM-DD`; `url` requiere HTTPS. Cada fuente aportada
-permanece identificada como pendiente de verificación, aunque su enlace sea
-oficial.
+Indicadores: `censo`, `poblacion`, `poblacion_urbana`, `poblacion_rural`, `electoras`, `electores`, `mesas`, `sufragantes`, `blancos`, `nulos`, `no_marcados`, `votos_partido`, `curules`, `poblacion_edad`, `pobreza_pct`, `desempleo_pct`. Las fuentes importadas se identifican como aportadas por usuarios: validar formato y totales no certifica autenticidad. Edad, pobreza y desempleo se admiten por importación; no hay cifras precargadas ni se inventan valores ausentes.
 
-## Cálculos y límites
+## Cálculos y verificación
 
-- No se asignan curules si los votos por listas no concilian con sufragantes
-  menos blancos, nulos y no marcados. **Ajustar al total** conserva proporciones
-  y reparte los residuos de redondeo.
-- Alcaldía/Gobernación usan mayoría relativa; no tienen un umbral ficticio
-  del 40%. D'Hondt conserva los cocientes decimales y bloquea empates en el
-  corte. La excepción de dos curules utiliza cociente y residuos. Referencia:
-  [Constitución, artículo 263](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=4125).
-- No se calcula una cifra repartidora a partir del censo solamente. Requiere
-  votos por todas las listas. Las curules iniciales del selector son una
-  referencia editable y deben confirmarse por corporación y año.
-- Los escenarios no son intervalos estadísticos ni probabilidades de victoria.
-  La demografía no se transforma automáticamente en preferencias políticas.
-- **Pendiente de fuentes**: resultados definitivos por lista y candidato,
-  participación histórica, grupos de edad, pobreza y desempleo. Se pueden
-  importar; no se rellenan con cifras inventadas. Los datos electorales de
-  presentación y otros catálogos heredados siguen siendo ficticios o supuestos
-  donde así se indica.
-- El guardado es local por organización. Falta sincronización de escenarios
-  entre usuarios/equipos mediante una colección y reglas de acceso validadas.
-  Las reglas locales de Firestore siguen pendientes de conciliación con
-  producción y no se despliegan en esta revisión.
+Las listas deben sumar sufragantes menos blancos, nulos y no marcados. **Ajustar al total** conserva proporciones y distribuye residuos de redondeo. Alcaldía/Gobernación usan mayoría relativa. D’Hondt conserva cocientes decimales, exige superar el umbral y bloquea empates en el corte; dos curules usan cociente y residuos. El voto en blanco con mayoría absoluta bloquea la asignación. Referencia: [Constitución, artículo 263](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=4125).
 
-## Verificación de esta actualización
+Los escenarios muestran consecuencias de supuestos, no intervalos estadísticos ni probabilidades de victoria. La demografía se muestra como contexto y no se convierte automáticamente en intención política.
 
-- TypeScript, 17 pruebas automatizadas, arranque de la API compilada y
-  compilaciones de frontend/servidor completados con `npm run check`.
-- Interfaz local verificada en escritorio (1440 px) y móvil (390 px), sin
-  errores de ejecución observados ni desbordamiento horizontal de la página.
-- Comprobados: escenarios repetidos sin acumulación, guardar/recuperar,
-  censo departamental correcto, bloqueo de exportaciones inconsistentes e
-  importación/aplicación de un histórico de prueba claramente identificado.
-- El flujo de prueba usa estadísticas públicas y un espacio de presentación
-  local; no escribe en Firebase ni prueba sesiones autenticadas de producción.
+La validación incluye TypeScript, **26 pruebas** de cálculo, API, fuentes y reglas; arranque de API compilada y compilaciones. Las reglas cubren registro atómico, rechazo de escalamiento, aislamiento de organizaciones, cuentas anónimas/inactivas/heredadas, formularios de integrantes y consentimiento/consulta propia de electores. Las pruebas de interfaz y servicio real comprueban guardados y recuperación. Las cuentas temporales se retiran al terminar.

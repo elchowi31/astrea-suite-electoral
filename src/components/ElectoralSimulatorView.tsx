@@ -1,22 +1,37 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { Candidate, ElectoralLevel, Tenant } from '../types';
 import { CESAR_MUNICIPALITIES } from '../data/geography';
 import bundledStatistics from '../data/cesarStatistics.json';
+import electionHistory from '../data/cesarElectionHistory.json';
+import referenceSeats from '../data/cesarSeats.json';
 import { StatisticalDataPanel, sourceIdentity } from './StatisticalDataPanel';
 import { AuthorHeader } from './common/AuthorHeader';
 import { distributeVotes, getVoteBudget, simulateElection, type ElectionParameters } from '../lib/electoralSimulation';
-import { downloadText, referenceRow, scopeForLevel, validateRows, type StatisticalRow } from '../lib/statisticalData';
+import { downloadText, historicalBaseline, historyKey, referenceRow, scopeForLevel, validateRows, type StatisticalRow } from '../lib/statisticalData';
+import { auth } from '../lib/firebase';
+import { appendSharedRows, deleteSharedScenario, loadSharedScenario, removeSharedSource, saveSharedScenario, subscribeSharedSimulation } from '../lib/sharedSimulation';
+import { accountError } from '../lib/userProvisioning';
 import { buildScenario, validateSnapshot, type SavedScenario, type SimulatorSnapshot } from '../lib/simulationScenarios';
 
-const OFFICIAL_ROWS = bundledStatistics as StatisticalRow[];
+const OFFICIAL_ROWS = [...bundledStatistics, ...electionHistory, ...referenceSeats] as StatisticalRow[];
 const COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#a855f7', '#06b6d4'];
 const LEVELS: ElectoralLevel[] = ['Concejo Municipal', 'Alcaldía', 'Gobernación', 'Asamblea / Diputación', 'Cámara de Representantes'];
 const balance = (input: ElectionParameters): ElectionParameters => ({ ...input, parties: distributeVotes(input.parties, getVoteBudget(input.census, input.turnout, input.nullPct, input.unmarkedPct, input.blankPct)) });
-const initialParameters = (tenant: Tenant): ElectionParameters => balance({ census: referenceRow(OFFICIAL_ROWS, 'Astrea', 'censo')?.value ?? 0, turnout: 58.5, nullPct: 2.8, unmarkedPct: 1.4, blankPct: 2.2, seats: 13, level: 'Concejo Municipal', parties: [
-  { id: 'lista-1', name: `${tenant.name} (lista de escenario)`, votes: 36, isUserParty: true, color: COLORS[0] },
-  ...[31, 22, 14, 7].map((votes, index) => ({ id: `lista-${index + 2}`, name: `Lista de ejemplo ${index + 2}`, votes, color: COLORS[index + 1] })),
-] });
+function initialParameters(tenant: Tenant, municipality='Astrea', level:ElectoralLevel='Concejo Municipal', rows=OFFICIAL_ROWS): ElectionParameters {
+  const scope=scopeForLevel(municipality,level);
+  const source=rows.find(row=>row.municipality===scope && row.level===level && row.metric==='sufragantes');
+  const history=source ? historicalBaseline(rows,scope,level,historyKey(source)) : undefined;
+  const seats=referenceRow(rows.filter(row=>row.level===level),scope,'curules')?.value;
+  return balance({census:referenceRow(rows,scope,'censo')?.value ?? 0,level,seats:['Alcaldía','Gobernación'].includes(level)?1:seats ?? (level==='Cámara de Representantes'?4:11),
+    turnout:history?.turnout ?? 58.5,nullPct:history?.nullPct ?? 2.8,unmarkedPct:history?.unmarkedPct ?? 1.4,blankPct:history?.blankPct ?? 2.2,
+    parties:history ? history.parties.map((row,index)=>({id:`hist-${index}`,name:row.group,votes:row.value,color:COLORS[index%COLORS.length],isUserParty:false})) : [{id:'lista-manual',name:`${tenant.name} · escenario manual`,votes:1,color:COLORS[0],isUserParty:false}]
+  });
+}
+function initialHistoryOrigin(municipality='Astrea',level:ElectoralLevel='Concejo Municipal') {
+  return OFFICIAL_ROWS.some(row=>row.municipality===scopeForLevel(municipality,level)&&row.level===level&&row.metric==='sufragantes')
+    ? 'RNEC · Preconteo territorial 2023 (informativo, no escrutinio). Tasas y proporciones aplicadas al censo de referencia.' : 'Supuestos manuales; sin histórico electoral incorporado para este cargo.';
+}
 const number = (value: number) => value.toLocaleString('es-CO', { maximumFractionDigits: 2 });
 const rowKey = (row: StatisticalRow) => [row.municipality, row.year, row.metric, row.group, row.level, sourceIdentity(row)].join('|');
 const inputClass = 'w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm text-slate-100';
@@ -24,6 +39,8 @@ const buttonClass = 'rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 t
 
 interface Props { currentTenant: Tenant; candidates?: Candidate[]; onNavigateTab?: (tab: any) => void }
 export function ElectoralSimulatorView({ currentTenant, candidates = [], onNavigateTab }: Props) {
+  const shared = !!auth.currentUser;
+  const [busy, setBusy] = useState(false);
   const storageKey = `astrea:simulaciones:v1:${currentTenant.tenantId}`;
   const dataKey = `astrea:estadisticas:v1:${currentTenant.tenantId}`;
   const [municipality, setMunicipality] = useState('Astrea');
@@ -31,7 +48,7 @@ export function ElectoralSimulatorView({ currentTenant, candidates = [], onNavig
   const [parameters, setParameters] = useState(() => initialParameters(currentTenant));
   const [base, setBase] = useState(() => initialParameters(currentTenant));
   const [censusOrigin, setCensusOrigin] = useState('RNEC · Divipole Congreso 2026 · elección 2026-03-08');
-  const [historicalOrigin, setHistoricalOrigin] = useState('Supuestos de ejemplo; sin histórico electoral incorporado.');
+  const [historicalOrigin, setHistoricalOrigin] = useState(initialHistoryOrigin());
   const [message, setMessage] = useState('');
   const [scenarioName, setScenarioName] = useState('');
   const [savedChoice, setSavedChoice] = useState('');
@@ -39,6 +56,10 @@ export function ElectoralSimulatorView({ currentTenant, candidates = [], onNavig
     try { const raw = JSON.parse(localStorage.getItem(storageKey) || '[]'); if (!Array.isArray(raw) || raw.length > 30) return []; return raw.filter(item => { try { validateSnapshot(item.snapshot, currentTenant.tenantId); return typeof item.id === 'string' && typeof item.name === 'string'; } catch { return false; } }); } catch { return []; }
   });
   const [imported, setImported] = useState<StatisticalRow[]>(() => { try { return validateRows(JSON.parse(localStorage.getItem(dataKey) || '[]')); } catch { return []; } });
+  useEffect(() => {
+    if (!shared) return;
+    return subscribeSharedSimulation(currentTenant.tenantId, setSaved, setImported, error => setMessage(accountError(error)));
+  }, [currentTenant.tenantId, shared]);
   const rows = useMemo(() => [...OFFICIAL_ROWS, ...imported], [imported]);
   const scope = scopeForLevel(municipality, parameters.level);
   const { result, issues } = useMemo(() => simulateElection(parameters), [parameters]);
@@ -48,29 +69,30 @@ export function ElectoralSimulatorView({ currentTenant, candidates = [], onNavig
   const isSingle = parameters.level === 'Alcaldía' || parameters.level === 'Gobernación';
   const comparisons = (['conservador', 'base', 'optimista'] as const).map(mode => { const input = balance(buildScenario(base, mode)); return { mode, input, ...simulateElection(input) }; });
 
-  function persistImported(next: StatisticalRow[]) {
+  async function persistImported(next: StatisticalRow[]) {
+
     setImported(next);
-    try { localStorage.setItem(dataKey, JSON.stringify(next)); } catch { setMessage('Los datos están cargados, pero el navegador no pudo guardarlos. Exporte el escenario.'); }
+    try { localStorage.setItem(dataKey, JSON.stringify(next)); } catch { /* The committed cloud copy remains available. */ }
   }
   function changeTerritory(nextMunicipality: string, level: ElectoralLevel) {
     const census = referenceRow(rows.filter(row => row.year <= referenceYear), scopeForLevel(nextMunicipality, level), 'censo');
-    const seats = ['Alcaldía', 'Gobernación'].includes(level) ? 1 : level === 'Asamblea / Diputación' ? 11 : level === 'Cámara de Representantes' ? 4 : 13;
-    const next = balance({ ...initialParameters(currentTenant), census: census?.value ?? 0, level, seats });
+    const next = balance({ ...initialParameters(currentTenant,nextMunicipality,level,rows), census: census?.value ?? 0, level });
     setMunicipality(nextMunicipality); setParameters(next); setBase(next);
     setCensusOrigin(census ? `${census.source} · ${census.referenceDate}` : 'Sin censo de referencia. Ingrese una base manual.');
-    setHistoricalOrigin('Supuestos de ejemplo; sin histórico electoral incorporado.'); setMessage('Territorio y cargo cambiados. Revise las curules para esta elección.');
+    setHistoricalOrigin(initialHistoryOrigin(nextMunicipality,level)); setMessage('Territorio y cargo cambiados. Revise las curules para esta elección.');
   }
   function snapshot(): SimulatorSnapshot { return { version: 1, tenantId: currentTenant.tenantId, municipality, referenceYear, parameters, base, censusOrigin, historicalOrigin, imported }; }
-  function restore(raw: unknown) {
+  async function restore(raw: unknown) {
     const item = validateSnapshot(raw, currentTenant.tenantId);
-    setMunicipality(item.municipality); setReferenceYear(item.referenceYear); setParameters(item.parameters); setBase(item.base); setCensusOrigin(item.censusOrigin); setHistoricalOrigin(item.historicalOrigin); persistImported(item.imported); setMessage('Escenario restaurado con parámetros, base y fuentes importadas.');
+    setImported(item.imported);
+    setMunicipality(item.municipality); setReferenceYear(item.referenceYear); setParameters(item.parameters); setBase(item.base); setCensusOrigin(item.censusOrigin); setHistoricalOrigin(item.historicalOrigin); setMessage('Escenario restaurado con parámetros, base y fuentes importadas.');
   }
   function saveScenarios(next: SavedScenario[]) {
     try { localStorage.setItem(storageKey, JSON.stringify(next)); setSaved(next); return true; } catch { setMessage('No se pudo guardar. Exporte un JSON o elimine escenarios anteriores.'); return false; }
   }
   async function importScenario(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]; event.target.value = ''; if (!file) return;
-    try { if (file.size > 5 * 1024 * 1024) throw new Error('El archivo supera 5 MB.'); restore(JSON.parse(await file.text())); } catch (error) { setMessage((error as Error).message); }
+    try { if (file.size > 5 * 1024 * 1024) throw new Error('El archivo supera 5 MB.'); await restore(JSON.parse(await file.text())); } catch (error) { setMessage((error as Error).message); }
   }
   function exportResults() {
     const entries = [['SIMULACIÓN ELECTORAL · RESULTADOS CONDICIONADOS A LOS SUPUESTOS'], ['Ámbito', scope], ['Cargo', parameters.level], ['Censo de escenario', parameters.census], ['Origen del censo', censusOrigin], ['Base de comportamiento', historicalOrigin], ['Participación (%)', parameters.turnout], ['Votos válidos (incluye blancos)', result.totalValidVotes], ['Votos en blanco', result.blankVotes], ['Mínimo para superar umbral', result.thresholdVotes], ['Método', isSingle ? 'Mayoría relativa' : parameters.seats === 2 ? 'Cociente y residuos' : 'D’Hondt'], [], ['Lista / candidatura', 'Votos', 'Porcentaje de válidos', 'Curules'], ...result.allocationsByParty.map(party => [party.partyName, party.totalVotes, party.votePercentage, party.seatsWon])];
@@ -88,8 +110,8 @@ export function ElectoralSimulatorView({ currentTenant, candidates = [], onNavig
       </div><p className="mt-3 text-xs text-slate-400">Ámbito: <strong className="text-cyan-200">{scope}</strong> · Censo usado: {censusOrigin}. Las curules iniciales son una referencia; confirme las de la corporación y el año.</p>
     </section>
     <StatisticalDataPanel scope={scope} year={referenceYear} level={parameters.level} rows={rows} imported={imported} onYearChange={setReferenceYear}
-      onImport={incoming => { const merged = new Map<string, StatisticalRow>(imported.map(row => [rowKey(row), row])); incoming.forEach(row => merged.set(rowKey(row), row)); try { persistImported(validateRows([...merged.values()])); } catch (error) { setMessage((error as Error).message); } }}
-      onRemoveSource={key => { persistImported(imported.filter(row => sourceIdentity(row) !== key)); setMessage('Fuente retirada. Los parámetros ya aplicados permanecen en el escenario; elija una nueva base para recalcularlos.'); }}
+      onImport={async incoming => { const merged = new Map<string, StatisticalRow>(imported.map(row => [rowKey(row), row])); incoming.forEach(row => merged.set(rowKey(row), row)); const next=validateRows([...merged.values()]); if (shared) await appendSharedRows(currentTenant.tenantId,incoming); else await persistImported(next); }}
+      onRemoveSource={async key => { if (shared) await removeSharedSource(currentTenant.tenantId,key); else await persistImported(imported.filter(row => sourceIdentity(row) !== key)); setMessage('Fuente retirada. Los parámetros ya aplicados permanecen en el escenario; elija una nueva base para recalcularlos.'); }}
       onApplyCensus={row => { const next = balance({ ...parameters, census: row.value }); setParameters(next); setBase(next); setCensusOrigin(`${row.source} · ${row.referenceDate} · ${row.provenance}`); setMessage('Censo aplicado y listas ajustadas conservando sus proporciones.'); }}
       onApplyHistory={history => {
         const parties = history.parties.map((row, index) => ({ id: `historico-${index}`, name: row.group, votes: row.value, color: COLORS[index % COLORS.length], isUserParty: false }));
@@ -123,9 +145,17 @@ export function ElectoralSimulatorView({ currentTenant, candidates = [], onNavig
       <div className="grid gap-3 sm:grid-cols-3">{comparisons.map(({ mode, input, result: calculation, issues: errors }) => <article key={mode} className="space-y-2 rounded-xl border border-slate-700 bg-slate-950 p-4"><h4 className="font-bold capitalize">{mode}</h4><p className="text-xs text-slate-400">Participación: {number(input.turnout)}% · Sufragantes: {number(calculation.totalVoters)}</p><p className="text-sm text-cyan-200">{errors.length ? 'Requiere revisar la base' : `Nuestra lista: ${calculation.userPartySeats} ${isSingle ? 'cargo' : 'curules'}`}</p><button className={buttonClass} onClick={() => { setParameters(input); setMessage(`Escenario ${mode} aplicado desde la base guardada.`); }}>Aplicar {mode}</button></article>)}</div>
     </section>
     <section className="space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 text-slate-100">
-      <h3 className="font-bold">Guardar y recuperar escenarios</h3><p className="text-xs text-slate-400">Guardado por organización en este navegador. El JSON conserva parámetros y fuentes para otro equipo de la misma organización. No se sincroniza con Firestore.</p>
-      <div className="flex flex-wrap gap-2"><input aria-label="Nombre del escenario" placeholder="Nombre del escenario" maxLength={100} value={scenarioName} onChange={event => setScenarioName(event.target.value)} className={`${inputClass} sm:max-w-xs`} /><button className={buttonClass} disabled={!scenarioName.trim()} onClick={() => { if (saved.length >= 30) { setMessage('Límite de 30 escenarios; elimine uno antes de guardar.'); return; } const id = crypto.randomUUID(); if (saveScenarios([...saved, { id, name: scenarioName.trim(), savedAt: new Date().toISOString(), snapshot: snapshot() }])) { setSavedChoice(id); setMessage('Escenario guardado en este navegador.'); } }}>Guardar escenario</button><button className={buttonClass} onClick={() => downloadText(`escenario-${municipality}.json`, JSON.stringify(snapshot(), null, 2), 'application/json')}>Exportar JSON</button><label className={`${buttonClass} cursor-pointer`}>Importar escenario JSON<input aria-label="Importar escenario JSON" type="file" accept=".json,application/json" className="sr-only" onChange={importScenario} /></label></div>
-      {saved.length > 0 && <div className="flex flex-wrap gap-2"><select aria-label="Escenarios guardados" className={`${inputClass} sm:max-w-sm`} value={savedChoice} onChange={event => setSavedChoice(event.target.value)}><option value="">Seleccione un escenario</option>{saved.map(item => <option key={item.id} value={item.id}>{item.name} · {item.snapshot.municipality}</option>)}</select><button className={buttonClass} disabled={!savedChoice} onClick={() => { try { const item = saved.find(row => row.id === savedChoice); if (item) restore(item.snapshot); } catch (error) { setMessage((error as Error).message); } }}>Recuperar</button><button className={buttonClass} disabled={!savedChoice} onClick={() => { if (saveScenarios(saved.filter(item => item.id !== savedChoice))) setSavedChoice(''); }}>Eliminar escenario</button></div>}
+      <h3 className="font-bold">Guardar y recuperar escenarios</h3><p className="text-xs text-slate-400">{shared ? 'Escenarios y fuentes compartidos en Firestore con los usuarios de su organización. El JSON permite conservar una copia completa.' : 'La presentación conserva escenarios en este navegador. Ingrese para compartirlos con su equipo.'}</p>
+      <div className="flex flex-wrap gap-2"><input aria-label="Nombre del escenario" placeholder="Nombre del escenario" maxLength={100} value={scenarioName} onChange={event => setScenarioName(event.target.value)} className={`${inputClass} sm:max-w-xs`} /><button className={buttonClass} disabled={busy || !scenarioName.trim()} onClick={async () => {
+        if (busy) return;
+        if (saved.length >= 30) { setMessage('Límite de 30 escenarios; elimine uno antes de guardar.'); return; }
+        setBusy(true); const id = crypto.randomUUID();
+        try { const scenario = { id, name: scenarioName.trim(), savedAt: new Date().toISOString(), snapshot: snapshot() };
+          if (shared) await saveSharedScenario(currentTenant.tenantId, scenario); else if (!saveScenarios([...saved, scenario])) return;
+          setSavedChoice(id); setMessage(shared ? 'Escenario guardado y compartido en Firestore.' : 'Escenario guardado en este navegador.');
+        } catch(error) { setMessage(accountError(error)); } finally { setBusy(false); }
+      }}>Guardar escenario</button><button className={buttonClass} onClick={() => downloadText(`escenario-${municipality}.json`, JSON.stringify(snapshot(), null, 2), 'application/json')}>Exportar JSON</button><label className={`${buttonClass} cursor-pointer`}>Importar escenario JSON<input aria-label="Importar escenario JSON" type="file" accept=".json,application/json" className="sr-only" onChange={importScenario} /></label></div>
+      {saved.length > 0 && <div className="flex flex-wrap gap-2"><select aria-label="Escenarios guardados" className={`${inputClass} sm:max-w-sm`} value={savedChoice} onChange={event => setSavedChoice(event.target.value)}><option value="">Seleccione un escenario</option>{saved.map(item => <option key={item.id} value={item.id}>{item.name} · {item.snapshot.municipality}</option>)}</select><button className={buttonClass} disabled={busy || !savedChoice} onClick={async () => { if (busy) return; setBusy(true); try { const item = saved.find(row => row.id === savedChoice); if (item) await restore((shared ? await loadSharedScenario(currentTenant.tenantId,item) : item).snapshot); } catch (error) { setMessage(accountError(error)); } finally { setBusy(false); } }}>Recuperar</button><button className={buttonClass} disabled={busy || !savedChoice} onClick={async () => { if (busy) return; setBusy(true); try { if (shared) await deleteSharedScenario(currentTenant.tenantId,savedChoice); else saveScenarios(saved.filter(item => item.id !== savedChoice)); setSavedChoice(''); } catch(error) { setMessage(accountError(error)); } finally { setBusy(false); } }}>Eliminar escenario</button></div>}
       {candidates.length > 0 && onNavigateTab && <button className="text-xs text-cyan-300 underline" onClick={() => onNavigateTab('candidates')}>Ver {candidates.length} candidaturas registradas</button>}
       {message && <p role="status" className="text-sm text-amber-200">{message}</p>}
     </section>

@@ -43,6 +43,7 @@ export interface UserProfile {
   avatarUrl?: string;
   createdAt: string;
   active?: boolean;
+  accessVersion?: number;
   requestedRole?: UserRole;
   lastLoginAt?: string;
 }
@@ -313,6 +314,7 @@ export interface CampaignCommittee {
   completedTasksCount: number;
   status: 'Activo' | 'En Ejecución' | 'Completado' | 'Planificación';
   membersCount?: number;
+  tasks?: CampaignTask[];
 }
 
 export interface CampaignCoordination {

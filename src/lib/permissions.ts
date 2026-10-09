@@ -481,6 +481,7 @@ export function filterGrassrootsVotersByScope(
     const userMuni = (user?.municipality || 'Astrea').toLowerCase();
 
     return byTenant.filter((v) => {
+      if ((v as any).createdBy === user?.uid) return true;
       // Must be from same municipality
       const vMuni = (v.municipality || '').toLowerCase();
       if (!vMuni.includes(userMuni) && !userMuni.includes(vMuni)) return false;
@@ -500,6 +501,7 @@ export function filterGrassrootsVotersByScope(
     const userDisplayName = (user?.displayName || '').toLowerCase();
 
     return byTenant.filter((v) => {
+      if ((v as any).createdBy === user?.uid) return true;
       if (userLeaderId && v.leaderId === userLeaderId) return true;
       if (v.leaderName && v.leaderName.toLowerCase().includes(userDisplayName)) return true;
       return false;

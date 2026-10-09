@@ -1,7 +1,8 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { connectAuthEmulator, getAuth } from 'firebase/auth';
 import {
   getFirestore,
+  connectFirestoreEmulator,
   doc,
   getDoc,
   getDocs,
@@ -11,6 +12,7 @@ import {
   onSnapshot,
   getDocFromServer,
   writeBatch,
+  runTransaction,
   query,
   where
 } from 'firebase/firestore';
@@ -27,17 +29,44 @@ import {
   TransportVehicle,
   DonorContribution
 } from '../types';
+import type { CampaignCoordination, CampaignTask } from '../types';
 import { buildDemoBundle, type DemoBundle } from '../data/demoSeed';
 import { omitUndefined } from './serialization';
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const emulatorMode = import.meta.env?.VITE_FIREBASE_EMULATORS === 'true';
+export const app = getApps().find(item => item.name === '[DEFAULT]') || initializeApp(emulatorMode ? { ...firebaseConfig, projectId: 'demo-astrea' } : firebaseConfig);
 
 // Use firestoreDatabaseId if specified, or default database
-export const db = (firebaseConfig as any).firestoreDatabaseId
+export const db = !emulatorMode && (firebaseConfig as any).firestoreDatabaseId
   ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
   : getFirestore(app);
 
 export const auth = getAuth(app);
+if (emulatorMode) {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9098', { disableWarnings: true });
+  connectFirestoreEmulator(db, '127.0.0.1', 8088);
+}
+
+/** Retry against the latest committee, preserving tasks saved by other members. */
+export async function saveCommitteeTask(tenantId: string, coordinationId: string, committeeId: string, task: CampaignTask): Promise<void> {
+  const actorId=auth.currentUser?.uid;
+  if (!actorId) throw new Error('Inicie sesión para guardar la tarea.');
+  const reference=doc(db,'comites_coordinaciones',coordinationId);
+  const auditId=crypto.randomUUID();
+  await runTransaction(db,async transaction=>{
+    const snapshot=await transaction.get(reference);
+    const coordination=snapshot.data() as CampaignCoordination | undefined;
+    if (!coordination || coordination.tenantId!==tenantId || !coordination.committees.some(item=>item.id===committeeId)) throw new Error('No se encontró el comité de esta organización.');
+    const committees=coordination.committees.map(committee=>{
+      if (committee.id!==committeeId) return committee;
+      const current=committee.tasks||[];
+      const tasks=current.some(item=>item.id===task.id) ? current.map(item=>item.id===task.id ? {...item,completed:task.completed} : item) : [...current,task];
+      return {...committee,tasks,tasksCount:tasks.length,completedTasksCount:tasks.filter(item=>item.completed).length};
+    });
+    transaction.update(reference,{committees,updatedBy:actorId});
+    transaction.set(doc(db,'auditoria',auditId),{id:auditId,tenantId,actorId,entity:'comites_coordinaciones',entityId:coordinationId,action:'update',createdAt:new Date().toISOString()});
+  });
+}
 
 export async function authenticatedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const user = auth.currentUser;
@@ -49,7 +78,7 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   return fetch(input, { ...init, headers });
 }
 
-async function persistEntity<T extends { tenantId: string }>(collectionName: string, entityId: string, data: T): Promise<void> {
+export async function persistEntity<T extends { tenantId: string }>(collectionName: string, entityId: string, data: T): Promise<void> {
   const actor = auth.currentUser;
   if (!actor) throw new Error('Inicie sesión antes de guardar información.');
   if (!data.tenantId || !entityId || entityId.includes('/')) throw new Error('El registro no tiene una organización o identificador válido.');
@@ -58,6 +87,7 @@ async function persistEntity<T extends { tenantId: string }>(collectionName: str
   const batch = writeBatch(db);
   batch.set(doc(db, collectionName, entityId), {
     ...omitUndefined(data),
+    ...((data as any).createdBy || ['organizaciones','usuarios'].includes(collectionName) ? {} : { createdBy: actor.uid }),
     updatedAt: now,
     updatedBy: actor?.uid || 'unknown'
   }, { merge: true });
@@ -77,7 +107,7 @@ async function persistEntity<T extends { tenantId: string }>(collectionName: str
   await batch.commit();
 }
 
-async function removeEntity(collectionName: string, entityId: string, tenantId?: string): Promise<void> {
+export async function removeEntity(collectionName: string, entityId: string, tenantId?: string): Promise<void> {
   const actor = auth.currentUser;
   if (!tenantId) {
     const snapshot = await getDoc(doc(db, collectionName, entityId));

@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Buffer } from 'node:buffer';
 import { createVerify } from 'node:crypto';
 import firebaseConfig from '../firebase-applet-config.json' with { type: 'json' };
+import { isPlatformAdminClaims } from '../src/lib/accessPolicy.js';
 
 type ApiRequest = IncomingMessage & { body?: Record<string, unknown> };
 type TokenPayload = {
@@ -11,6 +12,8 @@ type TokenPayload = {
   iat: number;
   sub: string;
   admin?: boolean;
+  email?: string;
+  email_verified?: boolean;
 };
 
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId;
@@ -127,17 +130,18 @@ async function readAuthorizedDocument(path: string, token: string): Promise<Reco
   });
   if (response.status === 403 || response.status === 404) return null;
   if (!response.ok) throw new Error('IDENTITY_SERVICE_UNAVAILABLE');
-  const document = await response.json() as { fields?: Record<string, { stringValue?: string; booleanValue?: boolean }> };
-  return Object.fromEntries(Object.entries(document.fields || {}).map(([key, value]) => [key, value.stringValue ?? value.booleanValue]));
+  const document = await response.json() as { fields?: Record<string, { stringValue?: string; booleanValue?: boolean; integerValue?: string }> };
+  return Object.fromEntries(Object.entries(document.fields || {}).map(([key, value]) => [key, value.stringValue ?? value.booleanValue ?? (value.integerValue === undefined ? undefined : Number(value.integerValue))]));
 }
 
 async function authorizeOrganization(user: TokenPayload, token: string, body: Record<string, unknown>) {
   const profile = await readAuthorizedDocument(`usuarios/${encodeURIComponent(user.sub)}`, token);
   if (!profile || profile.active === false || typeof profile.tenantId !== 'string') return null;
   const permittedRoles = ['AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'JefePolitico'];
-  if (!user.admin && !permittedRoles.includes(String(profile.role))) return null;
+  const platformAdmin = isPlatformAdminClaims(user as unknown as Record<string, unknown>);
+  if (!platformAdmin && (profile.accessVersion !== 2 || !permittedRoles.includes(String(profile.role)))) return null;
   const tenantId = typeof body.tenantId === 'string' ? body.tenantId : profile.tenantId;
-  if (!tenantId || (!user.admin && tenantId !== profile.tenantId)) return null;
+  if (!tenantId || (!platformAdmin && tenantId !== profile.tenantId)) return null;
   const tenant = await readAuthorizedDocument(`organizaciones/${encodeURIComponent(tenantId)}`, token);
   return tenant?.active === true && typeof tenant.name === 'string' ? tenant : null;
 }

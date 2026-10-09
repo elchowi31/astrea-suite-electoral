@@ -1,5 +1,7 @@
 # Despliegue de Astrea en Vercel
 
+> Registro histórico de la publicación anterior. El estado actual de usuarios, formularios, Firestore y simulación está documentado en [Usuarios y Firestore](USUARIOS-Y-FIRESTORE.md) y [Revisión y simulación](REVISION-Y-SIMULACION.md). Los apartados de alcance pendiente de este registro describen aquella publicación, no la actualización del 9 de octubre de 2026.
+
 - Proyecto: `astrea-suite-electoral` (`prj_gp0Vx6QrpUG25MzMFpeDBZCYCNfX`).
 - Producción: https://astrea-suite-electoral.vercel.app
 - Despliegue de la corrección: `dpl_8ATE4PCQpjr9HHJW61Di8gC35Vy6`. Sustituye la publicación inicial `dpl_DXuS1i3jXQuSfL4iwukzF953Ytj5`.

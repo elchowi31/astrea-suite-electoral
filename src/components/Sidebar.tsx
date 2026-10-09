@@ -3,7 +3,7 @@ import { BarChart3, Bot, Building2, Calculator, ChevronRight, CircleDollarSign, 
 import { UserProfile, UserRole } from '../types';
 import { getRoleHierarchyLevel, getTerritorialScope } from '../lib/permissions';
 
-export type ActiveTab = 'dashboard' | 'campaign_structure' | 'hierarchy_pyramid' | 'login' | 'simulator' | 'costs_report' | 'zone_projections' | 'workspace' | 'map' | 'finances' | 'leaders' | 'transport' | 'candidates' | 'districts' | 'proposals' | 'drive' | 'ai' | 'tenants';
+export type ActiveTab = 'users' | 'dashboard' | 'campaign_structure' | 'hierarchy_pyramid' | 'login' | 'simulator' | 'costs_report' | 'zone_projections' | 'workspace' | 'map' | 'finances' | 'leaders' | 'transport' | 'candidates' | 'districts' | 'proposals' | 'drive' | 'ai' | 'tenants';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -29,25 +29,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, driveF
   const groups: MenuGroup[] = [
     { label: 'Resumen', tone: 'text-cyan-300', items: [{ id: 'dashboard', label: 'Centro de control', shortLabel: 'Inicio', icon: LayoutDashboard }] },
     { label: 'Operación', tone: 'text-emerald-300', items: [
-      { id: 'campaign_structure', label: 'Equipo y comités', shortLabel: 'Equipo', icon: ShieldCheck, minLevel: 20 },
-      { id: 'hierarchy_pyramid', label: 'Base territorial', shortLabel: 'Territorio', icon: Layers, badge: voterCount, minLevel: 20 },
-      { id: 'leaders', label: 'Líderes y metas', icon: Target, badge: leaderCount, minLevel: 20 },
-      { id: 'map', label: 'Mapa territorial', icon: Map, minLevel: 20 },
-      { id: 'transport', label: 'Transporte', icon: Truck, badge: vehicleCount, minLevel: 20 },
+      { id: 'campaign_structure', label: 'Equipo y comités', shortLabel: 'Equipo', icon: ShieldCheck, minLevel: 10 },
+      { id: 'hierarchy_pyramid', label: 'Base territorial', shortLabel: 'Territorio', icon: Layers, badge: voterCount, minLevel: 10 },
+      { id: 'leaders', label: 'Líderes y metas', icon: Target, badge: leaderCount, minLevel: 10 },
+      { id: 'map', label: 'Mapa territorial', icon: Map, minLevel: 10 },
+      { id: 'transport', label: 'Transporte', icon: Truck, badge: vehicleCount, minLevel: 10 },
     ] },
     { label: 'Administración', tone: 'text-amber-300', items: [
-      { id: 'finances', label: 'Finanzas y aportes', shortLabel: 'Finanzas', icon: CircleDollarSign, minLevel: 40 },
-      { id: 'costs_report', label: 'Control de gastos', icon: FileSpreadsheet, minLevel: 40 },
-      { id: 'candidates', label: 'Candidaturas', icon: Users, badge: candidateCount, minLevel: 40 },
+      { id: 'users', label: 'Usuarios y accesos', icon: Users, minLevel: 35 },
+      { id: 'finances', label: 'Finanzas y aportes', shortLabel: 'Finanzas', icon: CircleDollarSign, minLevel: 10 },
+      { id: 'costs_report', label: 'Control de gastos', icon: FileSpreadsheet, minLevel: 10 },
+      { id: 'candidates', label: 'Candidaturas', icon: Users, badge: candidateCount, minLevel: 10 },
       { id: 'districts', label: 'Territorios y censo', icon: MapPin, minLevel: 40 },
-      { id: 'proposals', label: 'Programa y propuestas', icon: FileText, minLevel: 40 },
+      { id: 'proposals', label: 'Programa y propuestas', icon: FileText, minLevel: 10 },
       { id: 'workspace', label: 'Google Workspace', icon: ClipboardList, minLevel: 50 },
-      { id: 'drive', label: 'Archivo documental', icon: FolderSync, badge: driveFileCount, minLevel: 50 },
+      { id: 'drive', label: 'Archivo documental', icon: FolderSync, badge: driveFileCount, minLevel: 10 },
       { id: 'tenants', label: 'Organizaciones', icon: Building2, globalOnly: true },
     ] },
     { label: 'Inteligencia', tone: 'text-violet-300', items: [
       { id: 'zone_projections', label: 'Proyección territorial', icon: BarChart3, minLevel: 40 },
-      { id: 'simulator', label: 'Simulador electoral', icon: Calculator, minLevel: 40 },
+      { id: 'simulator', label: 'Simulador electoral', icon: Calculator, minLevel: 10 },
       { id: 'ai', label: 'Asistente de análisis', icon: Bot, minLevel: 50 },
     ] },
   ];

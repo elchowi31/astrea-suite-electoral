@@ -38,7 +38,7 @@ before(async () => {
       assert(url.includes(`/databases/${encodeURIComponent(firebaseConfig.firestoreDatabaseId)}/documents/`), 'API must use the same named Firestore database as the client');
       if (url.includes('/usuarios/')) {
         if (!profileExists) return new Response('{}', { status: 404 });
-        return new Response(JSON.stringify({ fields: { tenantId: { stringValue: 'tenant-a' }, role: { stringValue: role }, active: { booleanValue: active } } }));
+        return new Response(JSON.stringify({ fields: { tenantId: { stringValue: 'tenant-a' }, role: { stringValue: role }, active: { booleanValue: active }, accessVersion: { integerValue: '2' } } }));
       }
       if (url.endsWith('/organizaciones/tenant-a')) {
         return new Response(JSON.stringify({ fields: { name: { stringValue: 'Authorized organization' }, active: { booleanValue: tenantActive } } }));

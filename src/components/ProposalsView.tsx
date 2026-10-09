@@ -1,3 +1,5 @@
+import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
+import { createRecordId } from '../lib/recordIds';
 import React, { useState, useEffect } from 'react';
 import { Proposal, Tenant } from '../types';
 import { generarIdDocumentoLegible } from '../lib/slugify';
@@ -18,7 +20,7 @@ import {
 interface ProposalsViewProps {
   currentTenant: Tenant;
   proposals: Proposal[];
-  onAddProposal: (prop: Proposal) => void;
+  onAddProposal: (prop: Proposal) => Promise<void>;
   onAnalyzeProposalWithAi: (title: string, summary: string) => void;
 }
 
@@ -28,6 +30,7 @@ export const ProposalsView: React.FC<ProposalsViewProps> = ({
   onAddProposal,
   onAnalyzeProposalWithAi,
 }) => {
+  const { saving, saveError, submit, runSave } = useFirestoreForm();
   const [categoryFilter, setCategoryFilter] = useState<string>('TODAS');
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(proposals[0] || null);
   const [showModal, setShowModal] = useState(false);
@@ -72,12 +75,12 @@ export const ProposalsView: React.FC<ProposalsViewProps> = ({
     setFullText(`${presetTitle}\n\nResumen Ejecutivo:\n${presetSummary}\n\nObjetivos Estratégicos:\n1. Asignación presupuestal prioritaria.\n2. Ejecución con veeduría ciudadana comunitaria.\n3. Impacto medible en empleo y conectividad local.`);
   };
 
-  const handleSubmitNewProposal = (e: React.FormEvent) => {
+  const handleSubmitNewProposal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !summary) return;
 
     const newProp: Proposal = {
-      id: generatedDocId || `prop-${Date.now()}`,
+      id: createRecordId(currentTenant.tenantId, generatedDocId || 'propuesta'),
       tenantId: currentTenant.tenantId,
       title,
       category,
@@ -88,7 +91,7 @@ export const ProposalsView: React.FC<ProposalsViewProps> = ({
       createdAt: new Date().toISOString()
     };
 
-    onAddProposal(newProp);
+    await onAddProposal(newProp);
     setShowModal(false);
     setTitle('');
     setSummary('');
@@ -322,7 +325,7 @@ export const ProposalsView: React.FC<ProposalsViewProps> = ({
               </span>
             </div>
 
-            <form onSubmit={handleSubmitNewProposal} className="space-y-4 text-xs">
+            <form onSubmit={event => submit(event, handleSubmitNewProposal)} className="space-y-4 text-xs"><FormSaveStatus saving={saving} error={saveError} /><fieldset disabled={saving} className="contents">
               
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">
@@ -419,7 +422,7 @@ export const ProposalsView: React.FC<ProposalsViewProps> = ({
                 </div>
               </div>
 
-            </form>
+            </fieldset></form>
           </div>
         </div>
       )}

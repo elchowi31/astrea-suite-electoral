@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
+import { persistEntity, saveCommitteeTask, saveCoordinationToFirestore, subscribeToCollection } from '../lib/firebase';
+import React, { useEffect, useState } from 'react';
 import {
+  Tenant,
   CampaignCoordination,
   CampaignCommittee,
   CampaignTask,
@@ -37,20 +40,26 @@ import {
 } from 'lucide-react';
 
 interface CampaignStructureViewProps {
+  currentTenant: Tenant;
+  onNavigateTab?: (tab: any)=>void;
   coordinations: CampaignCoordination[];
   currentUser?: UserProfile | null;
   userRole?: UserRole;
   onNavigateToHierarchy?: () => void;
-  onUpdateCoordination?: (updated: CampaignCoordination) => void;
+  onUpdateCoordination?: (updated: CampaignCoordination) => Promise<void>;
 }
 
 export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   coordinations,
+  currentTenant,
   currentUser,
   userRole = 'Alcalde',
   onNavigateToHierarchy,
   onUpdateCoordination
 }) => {
+  const { saving, saveError, submit, runSave } = useFirestoreForm();
+  const [coordTitle, setCoordTitle] = useState('');
+  const [coordName, setCoordName] = useState('');
   const [selectedCoordId, setSelectedCoordId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeCommitteeModal, setActiveCommitteeModal] = useState<{
@@ -133,16 +142,54 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const totalCompletedTasks = coordinations.reduce((acc, c) => acc + c.committees.reduce((t, cm) => t + cm.completedTasksCount, 0), 0);
   const overallProgress = totalTasks > 0 ? Math.round((totalCompletedTasks / totalTasks) * 100) : 0;
 
-  const handleSaveExecutiveLeaders = (e: React.FormEvent) => {
+  useEffect(() => subscribeToCollection<any>('equipo_campana', rows => {
+    if (!rows[0]) return;
+    const data = rows[0];
+    if (data.generalCoordinator) setGeneralCoordinator(data.generalCoordinator);
+    if (data.campaignManager) setCampaignManager(data.campaignManager);
+    if (data.candidateInfo) setCandidateInfo(data.candidateInfo);
+  }, [], currentTenant.tenantId), [currentTenant.tenantId]);
+  useEffect(() => {
+    setActiveCommitteeModal(previous => {
+      if (!previous) return previous;
+      const coordination = coordinations.find(item => item.id === previous.coordination.id);
+      const committee = coordination?.committees.find(item => item.id === previous.committee.id);
+      return coordination && committee ? { coordination, committee } : null;
+    });
+  }, [coordinations]);
+  const handleSaveExecutiveLeaders = async (e: React.FormEvent) => {
     e.preventDefault();
-    setGeneralCoordinator({ ...tempCoordinator });
-    setCampaignManager({ ...tempManager });
-    setCandidateInfo({ ...tempCandidate });
+    await persistEntity('equipo_campana', `equipo-${currentTenant.tenantId}`, { tenantId:currentTenant.tenantId, generalCoordinator:tempCoordinator, campaignManager:tempManager, candidateInfo:tempCandidate });
+    setGeneralCoordinator({ ...tempCoordinator }); setCampaignManager({ ...tempManager }); setCandidateInfo({ ...tempCandidate });
     setIsEditExecutiveModalOpen(false);
   };
+  const createCoordination = async (event:React.FormEvent) => {
+    event.preventDefault();
+    if (!coordTitle.trim() || !coordName.trim()) throw new Error('Ingrese el nombre de la coordinación y su responsable.');
+    const id = `coord-${crypto.randomUUID()}`;
+    await saveCoordinationToFirestore({ id, tenantId:currentTenant.tenantId, title:coordTitle.trim(), coordinatorName:coordName.trim(), coordinatorRole:'Coordinador', color:'#6366f1', iconName:'Users', summary:'', committees:[{ id:`comite-${crypto.randomUUID()}`, coordinationId:id, name:'Comité operativo', responsibilities:[], leadPerson:coordName.trim(), tasksCount:0, completedTasksCount:0, status:'Planificación', tasks:[] }] });
+    setCoordTitle('');setCoordName('');
+  };
+  async function saveTask(task?:CampaignTask) {
+    if (!activeCommitteeModal || !onUpdateCoordination) throw new Error('No se encontró el comité seleccionado.');
+    if (!task && !newTaskTitle.trim()) throw new Error('Escriba la tarea.');
+    const { coordination,committee }=activeCommitteeModal;
+    const updatedTask=task ? {...task,completed:!task.completed}
+      : { id:crypto.randomUUID(),tenantId:currentTenant.tenantId,coordinationId:coordination.id,committeeId:committee.id,title:newTaskTitle.trim(),description:'',assignedTo:newTaskAssignee.trim() || committee.leadPerson || '',dueDate:newTaskDueDate,priority:'Media' as const,completed:false,createdAt:new Date().toISOString() };
+    await saveCommitteeTask(currentTenant.tenantId,coordination.id,committee.id,updatedTask);
+    if (!task) setNewTaskTitle('');
+  }
 
   return (
     <div className="space-y-6 pb-12">
+      <form onSubmit={event=>submit(event,createCoordination)} className="rounded-2xl border border-slate-700 bg-slate-900 p-4 text-white">
+        <FormSaveStatus saving={saving} error={saveError} />
+        <fieldset disabled={saving} className="flex flex-wrap gap-3">
+          <label className="flex-1 text-xs">Coordinación<input required aria-label="Nombre de coordinación" value={coordTitle} onChange={event=>setCoordTitle(event.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 p-3" /></label>
+          <label className="flex-1 text-xs">Responsable<input required aria-label="Responsable de coordinación" value={coordName} onChange={event=>setCoordName(event.target.value)} className="mt-1 w-full rounded-lg bg-slate-950 p-3" /></label>
+          <button type="submit" className="self-end rounded-lg bg-indigo-600 p-3 text-sm font-semibold">Crear coordinación</button>
+        </fieldset>
+      </form>
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -156,12 +203,12 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
               Organigrama Operativo & Comités Estratégicos
             </h1>
             <p className="text-slate-300 text-sm max-w-3xl leading-relaxed">
-              Gestión articulada del <span className="font-semibold text-white">Mando Central (Coordinador General y Gerente)</span> junto a las <span className="font-semibold text-white">8 Coordinaciones Oficiales</span> y comités especializados 2026.
+              Gestión articulada del <span className="font-semibold text-white">Mando Central (Coordinador General y Gerente)</span> junto a las <span className="font-semibold text-white">Coordinaciones y comités</span> y comités especializados 2026.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {false && <button
+            {currentUser && <button
               id="btn-edit-executive-team"
               onClick={() => {
                 setTempCoordinator({ ...generalCoordinator });
@@ -621,7 +668,7 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSaveExecutiveLeaders} className="p-6 space-y-6 overflow-y-auto flex-1">
+            <form onSubmit={event=>submit(event,handleSaveExecutiveLeaders)} className="p-6 space-y-6 overflow-y-auto flex-1"><FormSaveStatus saving={saving} error={saveError} /><fieldset disabled={saving} className="contents">
 
               {/* Sección Candidato */}
               <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
@@ -792,7 +839,7 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                   Guardar Cambios del Mando Central
                 </button>
               </div>
-            </form>
+            </fieldset></form>
           </div>
         </div>
       )}
@@ -882,29 +929,8 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                   </span>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      <div>
-                        <p className="text-xs font-medium text-white">Cronograma y plan de trabajo semanal aprobado</p>
-                        <p className="text-[10px] text-slate-400">Asignado a: {activeCommitteeModal.committee.leadPerson}</p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold">Listo</span>
-                  </div>
-
-                  <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Clock className="w-4 h-4 text-amber-400" />
-                      <div>
-                        <p className="text-xs font-medium text-white">Consolidación de informes y entrega a Coordinación General</p>
-                        <p className="text-[10px] text-slate-400">Fecha límite: Viernes 18:00</p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold">En Curso</span>
-                  </div>
-                </div>
+                <FormSaveStatus saving={saving} error={saveError} />
+                <div className="space-y-2">{(activeCommitteeModal.committee.tasks || []).map(task=><div key={task.id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-800 p-3"><div><p className="text-xs text-white">{task.title}</p><p className="text-[10px] text-slate-400">{task.assignedTo} {task.dueDate}</p></div><button disabled={saving} onClick={()=>void runSave(()=>saveTask(task))} className="rounded-lg border border-slate-600 p-2 text-xs text-cyan-200">{task.completed ? 'Reabrir' : 'Completar'}</button></div>)}</div>
 
                 {/* Add Quick Task Input */}
                 <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-2">
@@ -919,11 +945,8 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                     />
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!newTaskTitle.trim()) return;
-                        alert(`Tarea "${newTaskTitle}" asignada al comité "${activeCommitteeModal.committee.name}".`);
-                        setNewTaskTitle('');
-                      }}
+                      disabled={saving}
+                      onClick={()=>void runSave(()=>saveTask())}
                       className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
                     >
                       Asignar

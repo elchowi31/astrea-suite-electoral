@@ -26,7 +26,6 @@ import {
   saveTenantToFirestore,
   deleteTenantFromFirestore,
   saveDonorContributionToFirestore,
-  saveUserToFirestore,
   saveGrassrootsVoterToFirestore,
   saveCoordinationToFirestore,
   createDemoCollection,
@@ -35,6 +34,7 @@ import {
 } from './lib/firebase';
 import { buildDemoBundle, type DemoBundle } from './data/demoSeed';
 import { logoutFirebaseAuth, observeAuthenticatedProfile } from './lib/firebaseAuth';
+import { UserManagementView } from './components/UserManagementView';
 import { Header } from './components/Header';
 import { Sidebar, ActiveTab } from './components/Sidebar';
 import { FirestoreStatusModal } from './components/FirestoreStatusModal';
@@ -136,8 +136,8 @@ export default function App() {
   // Real-time Firestore subscriptions for all active collections in Spanish
   useEffect(() => {
     const unsubTenants = subscribeToCollection<Tenant>('organizaciones', (data) => {
+      setTenants(data);
       if (data && data.length > 0) {
-        setTenants(data);
         // Ensure current tenant remains valid
         setCurrentTenant((prev) => data.find((t) => t.tenantId === prev.tenantId) || data[0]);
       }
@@ -189,9 +189,9 @@ export default function App() {
       : (() => { setDemoBundle(null); return () => {}; })();
 
     const voterManagers: UserRole[] = ['AdminGlobal', 'AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'JefePolitico'];
-    const canReadVoters = currentUser && (voterManagers.includes(currentUser.role) || Boolean(currentUser.assignedLeaderId) || (currentUser.role === 'Concejal' && Boolean(currentUser.assignedCandidateId)));
+    const canReadVoters = !!currentUser;
     const unsubGrassrootsVoters = canReadVoters
-      ? subscribeToCollection<GrassrootsVoter>('votantes_rasos', setGrassrootsVoters, [], selectedTenantId, voterManagers.includes(currentUser!.role) ? undefined : currentUser!.role === 'Concejal' ? { field: 'candidateId', value: currentUser!.assignedCandidateId } : { field: 'leaderId', value: currentUser!.assignedLeaderId })
+      ? subscribeToCollection<GrassrootsVoter>('votantes_rasos', setGrassrootsVoters, [], selectedTenantId, voterManagers.includes(currentUser!.role) ? undefined : currentUser!.role === 'Concejal' && currentUser!.assignedCandidateId ? { field: 'candidateId', value: currentUser!.assignedCandidateId } : currentUser!.assignedLeaderId ? { field: 'leaderId', value: currentUser!.assignedLeaderId } : { field: 'createdBy', value: currentUser!.uid })
       : (() => { setGrassrootsVoters([]); return () => {}; })();
 
     return () => {
@@ -214,6 +214,7 @@ export default function App() {
   // Auth Handlers
   const handleLogin = (user: UserProfile) => {
     setCurrentUser(user);
+    setActiveTab(previous => previous === 'login' ? 'dashboard' : previous);
 
     // Automatically isolate and switch tenant to the user's tenantId
     if (user.tenantId) {
@@ -228,16 +229,8 @@ export default function App() {
     );
   };
 
-  const handleRegisterUser = async (newUser: UserProfile) => {
-    setUsers((prev) => [newUser, ...prev]);
-    try {
-      await saveUserToFirestore(newUser);
-      notifyFirestoreSave(
-        `Usuario ${newUser.prefix ? `${newUser.prefix} ` : ''}${newUser.displayName} creado y guardado en Firestore.`
-      );
-    } catch (e) {
-      console.error('Error saving user to Firestore:', e);
-    }
+  const handleRegisterUser = (newUser: UserProfile) => {
+    notifyFirestoreSave(`Cuenta de ${newUser.displayName} creada y guardada en Firestore.`);
   };
 
   const handleLogout = async () => {
@@ -264,6 +257,7 @@ export default function App() {
       notifyFirestoreSave(res.message);
     } catch (e) {
       console.error('Error saving tenant to Firestore:', e);
+      throw e;
     }
   };
 
@@ -275,6 +269,7 @@ export default function App() {
       notifyFirestoreSave(`Parámetros de organización "${updatedTenant.name}" actualizados.`);
     } catch (e) {
       console.error('Error updating tenant in Firestore:', e);
+      throw e;
     }
   };
 
@@ -288,36 +283,37 @@ export default function App() {
       notifyFirestoreSave(`Partido / Organización "${tenantToRemove?.name || tenantIdToDelete}" eliminado de Firestore.`);
     } catch (e) {
       console.error('Error deleting tenant in Firestore:', e);
+      throw e;
     }
   };
 
   const handleAddCandidate = async (newCandidate: Candidate) => {
     try {
       await saveCandidateToFirestore(newCandidate);
-      setCandidates((prev) => [newCandidate, ...prev]);
       notifyFirestoreSave(`Candidato "${newCandidate.fullName}" guardado exitosamente en Firestore.`);
     } catch (e) {
       console.error('Error saving candidate to Firestore:', e);
+      throw e;
     }
   };
 
   const handleAddProposal = async (newProposal: Proposal) => {
     try {
       await saveProposalToFirestore(newProposal);
-      setProposals((prev) => [newProposal, ...prev]);
       notifyFirestoreSave(`Proyecto "${newProposal.title}" registrado en Firestore.`);
     } catch (e) {
       console.error('Error saving proposal to Firestore:', e);
+      throw e;
     }
   };
 
   const handleAddExpense = async (newExpense: CampaignExpense) => {
     try {
       await saveExpenseToFirestore(newExpense);
-      setExpenses((prev) => [newExpense, ...prev]);
       notifyFirestoreSave(`Gasto de $${newExpense.amount.toLocaleString('es-CO')} COP registrado en Firestore.`);
     } catch (e) {
       console.error('Error saving expense to Firestore:', e);
+      throw e;
     }
   };
 
@@ -332,6 +328,7 @@ export default function App() {
       notifyFirestoreSave(`Gasto "${updatedExpense.description}" actualizado en Firestore.`);
     } catch (e) {
       console.error('Error updating expense in Firestore:', e);
+      throw e;
     }
   };
 
@@ -346,23 +343,23 @@ export default function App() {
       notifyFirestoreSave(`Gasto eliminado de Firestore.`);
     } catch (e) {
       console.error('Error deleting expense in Firestore:', e);
+      throw e;
     }
   };
 
   const handleAddDonorContribution = async (newContribution: DonorContribution) => {
     try {
       await saveDonorContributionToFirestore(newContribution);
-      setDonorContributions((prev) => [newContribution, ...prev]);
       notifyFirestoreSave(`Aporte de "${newContribution.donorName}" por $${newContribution.amount.toLocaleString('es-CO')} COP registrado en Firestore.`);
     } catch (e) {
       console.error('Error saving donor contribution to Firestore:', e);
+      throw e;
     }
   };
 
   const handleAddLeader = async (newLeader: Leader) => {
     try {
       await saveLeaderToFirestore(newLeader);
-      setLeaders((prev) => [newLeader, ...prev]);
       notifyFirestoreSave(`Líder veredal "${newLeader.fullName}" guardado en Firestore.`);
     } catch (e) {
       console.error('Error saving leader to Firestore:', e);
@@ -373,7 +370,6 @@ export default function App() {
   const handleAddVehicle = async (newVehicle: TransportVehicle) => {
     try {
       await saveVehicleToFirestore(newVehicle);
-      setVehicles((prev) => [newVehicle, ...prev]);
       notifyFirestoreSave(`Vehículo placa "${newVehicle.licensePlate}" registrado en Firestore.`);
     } catch (e) {
       console.error('Error saving vehicle to Firestore:', e);
@@ -384,10 +380,10 @@ export default function App() {
   const handleAddGrassrootsVoter = async (newVoter: GrassrootsVoter) => {
     try {
       await saveGrassrootsVoterToFirestore(newVoter);
-      setGrassrootsVoters((prev) => [newVoter, ...prev]);
       notifyFirestoreSave(`Votante ${newVoter.fullName} registrado(a) y consolidado en la jerarquía electoral.`);
     } catch (e) {
       console.error('Error saving grassroots voter to Firestore:', e);
+      throw e;
     }
   };
 
@@ -402,6 +398,7 @@ export default function App() {
       notifyFirestoreSave(`Comité "${updatedCoordination.title}" actualizado.`);
     } catch (e) {
       console.error('Error updating coordination in Firestore:', e);
+      throw e;
     }
   };
 
@@ -671,6 +668,8 @@ export default function App() {
             />
             </div>
           )}
+
+          {currentUser && activeTab === 'users' && <UserManagementView currentUser={currentUser} currentTenant={currentTenant} users={users} leaders={leaders} candidates={candidates} />}
 
           {currentUser && activeTab === 'campaign_structure' && (
             <CampaignStructureView

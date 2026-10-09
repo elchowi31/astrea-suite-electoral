@@ -1,3 +1,5 @@
+import { createRecordId } from '../lib/recordIds';
+import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant, CampaignExpense, DonorContribution, ExpenseComponent, FinancialRubro, UserProfile, UserRole } from '../types';
 import { getTerritorialScope, filterExpensesByScope } from '../lib/permissions';
@@ -60,10 +62,10 @@ interface FinancesViewProps {
   userRole?: UserRole;
   expenses: CampaignExpense[];
   donorContributions: DonorContribution[];
-  onAddExpense: (expense: CampaignExpense) => void;
-  onAddDonorContribution: (contribution: DonorContribution) => void;
-  onDeleteExpense?: (id: string) => void;
-  onDeleteDonorContribution?: (id: string) => void;
+  onAddExpense: (expense: CampaignExpense) => Promise<void>;
+  onAddDonorContribution: (contribution: DonorContribution) => Promise<void>;
+  onDeleteExpense?: (id: string) => Promise<void>;
+  onDeleteDonorContribution?: (id: string) => Promise<void>;
   onNavigateTransport: () => void;
 }
 
@@ -101,6 +103,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
 }) => {
   const scope = getTerritorialScope(currentUser, userRole);
   // Navigation Sub-tabs
+  const { saving, saveError, submit, runSave } = useFirestoreForm();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'aportantes' | 'gastos' | 'topes_cne'>('dashboard');
 
   // Dynamic Filters for Finances
@@ -323,12 +326,12 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
   }, [tenantContributions, tenantExpenses]);
 
   // Handlers
-  const handleSaveExpense = (e: React.FormEvent) => {
+  const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newExpDesc.trim() || !Number.isFinite(Number(newExpAmount)) || Number(newExpAmount) <= 0) return;
 
     const expense: CampaignExpense = {
-      id: generatedExpDocId || `gasto-${Date.now()}`,
+      id: createRecordId(currentTenant.tenantId, generatedExpDocId || 'gasto'),
       tenantId: currentTenant.tenantId,
       component: newExpRubro as any,
       rubro: newExpRubro,
@@ -343,7 +346,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
       notes: newExpNotes
     };
 
-    onAddExpense(expense);
+    await onAddExpense(expense);
     setShowExpenseModal(false);
     setNewExpDesc('');
     setNewExpAmount('');
@@ -352,12 +355,12 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
     setNewExpNotes('');
   };
 
-  const handleSaveDonor = (e: React.FormEvent) => {
+  const handleSaveDonor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDonorName.trim() || !newDonorDoc.trim() || !newDonorReceipt.trim() || !Number.isFinite(Number(newDonorAmount)) || Number(newDonorAmount) <= 0) return;
 
     const contribution: DonorContribution = {
-      id: generatedDonorDocId || `aporte-${Date.now()}`,
+      id: createRecordId(currentTenant.tenantId, generatedDonorDocId || 'aporte'),
       tenantId: currentTenant.tenantId,
       donorName: newDonorName,
       donorDocument: newDonorDoc.trim(),
@@ -375,7 +378,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
       notes: newDonorNotes
     };
 
-    onAddDonorContribution(contribution);
+    await onAddDonorContribution(contribution);
     setShowDonorModal(false);
     setNewDonorName('');
     setNewDonorDoc('');
@@ -1198,7 +1201,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
               </div>
             </div>
 
-            <form onSubmit={handleSaveDonor} className="space-y-4">
+            <form onSubmit={event => submit(event, handleSaveDonor)} className="space-y-4"><FormSaveStatus saving={saving} error={saveError} /><fieldset disabled={saving} className="contents">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre Completo / Razón Social *</label>
@@ -1337,7 +1340,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                   Guardar Aporte en Firestore
                 </button>
               </div>
-            </form>
+            </fieldset></form>
           </div>
         </div>
       )}
@@ -1405,7 +1408,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
               </div>
             </div>
 
-            <form onSubmit={handleSaveExpense} className="space-y-4">
+            <form onSubmit={event => submit(event, handleSaveExpense)} className="space-y-4"><FormSaveStatus saving={saving} error={saveError} /><fieldset disabled={saving} className="contents">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Descripción / Concepto *</label>
@@ -1525,7 +1528,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                   Guardar Gasto en Firestore
                 </button>
               </div>
-            </form>
+            </fieldset></form>
           </div>
         </div>
       )}

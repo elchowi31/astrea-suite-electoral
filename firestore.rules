@@ -2,7 +2,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
-      return request.auth != null;
+      return request.auth != null && request.auth.token.get('email', '') != ''
+        && request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'anonymous';
     }
 
     function profileExists() {
@@ -17,12 +18,15 @@ service cloud.firestore {
       // `admin` is an optional custom claim. Access it with get() so a normal
       // Firebase user without that claim is evaluated as false instead of
       // producing a rules error that denies an otherwise valid request.
-      return signedIn() && request.auth.token.get('admin', false) == true;
+      return signedIn() && (request.auth.token.get('admin', false) == true
+        || (request.auth.token.get('email', '') == 'expcal@expcal.net'
+          && request.auth.token.get('email_verified', false) == true));
     }
 
     function sameTenant(tenantId) {
       return profileExists()
-        && me().get('active', true) == true
+        && me().get('active', false) == true
+        && me().get('accessVersion', 0) == 2
         && me().get('tenantId', '') == tenantId
         && exists(/databases/$(database)/documents/organizaciones/$(tenantId))
         && get(/databases/$(database)/documents/organizaciones/$(tenantId)).data.active == true;
@@ -33,11 +37,37 @@ service cloud.firestore {
     }
 
     function operator() {
-      return manager() || (profileExists() && me().get('role', 'Consulta') in ['Supervisor', 'Operador', 'LiderVeredal']);
+      return profileExists() && teamRole(me().get('role', ''));
     }
 
     function financialManager() {
       return profileExists() && me().get('role', 'Consulta') in ['AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'JefePolitico'];
+    }
+
+    function roleRank(role) {
+      return role == 'AdminTenant' ? 85 : role == 'Gobernador' ? 70
+        : role == 'Diputado' ? 60 : role == 'Alcalde' ? 50
+        : role == 'Concejal' ? 40 : role == 'JefePolitico' ? 35
+        : role == 'Supervisor' ? 30 : role in ['Operador', 'LiderVeredal'] ? 20 : 10;
+    }
+
+    function teamRole(role) {
+      return role in ['AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'Concejal', 'JefePolitico', 'Supervisor', 'Operador', 'LiderVeredal', 'Consulta', 'Invitado'];
+    }
+
+    function canProvision(data) {
+      return teamRole(data.role) && (platformAdmin() || (sameTenant(data.tenantId)
+        && manager() && roleRank(data.role) <= roleRank(me().role)));
+    }
+
+    function ownOrganizationBootstrap(data, userId) {
+      let tenant = getAfter(/databases/$(database)/documents/organizaciones/$(data.tenantId)).data;
+      return signedIn() && request.auth.uid == userId
+        && data.email == request.auth.token.email
+        && data.tenantId == 'org-' + userId && data.role == 'AdminTenant'
+        && data.active == true && tenant.ownerUid == userId
+        && data.accessVersion == 2
+        && tenant.tenantId == data.tenantId && tenant.active == true;
     }
 
     function canReadTenant(tenantId) {
@@ -57,12 +87,13 @@ service cloud.firestore {
     }
 
     match /usuarios/{userId} {
-      // User provisioning is performed only by a trusted Firebase Admin or
-      // invitation service. A tenant value supplied by a browser is not proof
-      // that the user belongs to that organization.
-      allow create: if platformAdmin()
-        && request.resource.data.uid == userId
-        && request.resource.data.tenantId is string;
+      allow create: if request.resource.data.uid == userId
+        && request.resource.data.email is string
+        && request.resource.data.displayName is string
+        && request.resource.data.tenantId is string
+        && request.resource.data.accessVersion == 2
+        && (ownOrganizationBootstrap(request.resource.data, userId)
+          || canProvision(request.resource.data));
       allow read: if signedIn() && (
         request.auth.uid == userId
         || platformAdmin()
@@ -70,14 +101,15 @@ service cloud.firestore {
       );
       allow update: if platformAdmin()
         || (request.auth.uid == userId
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'phone', 'avatarUrl', 'lastLoginAt', 'updatedAt', 'updatedBy']))
-        || (profileExists() && me().role == 'AdminTenant'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'prefix', 'phone', 'avatarUrl', 'lastLoginAt', 'updatedAt', 'updatedBy']))
+        || (canProvision(request.resource.data)
           && sameTenant(resource.data.tenantId)
           && request.resource.data.tenantId == resource.data.tenantId
           && request.resource.data.uid == resource.data.uid
           && request.resource.data.email == resource.data.email
-          && !(resource.data.role in ['AdminGlobal', 'AdminTenant'])
-          && request.resource.data.role in ['Gobernador', 'Diputado', 'Alcalde', 'Concejal', 'JefePolitico', 'Supervisor', 'Operador', 'LiderVeredal', 'Consulta', 'Invitado']);
+          && resource.data.get('uid', userId) != request.auth.uid
+          && !(resource.data.role == 'AdminGlobal')
+          && roleRank(resource.data.role) <= roleRank(me().role));
       allow delete: if platformAdmin();
     }
 
@@ -98,14 +130,23 @@ service cloud.firestore {
     }
 
     match /organizaciones/{tenantId} {
-      allow read: if platformAdmin() || sameTenant(tenantId);
-      allow create, update, delete: if platformAdmin();
+      allow read: if platformAdmin() || sameTenant(resource.data.tenantId);
+      allow create: if platformAdmin() || (signedIn() && !profileExists()
+        && tenantId == 'org-' + request.auth.uid
+        && request.resource.data.tenantId == tenantId
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.active == true && request.resource.data.plan == 'Gratuito'
+        && getAfter(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.tenantId == tenantId
+        && getAfter(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'AdminTenant');
+      allow update: if platformAdmin() || (sameTenant(tenantId) && me().role == 'AdminTenant'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'logoUrl', 'primaryColor', 'secondaryColor', 'campaignDate', 'budgetCap', 'updatedAt', 'updatedBy']));
+      allow delete: if platformAdmin();
     }
 
     match /candidatos/{id} {
       allow read: if canReadTenant(resource.data.tenantId);
-      allow create: if canManageTenant(request.resource.data.tenantId);
-      allow update: if canManageTenant(resource.data.tenantId) && immutableTenant();
+      allow create: if canOperateTenant(request.resource.data.tenantId);
+      allow update: if canOperateTenant(resource.data.tenantId) && immutableTenant();
       allow delete: if canManageTenant(resource.data.tenantId);
     }
 
@@ -125,6 +166,7 @@ service cloud.firestore {
 
     match /votantes_rasos/{id} {
       allow read: if platformAdmin()
+        || (sameTenant(resource.data.tenantId) && resource.data.get('createdBy', '') == request.auth.uid)
         || (sameTenant(resource.data.tenantId) && manager() && me().role != 'Concejal')
         || (sameTenant(resource.data.tenantId) && me().role == 'Concejal' && me().get('assignedCandidateId', '') != '' && me().assignedCandidateId == resource.data.candidateId)
         || (sameTenant(resource.data.tenantId) && operator() && me().get('assignedLeaderId', '') != '' && me().assignedLeaderId == resource.data.leaderId);
@@ -132,29 +174,31 @@ service cloud.firestore {
         && request.resource.data.consentGiven == true
         && request.resource.data.documentNumber is string
         && request.resource.data.documentNumber.size() > 0
-        && (platformAdmin() || (manager() && me().role != 'Concejal')
+        && request.resource.data.createdBy == request.auth.uid
+        && (platformAdmin() || request.resource.data.createdBy == request.auth.uid || (manager() && me().role != 'Concejal')
           || (me().role == 'Concejal' && me().get('assignedCandidateId', '') != '' && me().assignedCandidateId == request.resource.data.candidateId)
           || (me().get('assignedLeaderId', '') != '' && me().assignedLeaderId == request.resource.data.leaderId));
       allow update: if canOperateTenant(resource.data.tenantId)
         && immutableTenant()
         && request.resource.data.consentGiven == true
-        && (platformAdmin() || (manager() && me().role != 'Concejal')
+        && request.resource.data.get('createdBy', '') == resource.data.get('createdBy', '')
+        && (platformAdmin() || resource.data.get('createdBy', '') == request.auth.uid || (manager() && me().role != 'Concejal')
           || (me().role == 'Concejal' && me().get('assignedCandidateId', '') != '' && me().assignedCandidateId == resource.data.candidateId && me().assignedCandidateId == request.resource.data.candidateId)
           || (me().get('assignedLeaderId', '') != '' && me().assignedLeaderId == resource.data.leaderId && me().assignedLeaderId == request.resource.data.leaderId));
       allow delete: if canManageTenant(resource.data.tenantId);
     }
 
     match /gastos/{id} {
-      allow read: if platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager());
-      allow create: if platformAdmin() || (sameTenant(request.resource.data.tenantId) && financialManager());
-      allow update: if (platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager())) && immutableTenant();
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if canOperateTenant(request.resource.data.tenantId);
+      allow update: if canOperateTenant(resource.data.tenantId) && immutableTenant();
       allow delete: if platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager());
     }
 
     match /aportes/{id} {
-      allow read: if platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager());
-      allow create: if platformAdmin() || (sameTenant(request.resource.data.tenantId) && financialManager());
-      allow update: if (platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager())) && immutableTenant();
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if canOperateTenant(request.resource.data.tenantId);
+      allow update: if canOperateTenant(resource.data.tenantId) && immutableTenant();
       allow delete: if platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager());
     }
 
@@ -172,15 +216,20 @@ service cloud.firestore {
     }
 
     match /{collectionName}/{id} {
-      allow read: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace']
+      allow read: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace', 'simulaciones', 'fuentes_estadisticas', 'equipo_campana']
         && canReadTenant(resource.data.tenantId);
-      allow create: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace']
+      allow create: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace', 'simulaciones', 'fuentes_estadisticas', 'equipo_campana']
         && canOperateTenant(request.resource.data.tenantId);
-      allow update: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace']
+      allow update: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace', 'simulaciones', 'fuentes_estadisticas', 'equipo_campana']
         && canOperateTenant(resource.data.tenantId)
         && immutableTenant();
-      allow delete: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace']
-        && canManageTenant(resource.data.tenantId);
+      allow delete: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace', 'simulaciones', 'fuentes_estadisticas', 'equipo_campana']
+        && canOperateTenant(resource.data.tenantId);
+    }
+
+    // Preserve the already published, verified owner access during migration.
+    match /{document=**} {
+      allow read, write: if platformAdmin();
     }
   }
 }
