@@ -467,6 +467,44 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Planillas share the privacy scope of the individual voter list.
+    function registrationRole(data) {
+      let profile = me();
+      return profile.role in ['AdminTenant','Gobernador','Diputado','Alcalde','JefePolitico']
+        || data.get('createdBy','') == request.auth.uid
+        || (profile.role == 'Concejal' && profile.get('assignedCandidateId','') != '' && profile.assignedCandidateId == data.candidateId)
+        || (profile.get('assignedLeaderId','') != '' && profile.assignedLeaderId == data.leaderId);
+    }
+    function registrationScope(data) {
+      return platformAdmin() || (sameTenant(data.tenantId) && registrationRole(data));
+    }
+    function validRegistration(data,id) {
+      let voter = get(/databases/$(database)/documents/votantes_rasos/$(data.voterId)).data;
+      let event = get(/databases/$(database)/documents/jornadas_operativas/$(data.eventId)).data;
+      return data.keys().hasOnly(['id','tenantId','eventId','voterId','documentNumber','leaderId','candidateId','boarded','command','notes','createdBy','createdAt','updatedBy','updatedAt','revision'])
+        && data.id == id && id == data.tenantId + '--' + data.eventId + '--' + data.documentNumber
+        && data.documentNumber is string && data.documentNumber.matches('[1-9][0-9]{4,14}')
+        && voter.tenantId == data.tenantId && voter.documentNumber == data.documentNumber && voter.consentGiven == true
+        && voter.leaderId == data.leaderId && voter.candidateId == data.candidateId
+        && (data.leaderId != '' || data.candidateId != '')
+        && leaderReference(data.tenantId,data.leaderId) && candidateReference(data.tenantId,data.candidateId)
+        && registrationRole(voter) && event.tenantId == data.tenantId && event.get('status','') != 'Cancelado'
+        && data.boarded is bool && data.command is bool && data.notes is string && data.notes.size() <= 1500
+        && data.revision is int && data.updatedBy == request.auth.uid
+        && data.createdAt is string && data.updatedAt is string;
+    }
+    match /registros_jornada/{id} {
+      allow read: if registrationScope(resource.data);
+      allow create: if canOperateTenant(request.resource.data.tenantId) && validRegistration(request.resource.data,id)
+        && request.resource.data.createdBy == request.auth.uid && request.resource.data.revision == 1;
+      allow update: if registrationScope(resource.data) && teamRole(me().role)
+        && validRegistration(request.resource.data,id)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['boarded','command','notes','updatedBy','updatedAt','revision'])
+        && request.resource.data.revision == resource.data.revision + 1
+        && ((!resource.data.boarded || request.resource.data.boarded) && (!resource.data.command || request.resource.data.command) || request.resource.data.notes.size() > 0);
+      allow delete: if false;
+    }
+
     // bound to the stored profile; demo data never grants operational privileges.
     function ownDemo(id, data) {
       return sameTenant(data.tenantId) && data.ownerUid == request.auth.uid
@@ -480,7 +518,8 @@ service cloud.firestore {
           'candidates', 'districts', 'proposals', 'driveFiles', 'expenses', 'contributions', 'leaders', 'vehicles', 'coordinations', 'voters', 'operations'])
         && data.id == id && data.kind == 'presentation' && data.isSynthetic == true
         && ((data.version == 2 && !('operations' in data)) || (data.version == 3
-        && data.operations is map && data.operations.keys().hasOnly(['events','requests','trips','reports'])
+        && data.operations is map && data.operations.keys().hasOnly(['events','requests','trips','reports','registrations'])
+        && data.operations.get('registrations',[]) is list && data.operations.get('registrations',[]).size() <= 1500
         && data.operations.events is list && data.operations.events.size() <= 150
         && data.operations.requests is list && data.operations.requests.size() <= 500
         && data.operations.trips is list && data.operations.trips.size() <= 300
@@ -512,7 +551,7 @@ service cloud.firestore {
     }
 
     match /{collectionName}/{id} {
-      allow get: if collectionName in ['jornadas_operativas','solicitudes_recursos','viajes_operativos','agenda_vehiculos','reportes_jornada','gastos','auditoria']
+      allow get: if collectionName in ['jornadas_operativas','solicitudes_recursos','viajes_operativos','agenda_vehiculos','reportes_jornada','registros_jornada','gastos','auditoria']
         && profileExists() && canReadTenant(me().tenantId) && id.matches(me().tenantId + '--.*')
         && !exists(/databases/$(database)/documents/$(collectionName)/$(id));
       allow read: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace', 'simulaciones', 'fuentes_estadisticas', 'equipo_campana']

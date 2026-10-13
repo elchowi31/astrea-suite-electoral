@@ -1,8 +1,9 @@
-import { EditRecordButton } from './common/EditRecordButton';
+import { EditRecordButton,DemoEditing } from './common/EditRecordButton';
+import {saveDemoTask,saveDemoEntity,saveDemoExecutive} from '../lib/demoWorkspace';
 import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
 import { persistEntity, saveCommitteeTask, saveCoordinationToFirestore, subscribeToCollection } from '../lib/firebase';
 import { updateCommitteeRecord } from '../lib/recordEditing';
-import React, { useEffect, useState } from 'react';
+import React, { useContext,useEffect, useState } from 'react';
 import {
   Tenant,
   CampaignCoordination,
@@ -59,6 +60,7 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   onNavigateToHierarchy,
   onUpdateCoordination
 }) => {
+  const demoWorkspace=useContext(DemoEditing);
   const { saving, saveError, submit, runSave } = useFirestoreForm();
   const [coordTitle, setCoordTitle] = useState('');
   const [coordName, setCoordName] = useState('');
@@ -144,13 +146,19 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const totalCompletedTasks = coordinations.reduce((acc, c) => acc + c.committees.reduce((t, cm) => t + cm.completedTasksCount, 0), 0);
   const overallProgress = totalTasks > 0 ? Math.round((totalCompletedTasks / totalTasks) * 100) : 0;
 
-  useEffect(() => subscribeToCollection<any>('equipo_campana', rows => {
-    if (!rows[0]) return;
+  useEffect(() => {
+    if(demoWorkspace){const data=(demoWorkspace.bundle.coordinations[0] as any)?.presentationTeam;
+      setCandidateInfo(data?.candidateInfo||{name:demoWorkspace.bundle.candidates[0]?.fullName||'Sin candidatura',role:demoWorkspace.bundle.candidates[0]?.chamber||'Por definir',slogan:'',status:'En preparación'});
+      setGeneralCoordinator(previous=>data?.generalCoordinator||{...previous,name:demoWorkspace.bundle.coordinations[0]?.coordinatorName||'Sin coordinación',phone:'',email:''});
+      setCampaignManager(previous=>data?.campaignManager||{...previous,name:demoWorkspace.bundle.coordinations[1]?.coordinatorName||'Sin gerente',phone:'',email:''});return;
+    }
+    return subscribeToCollection<any>('equipo_campana', rows => {
+    if (!rows[0]) {setCandidateInfo({name:'Sin candidatura configurada',role:'Cargo por definir',slogan:'',status:'Pendiente de configuración'});setGeneralCoordinator(previous=>({...previous,name:'Sin coordinador asignado',phone:'',email:''}));setCampaignManager(previous=>({...previous,name:'Sin gerente asignado',phone:'',email:''}));return;}
     const data = rows[0];
     if (data.generalCoordinator) setGeneralCoordinator(data.generalCoordinator);
     if (data.campaignManager) setCampaignManager(data.campaignManager);
     if (data.candidateInfo) setCandidateInfo(data.candidateInfo);
-  }, [], currentTenant.tenantId), [currentTenant.tenantId]);
+  }, [], currentTenant.tenantId);}, [currentTenant.tenantId,demoWorkspace?.bundle]);
   useEffect(() => {
     setActiveCommitteeModal(previous => {
       if (!previous) return previous;
@@ -161,7 +169,8 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   }, [coordinations]);
   const handleSaveExecutiveLeaders = async (e: React.FormEvent) => {
     e.preventDefault();
-    await persistEntity('equipo_campana', `equipo-${currentTenant.tenantId}`, { tenantId:currentTenant.tenantId, generalCoordinator:tempCoordinator, campaignManager:tempManager, candidateInfo:tempCandidate });
+    if(demoWorkspace)await saveDemoExecutive(currentTenant.tenantId,{generalCoordinator:tempCoordinator,campaignManager:tempManager,candidateInfo:tempCandidate});
+    else await persistEntity('equipo_campana', `equipo-${currentTenant.tenantId}`, { tenantId:currentTenant.tenantId, generalCoordinator:tempCoordinator, campaignManager:tempManager, candidateInfo:tempCandidate });
     setGeneralCoordinator({ ...tempCoordinator }); setCampaignManager({ ...tempManager }); setCandidateInfo({ ...tempCandidate });
     setIsEditExecutiveModalOpen(false);
   };
@@ -169,7 +178,8 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     event.preventDefault();
     if (!coordTitle.trim() || !coordName.trim()) throw new Error('Ingrese el nombre de la coordinación y su responsable.');
     const id = `coord-${crypto.randomUUID()}`;
-    await saveCoordinationToFirestore({ id, tenantId:currentTenant.tenantId, title:coordTitle.trim(), coordinatorName:coordName.trim(), coordinatorRole:'Coordinador', color:'#6366f1', iconName:'Users', summary:'', committees:[{ id:`comite-${crypto.randomUUID()}`, coordinationId:id, name:'Comité operativo', responsibilities:[], leadPerson:coordName.trim(), tasksCount:0, completedTasksCount:0, status:'Planificación', tasks:[] }] });
+    const coordination:CampaignCoordination={ id, tenantId:currentTenant.tenantId, title:coordTitle.trim(), coordinatorName:coordName.trim(), coordinatorRole:'Coordinador', color:'#6366f1', iconName:'Users', summary:'', committees:[{ id:`comite-${crypto.randomUUID()}`, coordinationId:id, name:'Comité operativo', responsibilities:[], leadPerson:coordName.trim(), tasksCount:0, completedTasksCount:0, status:'Planificación', tasks:[] }] };
+    if(demoWorkspace)await saveDemoEntity(currentTenant.tenantId,'comites_coordinaciones',coordination);else await saveCoordinationToFirestore(coordination);
     setCoordTitle('');setCoordName('');
   };
   async function saveTask(task?:CampaignTask) {
@@ -178,7 +188,7 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     const { coordination,committee }=activeCommitteeModal;
     const updatedTask=task ? {...task,completed:!task.completed}
       : { id:crypto.randomUUID(),tenantId:currentTenant.tenantId,coordinationId:coordination.id,committeeId:committee.id,title:newTaskTitle.trim(),description:'',assignedTo:newTaskAssignee.trim() || committee.leadPerson || '',dueDate:newTaskDueDate,priority:'Media' as const,completed:false,createdAt:new Date().toISOString() };
-    await saveCommitteeTask(currentTenant.tenantId,coordination.id,committee.id,updatedTask);
+    if(demoWorkspace)await saveDemoTask(currentTenant.tenantId,coordination.id,committee.id,updatedTask);else await saveCommitteeTask(currentTenant.tenantId,coordination.id,committee.id,updatedTask);
     if (!task) setNewTaskTitle('');
   }
 
@@ -573,7 +583,7 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                             <div className="flex items-center gap-2">
                               <h4 className="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors">
                                 {committee.name}
-                                {!coord.id.startsWith('demo-')&&<EditRecordButton collection="comites" record={{...committee,tenantId:currentTenant.tenantId}} savePatch={(patch,original)=>updateCommitteeRecord(currentTenant.tenantId,coord.id,committee.id,undefined,patch,original)} />}
+                                <EditRecordButton collection="comites" record={{...committee,tenantId:currentTenant.tenantId}} savePatch={(patch,original)=>updateCommitteeRecord(currentTenant.tenantId,coord.id,committee.id,undefined,patch,original)} />
                               </h4>
                               {committee.status === 'Activo' && (
                                 <span className="px-2 py-0.5 text-[9px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md">

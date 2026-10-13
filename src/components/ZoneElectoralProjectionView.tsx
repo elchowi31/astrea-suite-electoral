@@ -1,3 +1,4 @@
+import {categoryColors} from '../lib/chartPalette';
 import React, { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { AlertTriangle, Bus, DollarSign, MapPin, Target, TrendingUp, Users } from 'lucide-react';
@@ -69,10 +70,11 @@ export const ZoneElectoralProjectionView: React.FC<ZoneElectoralProjectionViewPr
 
   const visibleRows = selectedMunicipality === 'todos' ? rows : rows.filter((item) => item.municipality === selectedMunicipality);
   const selectedExpenses = selectedMunicipality === 'todos' ? scopedExpenses : scopedExpenses.filter((item) => item.municipality === selectedMunicipality);
+  const componentColors=categoryColors(scopedExpenses.map(row=>row.component||'Sin clasificar'));
   const expenseBreakdown = useMemo(() => {
     const grouped = new Map<string, number>();
     selectedExpenses.forEach((item) => grouped.set(item.component || 'Sin clasificar', (grouped.get(item.component || 'Sin clasificar') || 0) + Math.max(0, item.amount || 0)));
-    return Array.from(grouped.entries()).map(([name, value], index) => ({ name, value, color: COLORS[index % COLORS.length] })).sort((a, b) => b.value - a.value);
+    return Array.from(grouped.entries()).map(([name, value], index) => ({ name, value, color: componentColors[name] })).sort((a, b) => b.value - a.value);
   }, [selectedExpenses]);
 
   const totals = visibleRows.reduce((acc, item) => ({
@@ -134,7 +136,7 @@ export const ZoneElectoralProjectionView: React.FC<ZoneElectoralProjectionViewPr
 
           <section className="grid gap-5 lg:grid-cols-2">
             <ChartCard title="Meta y compromisos por municipio">
-              <ResponsiveContainer width="100%" height="100%"><BarChart data={visibleRows}><CartesianGrid stroke="#1e293b" vertical={false} /><XAxis dataKey="municipality" stroke="#64748b" fontSize={10} /><YAxis stroke="#64748b" fontSize={10} /><Tooltip contentStyle={{ background: '#020617', border: '1px solid #334155', borderRadius: 12 }} /><Legend /><Bar dataKey="target" name="Meta" fill="#3b82f6" radius={[4, 4, 0, 0]} /><Bar dataKey="committed" name="Comprometidos" fill="#22c55e" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
+              <ResponsiveContainer width="100%" height="100%"><BarChart data={visibleRows}><CartesianGrid stroke="#1e293b" vertical={false} /><XAxis dataKey="municipality" stroke="#64748b" fontSize={10} /><YAxis stroke="#64748b" fontSize={10} /><Tooltip contentStyle={{ background: '#020617', border: '1px solid #334155', borderRadius: 12 }} /><Legend /><Bar dataKey="target" name="Meta" fill="#64748b" radius={[4, 4, 0, 0]} /><Bar dataKey="committed" name="Comprometidos" fill="#a78bfa" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
             </ChartCard>
             <ChartCard title="Gasto real por componente">
               {expenseBreakdown.length ? <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={expenseBreakdown} dataKey="value" nameKey="name" innerRadius={45} outerRadius={85}>{expenseBreakdown.map((item) => <Cell key={item.name} fill={item.color} />)}</Pie><Tooltip formatter={(value: any) => money(Number(value))} contentStyle={{ background: '#020617', border: '1px solid #334155', borderRadius: 12 }} /><Legend wrapperStyle={{ fontSize: 10 }} /></PieChart></ResponsiveContainer> : <div className="flex h-full items-center justify-center text-center text-xs text-slate-500">No hay gastos clasificados para el filtro.</div>}

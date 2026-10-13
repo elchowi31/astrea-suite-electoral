@@ -42,8 +42,25 @@ export interface LeaderProgressReport {
   id: string; tenantId: string; eventId: string; leaderId: string; reportedVoters: number;
   notes: string; createdBy: string; updatedAt: string; revision: number;
 }
-export interface OperationsData { events: OperationalEvent[]; requests: ResourceRequest[]; trips: TransportTrip[]; reports: LeaderProgressReport[] }
-export const EMPTY_OPERATIONS: OperationsData = { events: [], requests: [], trips: [], reports: [] };
+export interface EventRegistration {
+  id: string; tenantId: string; eventId: string; voterId: string; documentNumber: string;
+  leaderId: string; candidateId: string; boarded: boolean; command: boolean;
+  notes: string; createdBy: string; createdAt: string; updatedBy: string; updatedAt: string; revision: number;
+}
+export interface OperationsData { events: OperationalEvent[]; requests: ResourceRequest[]; trips: TransportTrip[]; reports: LeaderProgressReport[]; registrations?: EventRegistration[] }
+export const EMPTY_OPERATIONS: OperationsData = { events: [], requests: [], trips: [], reports: [], registrations: [] };
+/** One identity per event, including imported duplicate voter profiles. Both channels count once. */
+export function uniqueEventRegistrations(event: OperationalEvent, rows: EventRegistration[]) {
+  const identities = new Map<string,EventRegistration>();
+  for (const row of [...rows].sort((a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id))) {
+    if (row.tenantId!==event.tenantId || row.eventId!==event.id || (!row.boarded&&!row.command)) continue;
+    const key=row.documentNumber.replace(/[^\p{L}\p{N}]/gu,'').toUpperCase();
+    const prior=identities.get(key);
+    if (prior) identities.set(key,{...prior,boarded:prior.boarded||row.boarded,command:prior.command||row.command});
+    else identities.set(key,row);
+  }
+  return [...identities.values()];
+}
 export const canCoordinate = (user: UserProfile | null) => !!user && ['AdminGlobal','AdminTenant','Gobernador','Diputado','Alcalde','Concejal','JefePolitico'].includes(user.role);
 export const overlaps = (a: Pick<TransportTrip,'startAt'|'endAt'>, b: Pick<TransportTrip,'startAt'|'endAt'>) => a.startAt < b.endAt && b.startAt < a.endAt;
 export const passengerTotal = (trip: TransportTrip) => trip.allocations.reduce((n, a) => n + a.passengers, 0);
@@ -112,21 +129,24 @@ export function suggestTransport(event: OperationalEvent, requests: ResourceRequ
   return {proposals,uncovered:pending.reduce((n,p)=>n+p.left,0),assigned:proposals.reduce((n,p)=>n+p.allocations.reduce((m,a)=>m+a.passengers,0),0)};
 }
 
-export function eventControl(event: OperationalEvent, leaders: Leader[], requests: ResourceRequest[], trips: TransportTrip[], reports: LeaderProgressReport[], expenses: CampaignExpense[], now=new Date()) {
+export function eventControl(event: OperationalEvent, leaders: Leader[], requests: ResourceRequest[], trips: TransportTrip[], reports: LeaderProgressReport[], expenses: CampaignExpense[], now=new Date(), registrations:EventRegistration[]=[]) {
   const start=Date.parse(event.startAt),end=Date.parse(event.endAt);
   const elapsed=Math.max(0,Math.min(1,(now.getTime()-start)/(end-start)));
   const inEvent=(r:{tenantId:string;eventId:string})=>r.tenantId===event.tenantId&&r.eventId===event.id;
   const needs=requests.filter(inEvent).filter(r=>r.status!=='Rechazada');
   const rides=trips.filter(inEvent).filter(t=>t.status!=='Cancelado');
-  return leaders.filter(l=>l.tenantId===event.tenantId&&(l.municipality===event.municipality||needs.some(r=>r.leaderId===l.id))).map(leader=>{
+  const unique=uniqueEventRegistrations(event,registrations);
+  return leaders.filter(l=>l.tenantId===event.tenantId&&(l.municipality===event.municipality||needs.some(r=>r.leaderId===l.id)||unique.some(r=>r.leaderId===l.id))).map(leader=>{
     const own=needs.filter(r=>r.leaderId===leader.id);const transport=own.filter(r=>r.resource===TRANSPORT_RESOURCE&&r.direction!=='Regreso');
     const reported=reports.find(r=>inEvent(r)&&r.leaderId===leader.id)?.reportedVoters||0;
+    const people=unique.filter(r=>r.leaderId===leader.id);
+    const registered=people.length,boarded=people.filter(r=>r.boarded).length,commandOnly=people.filter(r=>r.command&&!r.boarded).length,overlap=people.filter(r=>r.command&&r.boarded).length;
     const spent=expenses.filter(e=>e.tenantId===event.tenantId&&e.eventId===event.id&&e.responsibleLeaderId===leader.id).reduce((n,e)=>n+safe(e.amount),0);
     const demanded=transport.reduce((n,r)=>n+r.quantity,0),reserved=transport.reduce((n,r)=>n+r.reservedPassengers,0),arrived=transport.reduce((n,r)=>n+r.arrivedPassengers,0);
     const active=rides.filter(t=>t.status==='En curso').reduce((n,t)=>n+t.allocations.filter(a=>transport.some(r=>r.id===a.requestId)).reduce((s,a)=>s+a.passengers,0),0);
     const alerts:string[]=[];
-    if(reported>leader.voteTarget&&leader.voteTarget>0)alerts.push(`${reported-leader.voteTarget} reportados sobre la meta. Confirme alimentación adicional y regreso al lugar de origen.`);
-    if(event.status!=='Cancelado'&&['En curso','Finalizado'].includes(event.status)&&elapsed>0&&leader.voteTarget>0&&reported<leader.voteTarget*elapsed*.8)alerts.push(`Reporte bajo el avance esperado (${Math.round(leader.voteTarget*elapsed)} a esta hora)`);
+    if(registered>leader.voteTarget&&leader.voteTarget>0)alerts.push(`${registered-leader.voteTarget} registrados sobre la meta. Confirme alimentación adicional y regreso al lugar de origen.`);
+    if(event.status!=='Cancelado'&&['En curso','Finalizado'].includes(event.status)&&elapsed>0&&leader.voteTarget>0&&registered<leader.voteTarget*elapsed*.8)alerts.push(`Registro bajo el avance esperado (${Math.round(leader.voteTarget*elapsed)} a esta hora)`);
     if(demanded>reserved)alerts.push(`${demanded-reserved} personas sin cupo`);
     if(transport.some(r=>r.waitingPassengers===0&&r.reservedPassengers>r.arrivedPassengers))alerts.push('Cupos programados sin personas en espera: revisar posible reasignación.');
     if(own.some(r=>(r.confirmedSurplus||0)>0))alerts.push('Hay sobrantes confirmados que pueden cederse a otra necesidad.');
@@ -135,9 +155,9 @@ export function eventControl(event: OperationalEvent, leaders: Leader[], request
     if(returnPending>0)alerts.push(`${returnPending} personas pendientes de completar el regreso`);
     if(leader.budgetAllocated>0&&spent>leader.budgetAllocated)alerts.push('Gasto superior al presupuesto del líder');
     if(own.some(r=>r.status==='Pendiente'))alerts.push('Necesidades pendientes de aprobación');
-    return {leader,reported,spent,demanded,reserved,arrived,active,remaining:Math.max(0,leader.voteTarget-reported),compliance:leader.voteTarget?reported/leader.voteTarget*100:null,
+    return {leader,reported,registered,boarded,commandOnly,overlap,spent,demanded,reserved,arrived,active,remaining:Math.max(0,leader.voteTarget-registered),compliance:leader.voteTarget?registered/leader.voteTarget*100:null,
       requestedBudget:own.reduce((n,r)=>n+r.amount,0),approvedBudget:own.filter(r=>['Aprobada','Entregada'].includes(r.status)).reduce((n,r)=>n+r.amount,0),delivered:own.filter(r=>r.status==='Entregada').length,requests:own.length,
-      costPerReported:reported?spent/reported:null,budgetCompliance:leader.budgetAllocated?spent/leader.budgetAllocated*100:null,alerts};
+      costPerReported:reported?spent/reported:null,costPerRegistered:registered?spent/registered:null,budgetCompliance:leader.budgetAllocated?spent/leader.budgetAllocated*100:null,alerts};
   });
 }
 

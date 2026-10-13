@@ -1,0 +1,34 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {buildDemoBundle} from '../src/data/demoSeed';
+import {eventControl,uniqueEventRegistrations,TRANSPORT_RESOURCE} from '../src/lib/operations';
+import {mergeRegistration,registrationId} from '../src/lib/eventRegistration';
+import type {UserProfile} from '../src/types';
+const bundle=buildDemoBundle('test',{uid:'owner',tenantId:'test',role:'AdminTenant',displayName:'Owner',email:'owner@test.invalid',department:'Cesar',municipality:'Astrea',createdAt:'2026-10-13'} as UserProfile);
+const event=bundle.operations!.events[0],leader={...bundle.leaders.find(l=>l.municipality===event.municipality)!,voteTarget:50};
+const voter={...bundle.voters.find(v=>v.leaderId===leader.id)!,documentNumber:'12345678',consentGiven:true};
+test('20 boarded plus 23 command-only equals 43, overlapping identities and return trips never increase progress',()=>{
+  const records=Array.from({length:43},(_,i)=>mergeRegistration(event,{...voter,id:`v${i}`,documentNumber:String(12000+i)},undefined,i<20?'boarded':'command',true,'','owner'));
+  records[0]={...records[0],command:true};
+  records.push({...records[0],id:'duplicate-profile',voterId:'duplicate',boarded:false});
+  records.push({...records[1],id:'foreign',tenantId:'other',documentNumber:'66666'});
+  records.push({...records[1],id:'other-event',eventId:'other-event',documentNumber:'77777'});
+  const request={...bundle.operations!.requests.find(r=>r.leaderId===leader.id&&r.resource===TRANSPORT_RESOURCE)!,quantity:25,reservedPassengers:20,arrivedPassengers:18};
+  const rows=eventControl(event,[leader],[request,{...request,id:'return',direction:'Regreso',quantity:18,reservedPassengers:18,arrivedPassengers:18}],[],[],[],new Date(),records);
+  assert.equal(uniqueEventRegistrations(event,records).length,43);
+  assert.equal(rows[0].registered,43);assert.equal(rows[0].boarded,20);assert.equal(rows[0].commandOnly,23);assert.equal(rows[0].overlap,1);
+  assert.equal(rows[0].compliance,86);assert.equal(rows[0].demanded,25);assert.equal(rows[0].reserved,20);assert.equal(rows[0].arrived,18);
+});
+test('One identity per event survives repeated channels, supports audited corrections and rejects identity/consent changes',()=>{
+  const first=mergeRegistration(event,voter,undefined,'boarded',true,'Trip 1','owner');
+  const both=mergeRegistration(event,voter,first,'command',true,'Sheet 1','owner');
+  assert.equal(both.id,first.id);assert.equal(both.boarded,true);assert.equal(both.command,true);
+  assert.equal(registrationId(event,{...voter,id:'duplicate-profile'}),first.id);
+  assert.throws(()=>mergeRegistration(event,voter,both,'boarded',false,'','owner'),/corrección/);
+  const correction=mergeRegistration(event,voter,both,'boarded',false,'Incorrect boarding','owner');
+  assert.equal(uniqueEventRegistrations(event,[correction]).length,1);
+  assert.equal(uniqueEventRegistrations(event,[{...correction,command:false}]).length,0);
+  assert.throws(()=>mergeRegistration(event,{...voter,consentGiven:false},undefined,'command',true,'','owner'),/autorización/);
+  assert.throws(()=>mergeRegistration(event,{...voter,leaderId:'different'},both,'command',true,'','owner'),/otra asignación/);
+  assert.throws(()=>mergeRegistration({...event,status:'Cancelado'},voter,undefined,'command',true,'','owner'),/activa/);
+});

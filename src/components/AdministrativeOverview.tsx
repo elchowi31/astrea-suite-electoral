@@ -1,5 +1,6 @@
+import { categoryColors } from '../lib/chartPalette';
 import React, { useMemo, useState } from 'react';
-import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
+import {Cell, ResponsiveContainer, AreaChart, Area, Legend, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import type { CampaignExpense } from '../types';
 
 const money = (n: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', notation: 'compact', maximumFractionDigits: 1 }).format(n);
@@ -11,7 +12,7 @@ export function AdministrativeOverview({ tenantId, expenses }: { tenantId: strin
   const [status, setStatus] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [group, setGroup] = useState<'component' | 'phase' | 'status'>('component');
+  const [group, setGroup] = useState<'phase' | 'status'>('status');
   const scoped = expenses.filter(e => e.tenantId === tenantId);
   const invalidRange = !!(from && to && from > to);
   const rows = scoped.filter(e => !invalidRange && (!phase || (e.phase || 'Sin fase') === phase) && (!status || e.status === status) && (!from || e.date.slice(0, 10) >= from) && (!to || e.date.slice(0, 10) <= to));
@@ -32,6 +33,7 @@ export function AdministrativeOverview({ tenantId, expenses }: { tenantId: strin
     }
     return { totals, groups: [...groups.values()].sort((a, b) => b.amount - a.amount), days: [...days.values()].sort((a, b) => a.date.localeCompare(b.date)) };
   }, [rows, group]);
+  const colors=categoryColors(scoped.map(row=>row[group]||'Sin fase'));
   const cards = [ ['Gasto registrado', 'total', '#22d3ee'], ['Pagado', 'paid', '#34d399'], ['Por aprobar', 'pending', '#fbbf24'], ['Aprobado por pagar', 'approved', '#a78bfa'] ] as const;
   return <section className="space-y-3" aria-label="Resumen administrativo">
     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -53,20 +55,20 @@ export function AdministrativeOverview({ tenantId, expenses }: { tenantId: strin
         <h3 className="text-xs text-slate-300">{label}</h3>
         <p title={fullMoney(model.totals[key])} className="mt-1 text-xl font-black text-white sm:text-2xl">{money(model.totals[key])}</p>
         <div className="mt-2 h-9" role="img" aria-label={`${label} por fecha de registro`}>
-          {model.days.length ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={model.days}><Area dataKey={key} stroke={color} fill={color} fillOpacity={0.15} strokeWidth={2} isAnimationActive={false} dot={model.days.length === 1} /></AreaChart></ResponsiveContainer> : <span className="text-[10px] text-slate-500">Sin registros</span>}
+          {model.days.length && key!=='total' ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={model.days}><Area dataKey={key} stroke={color} fill={color} fillOpacity={0.15} strokeWidth={2} isAnimationActive={false} dot={model.days.length === 1} /></AreaChart></ResponsiveContainer> : <span className="text-[10px] text-slate-500">{key==='total'?`${rows.length} registros`:'Sin registros'}</span>}
         </div>
       </article>)}
     </div>
     <div className="grid gap-3 lg:grid-cols-2">
       <article className="min-w-0 rounded-xl border border-slate-800 bg-slate-900 p-3">
-        <h3 className="mb-2 text-sm font-bold text-white">Gasto por fecha</h3>
+        <h3 className="mb-2 text-sm font-bold text-white">Pendientes de pago por fecha</h3>
         <div className="h-44">
-          {model.days.length ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={model.days} margin={{ left: 0, right: 12 }}><XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v.slice(5)} minTickGap={30} /><YAxis width={60} tickFormatter={money} tick={{ fontSize: 10, fill: '#94a3b8' }} /><Tooltip formatter={(v: number) => fullMoney(v)} contentStyle={{ background: '#0f172a', borderColor: '#334155', color: 'white' }} /><Area name="Gasto" dataKey="total" stroke="#22d3ee" fill="#22d3ee" fillOpacity={0.12} /></AreaChart></ResponsiveContainer> : <p className="py-12 text-center text-sm text-slate-500">Sin gastos en este período</p>}
+          {model.days.length ? <ResponsiveContainer width="100%" height="100%"><AreaChart data={model.days} margin={{ left: 0, right: 12 }}><XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v.slice(5)} minTickGap={30} /><YAxis width={60} tickFormatter={money} tick={{ fontSize: 10, fill: '#94a3b8' }} /><Tooltip formatter={(v: number) => fullMoney(v)} contentStyle={{ background: '#0f172a', borderColor: '#334155', color: 'white' }} /><Legend wrapperStyle={{fontSize:11}}/><Area name="Por aprobar" dataKey="pending" stackId="pending" stroke="#fbbf24" fill="#fbbf24" fillOpacity={.15}/><Area name="Aprobado por pagar" dataKey="approved" stackId="pending" stroke="#a78bfa" fill="#a78bfa" fillOpacity={.15}/></AreaChart></ResponsiveContainer> : <p className="py-12 text-center text-sm text-slate-500">Sin gastos en este período</p>}
         </div>
       </article>
       <article className="min-w-0 rounded-xl border border-slate-800 bg-slate-900 p-3">
-        <div className="mb-2 flex items-center justify-between gap-2"><h3 className="text-sm font-bold text-white">Distribución del gasto</h3><select aria-label="Agrupar gastos" className={control} value={group} onChange={e => setGroup(e.target.value as typeof group)}><option value="component">Componente</option><option value="phase">Fase</option><option value="status">Estado</option></select></div>
-        <div className="h-40">{model.groups.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={model.groups.slice(0, 6)} layout="vertical" margin={{ right: 8 }}><XAxis type="number" hide /><YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 10, fill: '#cbd5e1' }} /><Tooltip formatter={(v: number) => fullMoney(v)} contentStyle={{ background: '#0f172a', color: 'white' }} /><Bar name="Gasto" dataKey="amount" fill="#818cf8" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer> : <p className="py-12 text-center text-sm text-slate-500">Sin registros</p>}</div>
+        <div className="mb-2 flex items-center justify-between gap-2"><h3 className="text-sm font-bold text-white">Estado y fase de los gastos</h3><select aria-label="Agrupar gastos" className={control} value={group} onChange={e => setGroup(e.target.value as typeof group)}><option value="phase">Fase</option><option value="status">Estado</option></select></div>
+        <div className="h-40">{model.groups.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={model.groups.slice(0, 6)} layout="vertical" margin={{ right: 8 }}><XAxis type="number" hide /><YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 10, fill: '#cbd5e1' }} /><Tooltip formatter={(v: number) => fullMoney(v)} contentStyle={{ background: '#0f172a', color: 'white' }} /><Bar name="Gasto" dataKey="amount" radius={[0,4,4,0]}>{model.groups.slice(0,6).map(row=><Cell key={row.name} fill={colors[row.name]}/>)}</Bar></BarChart></ResponsiveContainer> : <p className="py-12 text-center text-sm text-slate-500">Sin registros</p>}</div>
         <details className="mt-2 text-xs text-slate-300"><summary className="cursor-pointer">Ver tabla · {rows.length} registros</summary><div className="mt-2 max-h-60 overflow-auto"><table className="w-full text-left"><thead><tr><th scope="col">Grupo</th><th scope="col">Registros</th><th scope="col">COP</th></tr></thead><tbody>{model.groups.map(g => <tr key={g.name} className="border-t border-slate-800"><th scope="row" className="py-2 font-normal">{g.name}</th><td>{g.count}</td><td>{fullMoney(g.amount)}</td></tr>)}</tbody></table></div></details>
       </article>
     </div>

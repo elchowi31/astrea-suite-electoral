@@ -24,6 +24,36 @@ after(async()=>{if (env) await env.cleanup();});
 const check=(name:string,fn:()=>Promise<void>)=>test(name,{skip:!enabled},fn);
 const dbFor=(uid:string)=>env.authenticatedContext(uid,{email:`${uid}@test.invalid`}).firestore();
 
+check('Unique event planillas enforce document identity, consent, scoped access and revision-controlled corrections',async()=>{
+  const eventId='team-a--attendance',leaderId='attendance-leader',candidateId='attendance-candidate',voterId='attendance-person';
+  await env.withSecurityRulesDisabled(async ctx=>{
+    const db=ctx.firestore();
+    await setDoc(doc(db,'jornadas_operativas',eventId),{id:eventId,tenantId:'team-a',status:'En curso'});
+    await setDoc(doc(db,'lideres',leaderId),{id:leaderId,tenantId:'team-a'});
+    await setDoc(doc(db,'candidatos',candidateId),{id:candidateId,tenantId:'team-a'});
+    await setDoc(doc(db,'votantes_rasos',voterId),{id:voterId,tenantId:'team-a',documentNumber:'123456789',consentGiven:true,leaderId,candidateId,createdBy:'admin'});
+    await setDoc(doc(db,'votantes_rasos','no-consent'),{id:'no-consent',tenantId:'team-a',documentNumber:'123456780',consentGiven:false,leaderId,candidateId,createdBy:'admin'});
+    await setDoc(doc(db,'usuarios','sheet-operator'),{uid:'sheet-operator',tenantId:'team-a',role:'Operador',active:true,accessVersion:2,assignedLeaderId:leaderId});
+  });
+  const id=`team-a--${eventId}--123456789`;
+  const row={id,tenantId:'team-a',eventId,voterId,documentNumber:'123456789',leaderId,candidateId,boarded:true,command:false,notes:'Trip 1',createdBy:'admin',createdAt:'2026-10-13',updatedBy:'admin',updatedAt:'2026-10-13',revision:1};
+  const ref=doc(dbFor('admin'),'registros_jornada',id);
+  await assertSucceeds(getDoc(ref));await assertSucceeds(setDoc(ref,row));
+  await assertSucceeds(getDoc(doc(dbFor('sheet-operator'),'registros_jornada',id)));
+  await assertSucceeds(getDocs(query(collection(dbFor('sheet-operator'),'registros_jornada'),where('tenantId','==','team-a'),where('leaderId','==',leaderId))));
+  for(const uid of ['reader','other','inactive','operator'])await assertFails(getDoc(doc(dbFor(uid),'registros_jornada',id)));
+  await assertFails(getDocs(query(collection(dbFor('sheet-operator'),'registros_jornada'),where('tenantId','==','team-a'))));
+  await assertFails(updateDoc(ref,{command:true}));
+  await assertSucceeds(updateDoc(doc(dbFor('sheet-operator'),'registros_jornada',id),{command:true,updatedBy:'sheet-operator',revision:2}));
+  await assertFails(updateDoc(ref,{documentNumber:'999999999',revision:3}));
+  await assertFails(updateDoc(ref,{boarded:false,notes:'',updatedBy:'admin',revision:3}));
+  await assertSucceeds(updateDoc(ref,{boarded:false,notes:'Correction',updatedBy:'admin',revision:3}));
+  await assertFails(setDoc(doc(dbFor('admin'),'registros_jornada','random-id'),{...row,id:'random-id'}));
+  const badId=`team-a--${eventId}--123456780`;
+  await assertFails(setDoc(doc(dbFor('admin'),'registros_jornada',badId),{...row,id:badId,voterId:'no-consent',documentNumber:'123456780'}));
+  await assertFails(deleteDoc(ref));
+});
+
 check('Resource requests save for members; approval, reservations and cumulative reports respect authority and tenant',async()=>{
   const operatorDb=dbFor('operator');const adminDb=dbFor('admin');
   const eventId='team-a--event-ops';const requestId='team-a--request-ops';const vehicleId='team-a--vehicle-ops';

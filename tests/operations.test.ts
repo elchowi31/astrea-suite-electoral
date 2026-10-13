@@ -4,6 +4,7 @@ import {buildDemoBundle} from '../src/data/demoSeed';
 import {accountability,eventControl,suggestTransport,unrequestedTransport,TRANSPORT_RESOURCE,RESOURCE_CATALOG,validateRequest,validateEvent,overlaps,uniqueVoters} from '../src/lib/operations';
 import type {UserProfile} from '../src/types';
 import {suggestReallocation,stockAvailable,stockMissing,queueIsFresh} from '../src/lib/operations';
+import {mergeRegistration} from '../src/lib/eventRegistration';
 const profile:UserProfile={uid:'demo-owner',tenantId:'team-a',role:'AdminTenant',displayName:'Demo',email:'demo@example.invalid',department:'Cesar',municipality:'Astrea',createdAt:'2026-10-12'};
 const bundle=buildDemoBundle('team-a',profile);
 
@@ -24,7 +25,9 @@ test('Above-target progress remains above 100 and return journeys never inflate 
   const first=eventControl(event,bundle.leaders,requests,trips,reports,bundle.expenses)[0];
   const report={...reports[0],leaderId:leader.id,reportedVoters:leader.voteTarget*2};
   const returnRequest={...requests.find(r=>r.leaderId===leader.id&&r.resource===TRANSPORT_RESOURCE)!,id:'return',direction:'Regreso' as const,quantity:5,reservedPassengers:5,arrivedPassengers:5};
-  const row=eventControl(event,bundle.leaders,[...requests,returnRequest],trips,[report],bundle.expenses)[0];
+  const voter=bundle.voters.find(v=>v.leaderId===leader.id)!;
+  const registrations=Array.from({length:leader.voteTarget*2},(_,i)=>mergeRegistration(event,{...voter,documentNumber:String(80000+i)},undefined,'command',true,'','owner',true));
+  const row=eventControl(event,bundle.leaders,[...requests,returnRequest],trips,[report],bundle.expenses,new Date(),registrations)[0];
   assert.equal(row.compliance,200);assert.equal(row.arrived,first.arrived);assert.ok(row.alerts.some(a=>a.includes('alimentación adicional')));
 });
 
@@ -58,13 +61,13 @@ test('Transport proposals respect approval, remaining demand, territory, capacit
   assert.equal(suggestTransport(event,[request],[vehicle],[{...booked,status:'Finalizado'}]).assigned,5);
   assert.equal(overlaps({startAt:'2026-10-12T10:00:00Z',endAt:'2026-10-12T11:00:00Z'},{startAt:'2026-10-12T11:00:00Z',endAt:'2026-10-12T12:00:00Z'}),false);
 });
-test('Day control compares reported voters and transport independently; reports are cumulative',()=>{
+test('Historical declarations remain separate from unique attendance and transportation',()=>{
   const event={...bundle.operations!.events[0],status:'En curso' as const,startAt:'2026-10-12T10:00:00.000Z',endAt:'2026-10-12T20:00:00.000Z'};
   const leader={...bundle.leaders[0],voteTarget:100,budgetAllocated:10000};
   const report={...bundle.operations!.reports[0],leaderId:leader.id,eventId:event.id,reportedVoters:10};
   const expense={...bundle.expenses[0],responsibleLeaderId:leader.id,eventId:event.id,amount:12000};
   const row=eventControl(event,[leader],[],[],[report],[expense],new Date('2026-10-12T15:00:00Z'))[0];
-  assert.equal(row.reported,10);assert.equal(row.compliance,10);assert.equal(row.arrived,0);assert.equal(row.costPerReported,1200);assert.equal(row.alerts.length,2);
+  assert.equal(row.reported,10);assert.equal(row.compliance,0);assert.equal(row.registered,0);assert.equal(row.arrived,0);assert.equal(row.costPerRegistered,null);assert.equal(row.alerts.length,2);
   assert.equal(eventControl(event,[leader],[],[],[{...report,reportedVoters:50}],[expense],new Date('2026-10-12T15:00:00Z'))[0].reported,50);
 });
 test('Missing history yields no forecast and invalid quantities are rejected',()=>{

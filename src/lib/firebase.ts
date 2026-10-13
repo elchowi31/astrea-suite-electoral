@@ -36,6 +36,7 @@ import {
 import type { CampaignCoordination, CampaignTask } from '../types';
 import { buildDemoBundle, type DemoBundle } from '../data/demoSeed';
 import { personalDemoId } from '../data/contextualDemo';
+import { prepareDemoPresentation } from '../data/demoPresentation';
 import { omitUndefined } from './serialization';
 import { localDataEnabled } from './deviceStorage';
 
@@ -522,6 +523,6 @@ export async function deleteDemoCollection(tenantId: string, uid: string): Promi
 export function subscribeToDemoCollection(tenantId: string, uid: string, onData: (bundle: DemoBundle | null) => void, onError: (message: string) => void): () => void {
   return onSnapshot(doc(db, 'demo', personalDemoId(tenantId, uid)), snapshot => {
     const bundle = snapshot.exists() ? snapshot.data() as DemoBundle : null;
-    onData(bundle?.kind === 'presentation' && bundle.isSynthetic === true ? bundle : null);
+    onData(bundle?.kind === 'presentation' && bundle.isSynthetic === true ? prepareDemoPresentation(bundle) : null);
   }, error => { onData(null); onError(`No fue posible cargar su demostración: ${error.message}`); });
 }

@@ -1,3 +1,6 @@
+import {DemoEditing} from './components/common/EditRecordButton';
+import {DemoDataEditor} from './components/DemoDataEditor';
+import {saveDemoEntity,deleteDemoExpense} from './lib/demoWorkspace';
 import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { EditRecordButton } from './components/common/EditRecordButton';
 import { OperationsEditingReferences } from './components/operations/OperationsEditingReferences';
@@ -126,11 +129,13 @@ export default function App() {
   const [demoBundle, setDemoBundle] = useState<DemoBundle | null>(null);
   const [demoBusy, setDemoBusy] = useState(false);
   const [demoError, setDemoError] = useState<string | null>(null);
-  const [demoEnabled, setDemoEnabled] = useState(false);
+  const [demoEnabled, setDemoEnabledState] = useState(false);
+  function setDemoEnabled(value:boolean){setDemoEnabledState(value);if(currentUser)try{localStorage.setItem('astrea:demo-visible:'+currentUser.uid+':'+selectedTenantId,String(value));}catch{/* The cloud records remain saved. */}}
+
   const [demoDepartment, setDemoDepartment] = useState('');
   const [demoMunicipality, setDemoMunicipality] = useState('');
   useEffect(() => {
-    setDemoEnabled(false); setDemoBundle(null); setDemoError(null);
+    try{setDemoEnabledState(currentUser?localStorage.getItem('astrea:demo-visible:'+currentUser.uid+':'+selectedTenantId)==='true':false);}catch{setDemoEnabledState(false);} setDemoBundle(null); setDemoError(null);
     setDemoDepartment(currentUser?.department?.trim() || '');
     setDemoMunicipality(currentUser?.municipality?.trim() || '');
   }, [currentUser?.uid, selectedTenantId, currentUser?.role, currentUser?.department, currentUser?.municipality, currentUser?.electoralLevel]);
@@ -309,6 +314,7 @@ export default function App() {
   };
 
   const handleAddCandidate = async (newCandidate: Candidate) => {
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'candidatos',newCandidate);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
     requireRealWorkspace();
     try {
       await saveCandidateToFirestore(newCandidate);
@@ -320,6 +326,7 @@ export default function App() {
   };
 
   const handleAddProposal = async (newProposal: Proposal) => {
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'propuestas',newProposal);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
     requireRealWorkspace();
     try {
       await saveProposalToFirestore(newProposal);
@@ -331,6 +338,7 @@ export default function App() {
   };
 
   const handleAddExpense = async (newExpense: CampaignExpense) => {
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'gastos',newExpense);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
     requireRealWorkspace();
     try {
       await saveExpenseToFirestore(newExpense);
@@ -342,6 +350,7 @@ export default function App() {
   };
 
   const handleUpdateExpense = async (updatedExpense: CampaignExpense) => {
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'gastos',updatedExpense);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
     requireRealWorkspace();
     if (updatedExpense.id.startsWith('demo-')) {
       setDemoError('Los registros demo son de solo lectura. Elimine y vuelva a crear la colección para restaurarlos.');
@@ -358,6 +367,7 @@ export default function App() {
   };
 
   const handleDeleteExpense = async (expenseId: string) => {
+    if(demoActive){await deleteDemoExpense(currentTenant.tenantId,expenseId);notifyFirestoreSave('Gasto retirado del entorno de prueba.');return;}
     requireRealWorkspace();
     if (expenseId.startsWith('demo-')) {
       setDemoError('Elimine la colección demo completa desde el control de presentación.');
@@ -374,6 +384,7 @@ export default function App() {
   };
 
   const handleAddDonorContribution = async (newContribution: DonorContribution) => {
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'aportes',newContribution);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
     requireRealWorkspace();
     try {
       await saveDonorContributionToFirestore(newContribution);
@@ -385,6 +396,7 @@ export default function App() {
   };
 
   const handleAddLeader = async (newLeader: Leader) => {
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'lideres',newLeader);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
     requireRealWorkspace();
     try {
       await saveLeaderToFirestore(newLeader);
@@ -396,6 +408,7 @@ export default function App() {
   };
 
   const handleAddVehicle = async (newVehicle: TransportVehicle) => {
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'vehiculos',newVehicle);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
     requireRealWorkspace();
     try {
       await saveVehicleToFirestore(newVehicle);
@@ -407,6 +420,7 @@ export default function App() {
   };
 
   const handleAddGrassrootsVoter = async (newVoter: GrassrootsVoter) => {
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'votantes_rasos',newVoter);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
     requireRealWorkspace();
     try {
       await saveGrassrootsVoterToFirestore(newVoter);
@@ -418,6 +432,7 @@ export default function App() {
   };
 
   const handleUpdateCoordination = async (updatedCoordination: CampaignCoordination) => {
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'comites_coordinaciones',updatedCoordination);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
     requireRealWorkspace();
     if (updatedCoordination.id.startsWith('demo-')) {
       setDemoError('La estructura demo es de solo lectura y permanece aislada de la operación real.');
@@ -434,6 +449,7 @@ export default function App() {
   };
 
   const handleCreateDemo = async () => {
+    if(demoAvailable&&!window.confirm('Regenerar reemplazará sus fichas de prueba y los cambios guardados. Los registros reales se conservan. ¿Desea continuar?'))return;
     setDemoBusy(true);
     setDemoError(null);
     try {
@@ -452,6 +468,7 @@ export default function App() {
   };
 
   const handleDeleteDemo = async () => {
+    if(!window.confirm('¿Eliminar su entorno de prueba y sus cambios guardados? Los registros reales se conservan.'))return;
     setDemoBusy(true);
     setDemoError(null);
     try {
@@ -487,7 +504,7 @@ export default function App() {
   const demoAvailable = demoMatchesProfile(demoBundle, currentUser, currentTenant.tenantId);
   const demoActive = demoEnabled && demoAvailable;
   function requireRealWorkspace() {
-    if (demoActive) throw new Error('Estos datos de prueba son de solo lectura. Seleccione «Usar datos reales» antes de registrar información operativa.');
+    if (demoActive) throw new Error('Cambie a datos reales para esta operación. Puede editar las fichas desde el editor de datos de prueba.');
   }
   const demoViewUser = demoActive && currentUser ? { ...currentUser,
     assignedCandidateId: demoBundle!.candidates[0]?.id, assignedLeaderId: demoBundle!.leaders[0]?.id } : currentUser;
@@ -594,6 +611,7 @@ export default function App() {
         {/* Content Area */}
         <main className="flex-1 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
           <OperationsProvider key={`${currentTenant.tenantId}-${demoActive?'demo':'real'}`} tenant={currentTenant} user={demoViewUser} leaders={visibleLeaders} candidates={visibleCandidates} voters={visibleVoters} expenses={visibleExpenses} vehicles={visibleVehicles} contributions={visibleContributions} readOnly={demoActive} demo={demoBundle?.operations}>
+          <DemoEditing.Provider value={demoActive&&demoBundle?{bundle:demoBundle,realReferences:{candidatos:candidates.map(c=>({id:c.id,name:c.fullName})),lideres:leaders.map(l=>({id:l.id,name:l.fullName})),aportes:donorContributions.map(c=>({id:c.id,name:c.donorName})),vehiculos:vehicles.map(v=>({id:v.id,name:v.licensePlate}))},onPromoted:()=>{setDemoEnabled(false);notifyFirestoreSave('Ficha guardada en datos reales.');}}:null}>
           <OperationsEditingReferences>
           {activeTab === 'device' && isTrackingAdministrator(currentUser) && <><DevicePersistencePanel /><div className="flex flex-wrap gap-3"><EditRecordButton collection="usuarios" record={currentUser} label="Editar mi perfil" />{['AdminTenant','AdminGlobal'].includes(currentUser.role)&&<EditRecordButton collection="organizaciones" record={currentTenant} label="Editar organización" />}</div></>}
 
@@ -617,7 +635,7 @@ export default function App() {
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
                     {demoActive
-                      ? `${demoBundle!.context!.electoralLevel} · ${demoBundle!.context!.department} · ${demoBundle!.context!.municipality}. Personas y cifras ficticias; esta vista muestra únicamente su demostración.`
+                      ? `${demoBundle!.context!.electoralLevel} · ${demoBundle!.context!.department} · ${demoBundle!.context!.municipality}. Puede editar y guardar las fichas. Los cambios se conservan en su entorno de prueba.`
                       : `Perfil: ${currentUser.role}. Cargue su demostración personal para explorar la app. Puede volver a los datos reales en cualquier momento.`}
                   </p>
                   {!currentUser.department?.trim() && <label className="mt-2 block text-xs text-slate-300">Departamento del entorno de prueba<input list="demo-departments" value={demoDepartment} onChange={event => { setDemoDepartment(event.target.value); if (!currentUser.municipality) setDemoMunicipality(''); }} className="ml-2 rounded-lg bg-slate-900 p-2"/><datalist id="demo-departments">{Object.keys(COLOMBIA_ELECTORAL_GEOGRAPHY).map(name => <option key={name} value={name}/>)}</datalist></label>}
@@ -639,6 +657,7 @@ export default function App() {
                 </div>
               </div>
               </div>
+              {demoActive&&demoBundle&&<DemoDataEditor bundle={demoBundle}/>}
             </details>
           )}
 
@@ -892,6 +911,7 @@ export default function App() {
           </Suspense>
 
           </OperationsEditingReferences>
+          </DemoEditing.Provider>
           </OperationsProvider>
         </main>
 

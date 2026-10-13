@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import { AlertTriangle, ArrowRight, BadgeCheck, BarChart3, CircleDollarSign, ClipboardCheck, Database, Gauge, MapPinned, ShieldCheck, Sparkles, Target, Truck, Users } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { CampaignExpense, Candidate, District, DonorContribution, DriveFileItem, GrassrootsVoter, Leader, Proposal, Tenant, TransportVehicle, UserProfile, UserRole } from '../types';
 import { calculateExecutiveAnalytics } from '../lib/analytics';
 import { getTerritorialScope } from '../lib/permissions';
@@ -24,7 +23,6 @@ interface DashboardViewProps {
 
 const formatCOP = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
 const formatNumber = (value: number) => new Intl.NumberFormat('es-CO').format(Math.round(value));
-const pieColors = ['#22d3ee', '#38bdf8', '#818cf8', '#a78bfa', '#f59e0b', '#fb7185'];
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   currentTenant,
@@ -103,14 +101,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <ChartCard icon={MapPinned} title="Cobertura por territorio" subtitle="Metas y compromisos registrados, sin valores de relleno">
-          {analytics.territoryRows.length > 0 ? <ResponsiveContainer width="100%" height="100%"><BarChart data={analytics.territoryRows.slice(0, 10)} margin={{ top: 8, right: 8, left: -12, bottom: 8 }}><CartesianGrid stroke="#1e293b" vertical={false} /><XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} /><YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} /><Tooltip formatter={(value: any) => `${formatNumber(Number(value))} votos`} contentStyle={{ background: '#020617', border: '1px solid #334155', borderRadius: 12 }} /><Bar dataKey="meta" name="Meta" fill="#334155" radius={[5, 5, 0, 0]} /><Bar dataKey="comprometidos" name="Comprometidos" fill="#22d3ee" radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer> : <EmptyChart text="Registre candidatos con territorio y meta de votos para activar esta comparación." />}
-        </ChartCard>
-        <ChartCard icon={BarChart3} title="Distribución del gasto" subtitle="Participación real por componente operativo">
-          {analytics.expenseRows.length > 0 ? <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={analytics.expenseRows.slice(0, 6)} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>{analytics.expenseRows.slice(0, 6).map((row, index) => <Cell key={row.name} fill={pieColors[index % pieColors.length]} />)}</Pie><Tooltip formatter={(value: any) => formatCOP(Number(value))} contentStyle={{ background: '#020617', border: '1px solid #334155', borderRadius: 12 }} /></PieChart></ResponsiveContainer> : <EmptyChart text="Registre gastos para visualizar la composición presupuestal." />}
-        </ChartCard>
-      </section>
 
       <section className="grid grid-cols-1 gap-3 md:grid-cols-3"><QuickModule icon={Gauge} title="Operación territorial" detail={`${leaders.length} líderes · ${voters.length} registros de base`} onClick={() => onNavigateTab('campaign_structure')} /><QuickModule icon={ClipboardCheck} title="Administración" detail={`${expenses.length} gastos · ${contributions.length} aportes`} onClick={() => onNavigateTab('finances')} /><QuickModule icon={Database} title="Conectividad" detail={`${driveFiles.length} archivos · ${districts.length} territorios`} onClick={() => onNavigateTab('workspace')} /></section>
       <div className="flex flex-col gap-2 rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-[11px] text-slate-500 sm:flex-row sm:items-center sm:justify-between"><span className="flex items-center gap-2"><BadgeCheck className="h-4 w-4 text-emerald-400" /> Aislamiento activo: {scope.scopeTitle}</span><span>La confianza aumenta con volumen, completitud, soportes y verificación.</span></div>
@@ -119,6 +109,4 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 };
 
 const MetricLine = ({ label, value }: { label: string; value: number }) => <div><div className="mb-1 flex items-center justify-between"><span className="text-slate-400">{label}</span><strong className="text-white">{value.toFixed(0)}%</strong></div><div className="h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.min(100, Math.max(0, value))}%` }} /></div></div>;
-const ChartCard = ({ icon: Icon, title, subtitle, children }: { icon: any; title: string; subtitle: string; children: React.ReactNode }) => <div className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-xl"><div className="mb-4 flex items-center gap-3 border-b border-slate-800 pb-3"><div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-2 text-cyan-300"><Icon className="h-4 w-4" /></div><div><h3 className="text-sm font-black text-white">{title}</h3><p className="text-[11px] text-slate-400">{subtitle}</p></div></div><div className="h-72">{children}</div></div>;
-const EmptyChart = ({ text }: { text: string }) => <div className="grid h-full place-items-center rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 p-6 text-center text-xs text-slate-400">{text}</div>;
 const QuickModule = ({ icon: Icon, title, detail, onClick }: { icon: any; title: string; detail: string; onClick: () => void }) => <button onClick={onClick} className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 text-left transition hover:border-cyan-500/30 hover:bg-slate-800/80"><div className="rounded-xl bg-slate-800 p-2.5 text-cyan-300"><Icon className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h3 className="text-sm font-bold text-white">{title}</h3><p className="truncate text-[11px] text-slate-400">{detail}</p></div><ArrowRight className="h-4 w-4 text-slate-500" /></button>;

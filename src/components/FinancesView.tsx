@@ -13,6 +13,7 @@ import { generarIdDocumentoLegible } from '../lib/slugify';
 import { AuthorHeader } from './common/AuthorHeader';
 import {
   DollarSign,
+  BarChart3,
   TrendingUp,
   PlusCircle,
   Filter,
@@ -725,7 +726,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
               <div>
                 <h3 className="font-bold text-white text-base flex items-center gap-2">
-                  <BarChart className="w-5 h-5 text-emerald-400" />
+                  <BarChart3 className="w-5 h-5 text-emerald-400" />
                   Comparativa de Aportes Recibidos vs Gastos Ejecutados por Rubro
                 </h3>
                 <p className="text-xs text-slate-400">
@@ -825,12 +826,13 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-4">
               <h3 className="font-bold text-white text-base flex items-center gap-2 border-b border-slate-800 pb-3">
                 <Layers className="w-5 h-5 text-amber-400" />
-                Mini-Gráficas de Balance por Tipo de Inversión
+                Saldo disponible o déficit por rubro
               </h3>
 
               <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                 {chartDataRubros.map((item) => {
                   const totalRubro = Math.max(item.Aportes, item.Gastos, 1);
+                  const balancePct=Math.min(100,Math.abs(item.Diferencia)/totalRubro*100);
                   const pctAporte = Math.min(100, (item.Aportes / totalRubro) * 100);
                   const pctGasto = Math.min(100, (item.Gastos / totalRubro) * 100);
 
@@ -853,8 +855,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                           <span>Gastos: <strong className="text-emerald-400 font-mono">{formatCOP(item.Gastos)}</strong></span>
                         </div>
                         <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden flex gap-1">
-                          <div className="bg-blue-500 h-full rounded-l-full transition-all" style={{ width: `${pctAporte}%` }}></div>
-                          <div className="bg-emerald-500 h-full rounded-r-full transition-all" style={{ width: `${pctGasto}%` }}></div>
+                          <div role="img" aria-label={`${item.rubroCompleto}: ${item.Diferencia>=0?'saldo disponible':'déficit'}`} className={`h-full rounded-full ${item.Diferencia>=0?'bg-emerald-400':'bg-amber-400'}`} style={{width:`${balancePct}%`}}/>
                         </div>
                       </div>
                     </div>

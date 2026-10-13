@@ -1,4 +1,8 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {EDIT_FIELDS,editableValue,editPatch} from '../src/lib/recordEditing';
 test('Editing creates only changed fields and preserves IDs, route metadata and optional values',()=>{const original={id:'vehicle',tenantId:'team',licensePlate:'AAA123',dailyCost:100,plannedRoute:{name:'Original'},createdBy:'owner'};const fields=EDIT_FIELDS.vehiculos;const values=Object.fromEntries(fields.map(field=>[field.key,editableValue(field,original[field.key])]));values.dailyCost='200';assert.deepEqual(editPatch(fields,original,values),{dailyCost:200});});
+test('Targets and financial totals cannot be erased into invalid KPI denominators',()=>{
+  assert.throws(()=>editPatch(EDIT_FIELDS.lideres,{voteTarget:50},{voteTarget:''}),/Complete/);
+  assert.throws(()=>editPatch(EDIT_FIELDS.gastos,{amount:100},{amount:''}),/Complete/);
+});
 test('Edits validate coordinate pairs and retain legitimate zero and false values',()=>{const original={fullName:'Líder',latitude:9.5,longitude:-74};const fields=EDIT_FIELDS.lideres;const values=Object.fromEntries(fields.map(field=>[field.key,editableValue(field,original[field.key])]));values.latitude='';assert.throws(()=>editPatch(fields,original,values),/latitud/);values.longitude='';assert.equal(editPatch(fields,original,values).latitude,null);assert.deepEqual(editPatch(EDIT_FIELDS.gastos,{amount:100},{amount:'0'}),{amount:0});assert.deepEqual(editPatch(EDIT_FIELDS.votantes_rasos,{requiresTransport:true},{requiresTransport:false}),{requiresTransport:false});assert.throws(()=>editPatch(EDIT_FIELDS.gastos,{amount:100},{amount:'-1'}),/rango/);});
