@@ -1,7 +1,11 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { connectAuthEmulator, getAuth } from 'firebase/auth';
+import { connectAuthEmulator, getAuth, indexedDBLocalPersistence, initializeAuth } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
 import {
   getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   connectFirestoreEmulator,
   doc,
   getDoc,
@@ -31,17 +35,26 @@ import {
 } from '../types';
 import type { CampaignCoordination, CampaignTask } from '../types';
 import { buildDemoBundle, type DemoBundle } from '../data/demoSeed';
+import { personalDemoId } from '../data/contextualDemo';
 import { omitUndefined } from './serialization';
+import { localDataEnabled } from './deviceStorage';
 
 const emulatorMode = import.meta.env?.VITE_FIREBASE_EMULATORS === 'true';
 export const app = getApps().find(item => item.name === '[DEFAULT]') || initializeApp(emulatorMode ? { ...firebaseConfig, projectId: 'demo-astrea' } : firebaseConfig);
 
 // Use firestoreDatabaseId if specified, or default database
-export const db = !emulatorMode && (firebaseConfig as any).firestoreDatabaseId
-  ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
-  : getFirestore(app);
+const databaseId = !emulatorMode && (firebaseConfig as any).firestoreDatabaseId || '(default)';
+export const db = localDataEnabled() && !emulatorMode
+  ? initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }, databaseId)
+  : getFirestore(app, databaseId);
 
-export const auth = getAuth(app);
+// En la app nativa (Capacitor) getAuth puede quedar esperando el resolvedor de ventanas emergentes; se inicializa con IndexedDB.
+const nativeApp = (() => { try { return Capacitor.isNativePlatform(); } catch { return false; } })();
+export const auth = nativeApp ? initializeAuth(app, { persistence: indexedDBLocalPersistence }) : getAuth(app);
+/** Proyecto y base nombrada para escrituras nativas por la API REST de Firestore. */
+export const firestoreTarget = { projectId: app.options.projectId as string, databaseId: databaseId as string };
+/** La app nativa no tiene servidor propio: las rutas /api van al despliegue web. */
+export const API_BASE_URL = nativeApp ? (import.meta.env?.VITE_API_BASE_URL || 'https://astrea-suite-electoral.vercel.app') : '';
 if (emulatorMode) {
   connectAuthEmulator(auth, 'http://127.0.0.1:9098', { disableWarnings: true });
   connectFirestoreEmulator(db, '127.0.0.1', 8088);
@@ -75,7 +88,8 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   const headers = new Headers(init.headers || {});
   headers.set('Authorization', `Bearer ${token}`);
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  return fetch(input, { ...init, headers });
+  const target = typeof input === 'string' && input.startsWith('/api/') ? `${API_BASE_URL}${input}` : input;
+  return fetch(target, { ...init, headers });
 }
 
 export async function persistEntity<T extends { tenantId: string }>(collectionName: string, entityId: string, data: T): Promise<void> {
@@ -492,19 +506,22 @@ export async function saveAiAnalysisToFirestore(tenantId: string, analysis: { ty
 }
 
 // La demostración vive en una colección aislada. Nunca se mezcla con las
-// colecciones operativas y se elimina borrando un único documento por tenant.
-export async function createDemoCollection(tenantId: string): Promise<DemoBundle> {
-  const bundle = buildDemoBundle(tenantId);
-  await persistEntity('demo', bundle.id, bundle);
+// colecciones operativas. Cada usuario administra únicamente su presentación.
+export async function createDemoCollection(tenantId: string, profile: UserProfile): Promise<DemoBundle> {
+  if (auth.currentUser?.uid !== profile.uid) throw new Error('Mantenga su sesión activa para cargar los datos de prueba.');
+  const bundle = buildDemoBundle(tenantId, profile);
+  await setDoc(doc(db, 'demo', bundle.id), omitUndefined(bundle));
   return bundle;
 }
 
-export async function deleteDemoCollection(tenantId: string): Promise<void> {
-  await removeEntity('demo', `${tenantId}-presentacion`, tenantId);
+export async function deleteDemoCollection(tenantId: string, uid: string): Promise<void> {
+  if (auth.currentUser?.uid !== uid) throw new Error('Solo puede retirar su propia demostración.');
+  await deleteDoc(doc(db, 'demo', personalDemoId(tenantId, uid)));
 }
 
-export function subscribeToDemoCollection(tenantId: string, onData: (bundle: DemoBundle | null) => void): () => void {
-  return subscribeToCollection<DemoBundle>('demo', (items) => {
-    onData(items.find((item) => item.kind === 'presentation' && item.isSynthetic === true) || null);
-  }, [], tenantId);
+export function subscribeToDemoCollection(tenantId: string, uid: string, onData: (bundle: DemoBundle | null) => void, onError: (message: string) => void): () => void {
+  return onSnapshot(doc(db, 'demo', personalDemoId(tenantId, uid)), snapshot => {
+    const bundle = snapshot.exists() ? snapshot.data() as DemoBundle : null;
+    onData(bundle?.kind === 'presentation' && bundle.isSynthetic === true ? bundle : null);
+  }, error => { onData(null); onError(`No fue posible cargar su demostración: ${error.message}`); });
 }

@@ -213,6 +213,9 @@ export interface CampaignExpense {
   veredaOrBarrio?: string;
   fundedByDonorId?: string; // Optional link to specific donor
   responsibleLeaderId?: string; // Optional link to leader
+  candidateId?: string;
+  eventId?: string;
+  requestId?: string;
   vehiclePlate?: string; // Optional link to vehicle
   notes?: string;
 }

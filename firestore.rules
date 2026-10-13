@@ -202,20 +202,319 @@ service cloud.firestore {
       allow delete: if platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager());
     }
 
-    // Datos 100% sintéticos para presentaciones. Se conservan aislados de las
-    // colecciones reales y pueden retirarse eliminando la colección `demo`.
-    match /demo/{id} {
+    match /capas_geograficas/{id} {
       allow read: if canReadTenant(resource.data.tenantId);
-      allow create: if sameTenant(request.resource.data.tenantId)
-        && request.resource.data.isSynthetic == true
-        && request.resource.data.kind == 'presentation';
-      allow update: if canManageTenant(resource.data.tenantId)
-        && immutableTenant()
-        && request.resource.data.isSynthetic == true;
-      allow delete: if canManageTenant(resource.data.tenantId);
+      allow create: if canOperateTenant(request.resource.data.tenantId)
+        && request.resource.data.id == id && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.name is string && request.resource.data.name.size() <= 160
+        && request.resource.data.features is list && request.resource.data.features.size() <= 1000;
+      allow update: if canOperateTenant(resource.data.tenantId) && immutableTenant()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','features','updatedBy','updatedAt'])
+        && request.resource.data.features is list && request.resource.data.features.size() <= 1000
+        && request.resource.data.name is string && request.resource.data.name.size() <= 160;
+      allow delete: if canOperateTenant(resource.data.tenantId);
+    }
+    function routeEmployee(data) {
+      return exists(/databases/$(database)/documents/usuarios/$(data.userId))
+        && get(/databases/$(database)/documents/usuarios/$(data.userId)).data.tenantId == data.tenantId
+        && get(/databases/$(database)/documents/usuarios/$(data.userId)).data.get('active', false) == true
+        && get(/databases/$(database)/documents/usuarios/$(data.userId)).data.get('accessVersion', 0) == 2;
+    }
+    function readableTracking(data) {
+      return trackingAdministrator(data.tenantId);
+    }
+    function trackingAdministrator(tenantId) {
+      return platformAdmin() || (sameTenant(tenantId) && me().role == 'AdminTenant');
+    }
+    function publishedElectionTransport(data,id) {
+      let vehicle=get(/databases/$(database)/documents/vehiculos/$(data.vehicleId)).data;
+      return data.keys().hasOnly(['id','tenantId','vehicleId','vehiclePlate','electionDate','departureTime','route','notes','createdBy','createdAt'])
+        && data.id==id && data.createdBy==request.auth.uid && data.createdAt is string
+        && data.vehicleId is string && vehicle.tenantId==data.tenantId && data.vehiclePlate==vehicle.licensePlate
+        && data.electionDate is string && data.electionDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.departureTime is string && data.departureTime.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+        && data.notes is string && data.notes.size()<=1000 && data.route==vehicle.plannedRoute
+        && data.route.keys().hasOnly(['name','stops','geometry','distanceMeters','durationSeconds','provider','calculatedAt'])
+        && data.route.geometry is list && data.route.geometry.size()>=2 && data.route.geometry.size()<=25000
+        && data.route.stops is list && data.route.stops.size()>=2 && data.route.stops.size()<=100;
+    }
+    // Plan de transporte compartido: no concede acceso a ninguna colección de GPS personal.
+    match /rutas_transporte_electoral/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if trackingAdministrator(request.resource.data.tenantId) && publishedElectionTransport(request.resource.data,id);
+      allow update: if false;
+      allow delete: if trackingAdministrator(resource.data.tenantId);
+    }
+    function validRoute(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 160
+        && data.route.geometry is list && data.route.geometry.size() >= 2 && data.route.geometry.size() <= 25000
+        && data.route.stops is list && data.route.stops.size() >= 2 && data.route.stops.size() <= 100;
+    }
+    function ownAutomaticRoute(data, id) {
+      return sameTenant(data.tenantId) && data.userId == request.auth.uid
+        && data.id == id && data.kind == 'automatic' && data.createdBy == request.auth.uid
+        && data.employeeName == me().displayName && data.status == 'En curso'
+        && data.keys().hasOnly(['id','tenantId','userId','employeeName','deviceId','kind','vehicleId','vehiclePlate','name','instructions','scheduledDate','route','status','createdBy','createdAt','startedAt','startedAtMillis'])
+        && data.deviceId is string && data.deviceId.matches('^[A-Za-z0-9_-]{1,64}$')
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 160
+        && data.instructions is string && data.instructions.size() <= 3000
+        && data.vehicleId == '' && data.vehiclePlate == '' && data.scheduledDate is string
+        && data.createdAt is string && data.startedAt is string && data.startedAtMillis is int
+        && data.startedAtMillis > 0 && data.startedAtMillis <= request.time.toMillis() + 300000
+        && data.route.keys().hasOnly(['name','geometry','stops','distanceMeters','durationSeconds','provider','calculatedAt'])
+        && data.route.name is string && data.route.geometry == [] && data.route.stops == []
+        && data.route.distanceMeters == 0 && data.route.durationSeconds == 0
+        && data.route.provider == 'Archivo' && data.route.calculatedAt is string;
+    }
+    match /recorridos/{id} {
+      allow read: if readableTracking(resource.data);
+      allow create: if ownAutomaticRoute(request.resource.data,id) || (trackingAdministrator(request.resource.data.tenantId) && routeEmployee(request.resource.data)
+        && request.resource.data.id == id && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.status == 'Asignado' && validRoute(request.resource.data)
+        && !request.resource.data.keys().hasAny(['startedAt','startedAtMillis','finishedAt','finishedAtMillis','kind','deviceId']));
+      allow update: if immutableTenant() && (
+        (sameTenant(resource.data.tenantId) && resource.data.userId == request.auth.uid
+          && resource.data.get('kind','') == 'automatic' && resource.data.status == 'Finalizado'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt']))
+        ||
+        (trackingAdministrator(resource.data.tenantId)
+          && ((resource.data.status == 'Asignado' && request.resource.data.status == 'Asignado' && routeEmployee(request.resource.data) && validRoute(request.resource.data)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','userId','employeeName','vehicleId','vehiclePlate','route','instructions','scheduledDate','updatedAt','updatedBy']))
+            || (resource.data.status in ['Asignado','En curso','Pausado'] && request.resource.data.status == 'Cancelado'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','finishedAt','finishedAtMillis','updatedAt','updatedBy']))))
+        || (sameTenant(resource.data.tenantId) && resource.data.userId == request.auth.uid
+          && resource.data.status in ['Asignado','En curso','Pausado']
+          && request.resource.data.status in ['En curso','Pausado','Finalizado']
+          && (resource.data.status != 'Asignado' || request.resource.data.status == 'En curso')
+          && request.resource.data.startedAt is string && request.resource.data.startedAtMillis is int
+          && request.resource.data.startedAtMillis > 0 && request.resource.data.startedAtMillis <= request.time.toMillis() + 300000
+          && (resource.data.get('startedAtMillis', 0) == 0 || request.resource.data.startedAtMillis == resource.data.startedAtMillis)
+          && (resource.data.get('startedAt', '') == '' || request.resource.data.startedAt == resource.data.startedAt)
+          && (request.resource.data.status != 'Finalizado' || (request.resource.data.finishedAt is string && request.resource.data.finishedAtMillis is int && request.resource.data.finishedAtMillis >= request.resource.data.startedAtMillis))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','startedAt','startedAtMillis','finishedAt','finishedAtMillis','updatedAt','updatedBy']))
+      );
+      allow delete: if false;
+    }
+    match /puntos_recorrido/{id} {
+      allow read: if readableTracking(resource.data);
+      allow create: if sameTenant(request.resource.data.tenantId) && request.resource.data.userId == request.auth.uid
+        && request.resource.data.id == id
+        && request.resource.data.keys().hasOnly(['id','tenantId','userId','routeId','latitude','longitude','accuracy','capturedAt','capturedAtMillis','receivedAt'])
+        && exists(/databases/$(database)/documents/recorridos/$(request.resource.data.routeId))
+        && get(/databases/$(database)/documents/recorridos/$(request.resource.data.routeId)).data.tenantId == request.resource.data.tenantId
+        && get(/databases/$(database)/documents/recorridos/$(request.resource.data.routeId)).data.userId == request.auth.uid
+        && request.resource.data.latitude is number && request.resource.data.latitude >= -90 && request.resource.data.latitude <= 90
+        && request.resource.data.longitude is number && request.resource.data.longitude >= -180 && request.resource.data.longitude <= 180
+        && request.resource.data.accuracy is number && request.resource.data.accuracy >= 0 && request.resource.data.accuracy <= 50000
+        && request.resource.data.capturedAt is string && request.resource.data.capturedAtMillis is int
+        && request.resource.data.capturedAtMillis >= get(/databases/$(database)/documents/recorridos/$(request.resource.data.routeId)).data.startedAtMillis - 30000
+        && request.resource.data.capturedAtMillis <= request.time.toMillis() + 300000
+        && (get(/databases/$(database)/documents/recorridos/$(request.resource.data.routeId)).data.get('finishedAtMillis', 0) == 0
+          || request.resource.data.capturedAtMillis <= get(/databases/$(database)/documents/recorridos/$(request.resource.data.routeId)).data.finishedAtMillis + 30000)
+        && request.resource.data.receivedAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // Posición en vivo: un documento por integrante que se sobrescribe con cada posición.
+    // Solo el propio integrante la escribe, sobre un recorrido asignado a él y con la hora del servidor.
+    function validLive(id) {
+      let data = request.resource.data;
+      let route = get(/databases/$(database)/documents/recorridos/$(data.routeId)).data;
+      return sameTenant(data.tenantId) && data.userId == request.auth.uid
+        && id == data.tenantId + '--' + request.auth.uid && data.id == id
+        && data.keys().hasOnly(['id','tenantId','userId','routeId','deviceId','latitude','longitude','accuracy','speed','heading','battery','source','capturedAt','capturedAtMillis','updatedAt','motion','observedAtMillis'])
+        && data.routeId is string && exists(/databases/$(database)/documents/recorridos/$(data.routeId))
+        && route.tenantId == data.tenantId && route.userId == request.auth.uid
+        && data.deviceId is string && data.deviceId.size() <= 64
+        && data.latitude is number && data.latitude >= -90 && data.latitude <= 90
+        && data.longitude is number && data.longitude >= -180 && data.longitude <= 180
+        && data.accuracy is number && data.accuracy >= 0 && data.accuracy <= 50000
+        && (data.speed == null || data.speed is number) && (data.heading == null || data.heading is number)
+        && (data.battery == null || (data.battery is number && data.battery >= 0 && data.battery <= 100))
+        && data.source in ['web','android','ios']
+        && data.capturedAt is string && data.capturedAtMillis is int && data.capturedAtMillis <= request.time.toMillis() + 300000
+        && (!data.keys().hasAny(['motion','observedAtMillis']) || (data.motion in ['moving','stationary']
+          && data.observedAtMillis is int && data.observedAtMillis >= data.capturedAtMillis && data.observedAtMillis <= request.time.toMillis() + 300000))
+        && data.updatedAt == request.time;
+    }
+    match /posiciones_actuales/{id} {
+      allow read: if readableTracking(resource.data);
+      allow create: if validLive(id);
+      allow update: if validLive(id) && resource.data.userId == request.auth.uid && immutableTenant();
+      allow delete: if trackingAdministrator(resource.data.tenantId);
+    }
+
+    // Semilla de rastreo: cada integrante registra solo sus propios dispositivos.
+    // El identificador del documento es tenant--uid--dispositivo, de modo que nadie
+    // puede escribir el registro de otra persona ni moverlo a otra organización.
+    function validDevice(id) {
+      let data = request.resource.data;
+      return sameTenant(data.tenantId) && data.userId == request.auth.uid
+        && data.id == id && id == data.tenantId + '--' + request.auth.uid + '--' + data.deviceId
+        && data.keys().hasOnly(['id','tenantId','userId','deviceId','label','gps','installed','activeRouteId','firstSeenAt','lastSeenAt'])
+        && data.deviceId is string && data.deviceId.matches('^[A-Za-z0-9_-]{1,64}$')
+        && data.label is string && data.label.size() <= 160
+        && data.gps in ['granted','denied','prompt','unsupported','unknown']
+        && data.installed is bool
+        && data.activeRouteId is string && data.activeRouteId.size() <= 200
+        && data.firstSeenAt is string && data.firstSeenAt.size() <= 40
+        && data.lastSeenAt is string && data.lastSeenAt.size() <= 40;
+    }
+    match /dispositivos/{id} {
+      allow read: if readableTracking(resource.data);
+      allow create: if validDevice(id);
+      allow update: if validDevice(id) && resource.data.userId == request.auth.uid && immutableTenant();
+      allow delete: if trackingAdministrator(resource.data.tenantId);
+    }
+
+    // All active roles manage their own synthetic presentation. The context is
+    function eventReference(tenantId, eventId) {
+      return eventId == '' || get(/databases/$(database)/documents/jornadas_operativas/$(eventId)).data.tenantId == tenantId;
+    }
+    function leaderReference(tenantId, leaderId) {
+      return leaderId == '' || get(/databases/$(database)/documents/lideres/$(leaderId)).data.tenantId == tenantId;
+    }
+    function candidateReference(tenantId, candidateId) {
+      return candidateId == '' || get(/databases/$(database)/documents/candidatos/$(candidateId)).data.tenantId == tenantId;
+    }
+    function validResourceRequest(data, id) {
+      return data.id == id && data.createdBy is string && data.createdAt is string
+        && data.description is string && data.description.size() > 0 && data.description.size() <= 500
+        && data.notes is string && data.notes.size() <= 1500
+        && data.resource in ['Transporte de pasajeros','Alimentación','Refrigerios e hidratación','Combustible','Avanzada y montaje','Uniformes del equipo','Camisetas para asistentes','Publicidad y medios','Impresos y señalización','Sonido, tarima y evento','Sede y mobiliario','Honorarios y testigos','Tecnología y asesoría','Otros e imprevistos']
+        && data.quantity is number && data.quantity > 0 && data.quantity <= 1000000
+        && data.unitCost is number && data.unitCost >= 0 && data.unitCost <= 100000000000
+        && data.amount is number && data.amount >= 0 && data.amount - data.quantity * data.unitCost >= -0.5 && data.amount - data.quantity * data.unitCost <= 0.5
+        && data.status in ['Pendiente','Aprobada','Rechazada','Entregada']
+        && data.reservedPassengers is int && data.reservedPassengers >= 0 && data.reservedPassengers <= data.quantity
+        && data.arrivedPassengers is int && data.arrivedPassengers >= 0 && data.arrivedPassengers <= data.reservedPassengers
+        && data.get('direction','Ida') in ['Ida','Regreso']
+        && data.get('waitingPassengers',0) is int && data.get('waitingPassengers',0) >= 0 && data.get('waitingPassengers',0) <= data.quantity
+        && data.get('queueUpdatedAt','') is string
+        && data.get('consumedQuantity',0) is number && data.get('consumedQuantity',0) >= 0
+        && data.get('confirmedSurplus',0) is number && data.get('confirmedSurplus',0) >= 0
+        && data.get('transferredIn',0) is number && data.get('transferredIn',0) >= 0 && data.get('transferredIn',0) <= 1000000
+        && data.get('transferredOut',0) is number && data.get('transferredOut',0) >= 0 && data.get('transferredOut',0) <= 1000000
+        && data.get('deliveredQuantity',0) is number && data.get('deliveredQuantity',0) >= 0 && data.get('deliveredQuantity',0) <= 1000000
+        && data.get('consumedQuantity',0) + data.get('confirmedSurplus',0) <= data.get('deliveredQuantity',data.status == 'Entregada' ? data.quantity : 0) + data.get('transferredIn',0) - data.get('transferredOut',0)
+        && (data.resource != 'Transporte de pasajeros' || (data.eventId != '' && data.quantity is int))
+        && (data.leaderId != '' || data.candidateId != '')
+        && eventReference(data.tenantId,data.eventId) && leaderReference(data.tenantId,data.leaderId) && candidateReference(data.tenantId,data.candidateId);
+    }
+    match /jornadas_operativas/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if canOperateTenant(request.resource.data.tenantId) && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.id == id && request.resource.data.name is string
+        && request.resource.data.endAt > request.resource.data.startAt;
+      allow update: if canManageTenant(resource.data.tenantId) && immutableTenant()
+        && request.resource.data.id == id && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.endAt > request.resource.data.startAt;
+      allow delete: if false;
+    }
+    match /solicitudes_recursos/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if canOperateTenant(request.resource.data.tenantId) && validResourceRequest(request.resource.data,id)
+        && request.resource.data.createdBy == request.auth.uid && request.resource.data.status == 'Pendiente'
+        && request.resource.data.get('transferredIn',0) == 0 && request.resource.data.get('transferredOut',0) == 0
+        && request.resource.data.get('consumedQuantity',0) == 0 && request.resource.data.get('confirmedSurplus',0) == 0 && request.resource.data.get('deliveredQuantity',0) == 0
+        && request.resource.data.reservedPassengers == 0 && request.resource.data.arrivedPassengers == 0 && request.resource.data.expenseId == '';
+      allow update: if canOperateTenant(resource.data.tenantId) && immutableTenant() && validResourceRequest(request.resource.data,id)
+        && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.createdAt == resource.data.createdAt
+        && (manager() || (me().get('assignedLeaderId','') != '' && me().get('assignedLeaderId','') == resource.data.leaderId
+          && resource.data.status in ['Aprobada','Entregada']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['waitingPassengers','queueUpdatedAt','consumedQuantity','confirmedSurplus'])
+          && request.resource.data.get('consumedQuantity',0) >= resource.data.get('consumedQuantity',0)) || (resource.data.createdBy == request.auth.uid
+          && resource.data.status == 'Pendiente' && request.resource.data.status == 'Pendiente'
+          && request.resource.data.get('transferredIn',0) == 0 && request.resource.data.get('transferredOut',0) == 0
+          && request.resource.data.get('consumedQuantity',0) == 0 && request.resource.data.get('confirmedSurplus',0) == 0 && request.resource.data.get('deliveredQuantity',0) == 0
+          && request.resource.data.reservedPassengers == 0 && request.resource.data.arrivedPassengers == 0 && request.resource.data.expenseId == ''));
+      allow delete: if false;
+    }
+    match /viajes_operativos/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create, update: if canManageTenant(request.resource.data.tenantId)
+        && (resource == null || immutableTenant()) && request.resource.data.id == id
+        && eventReference(request.resource.data.tenantId,request.resource.data.eventId)
+        && get(/databases/$(database)/documents/vehiculos/$(request.resource.data.vehicleId)).data.tenantId == request.resource.data.tenantId
+        && request.resource.data.allocations is list && request.resource.data.allocations.size() > 0 && request.resource.data.allocations.size() <= 10
+        && request.resource.data.status in ['Programado','En curso','Finalizado','Cancelado']
+        && request.resource.data.endAt > request.resource.data.startAt;
+      allow delete: if false;
+    }
+    match /agenda_vehiculos/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create, update: if canManageTenant(request.resource.data.tenantId) && (resource == null || immutableTenant())
+        && id == request.resource.data.tenantId + '--' + request.resource.data.vehicleId + '--' + request.resource.data.day
+        && request.resource.data.slots is list && request.resource.data.slots.size() <= 100;
+      allow delete: if false;
+    }
+    function reportWriter(data) {
+      return canManageTenant(data.tenantId) || (sameTenant(data.tenantId) && me().get('assignedLeaderId','') == data.leaderId);
+    }
+    function validProgress(data, id) {
+      return id == data.tenantId + '--' + data.eventId + '--' + data.leaderId
+        && data.eventId != '' && data.leaderId != '' && data.id == id
+        && data.reportedVoters is int && data.reportedVoters >= 0 && data.reportedVoters <= 1000000
+        && data.notes is string && data.notes.size() <= 1500 && data.revision is int
+        && eventReference(data.tenantId,data.eventId) && leaderReference(data.tenantId,data.leaderId);
+    }
+    match /reportes_jornada/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create: if reportWriter(request.resource.data) && validProgress(request.resource.data,id)
+        && request.resource.data.createdBy == request.auth.uid && request.resource.data.revision == 1;
+      allow update: if reportWriter(resource.data) && immutableTenant() && validProgress(request.resource.data,id)
+        && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if false;
+    }
+
+    // bound to the stored profile; demo data never grants operational privileges.
+    function ownDemo(id, data) {
+      return sameTenant(data.tenantId) && data.ownerUid == request.auth.uid
+        && id == data.tenantId + '--demo--' + request.auth.uid;
+    }
+    function validDemo(id) {
+      let data = request.resource.data;
+      let context = data.context;
+      return ownDemo(id, data)
+        && data.keys().hasOnly(['id', 'tenantId', 'ownerUid', 'kind', 'isSynthetic', 'version', 'createdAt', 'context',
+          'candidates', 'districts', 'proposals', 'driveFiles', 'expenses', 'contributions', 'leaders', 'vehicles', 'coordinations', 'voters', 'operations'])
+        && data.id == id && data.kind == 'presentation' && data.isSynthetic == true
+        && ((data.version == 2 && !('operations' in data)) || (data.version == 3
+        && data.operations is map && data.operations.keys().hasOnly(['events','requests','trips','reports'])
+        && data.operations.events is list && data.operations.events.size() <= 150
+        && data.operations.requests is list && data.operations.requests.size() <= 500
+        && data.operations.trips is list && data.operations.trips.size() <= 300
+        && data.operations.reports is list && data.operations.reports.size() <= 300))
+        && data.createdAt is string && data.createdAt.size() <= 40
+        && context.keys().hasOnly(['role', 'department', 'municipality', 'electoralLevel', 'scopeLevel'])
+        && context.role == me().role
+        && context.department is string && context.department.size() > 0 && context.department.size() <= 120
+        && context.municipality is string && context.municipality.size() > 0 && context.municipality.size() <= 120
+        && (me().get('department', '') == '' || context.department == me().department)
+        && (me().get('municipality', '') == '' || context.municipality == me().municipality)
+        && context.electoralLevel in ['Gobernación', 'Asamblea / Diputación', 'Alcaldía', 'Concejo Municipal', 'Cámara de Representantes', 'Senado de la República']
+        && context.scopeLevel in ['Departamental', 'Municipal', 'Veredal']
+        && data.candidates is list && data.candidates.size() <= 300
+        && data.districts is list && data.districts.size() <= 150
+        && data.leaders is list && data.leaders.size() <= 300
+        && data.voters is list && data.voters.size() <= 1500
+        && data.vehicles is list && data.vehicles.size() <= 150
+        && data.expenses is list && data.expenses.size() <= 300
+        && data.proposals is list && data.contributions is list && data.coordinations is list && data.driveFiles is list;
+    }
+    match /demo/{id} {
+      // A direct lookup is also allowed before the personal document exists.
+      allow get: if profileExists() && sameTenant(me().tenantId)
+        && id == me().tenantId + '--demo--' + request.auth.uid;
+      allow create: if validDemo(id);
+      allow update: if ownDemo(id, resource.data) && immutableTenant() && validDemo(id);
+      allow delete: if ownDemo(id, resource.data);
     }
 
     match /{collectionName}/{id} {
+      allow get: if collectionName in ['jornadas_operativas','solicitudes_recursos','viajes_operativos','agenda_vehiculos','reportes_jornada','gastos','auditoria']
+        && profileExists() && canReadTenant(me().tenantId) && id.matches(me().tenantId + '--.*')
+        && !exists(/databases/$(database)/documents/$(collectionName)/$(id));
       allow read: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace', 'simulaciones', 'fuentes_estadisticas', 'equipo_campana']
         && canReadTenant(resource.data.tenantId);
       allow create: if collectionName in ['vehiculos', 'propuestas', 'archivos_drive', 'comites_coordinaciones', 'analisis_ia', 'eventos_workspace', 'simulaciones', 'fuentes_estadisticas', 'equipo_campana']

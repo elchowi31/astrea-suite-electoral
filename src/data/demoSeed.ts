@@ -10,14 +10,27 @@ import type {
   Proposal,
   TransportVehicle
 } from '../types';
+import type { UserProfile, UserRole, ElectoralLevel } from '../types';
+import { buildContextualDemo } from './contextualDemo';
+
+export interface DemoContext {
+  role: UserRole;
+  department: string;
+  municipality: string;
+  electoralLevel: ElectoralLevel;
+  scopeLevel: 'Departamental' | 'Municipal' | 'Veredal';
+}
 
 export interface DemoBundle {
+  operations?: import('../lib/operations').OperationsData;
   id: string;
   tenantId: string;
   kind: 'presentation';
   isSynthetic: true;
   version: number;
   createdAt: string;
+  ownerUid?: string;
+  context?: DemoContext;
   candidates: Candidate[];
   districts: District[];
   proposals: Proposal[];
@@ -30,7 +43,8 @@ export interface DemoBundle {
   voters: GrassrootsVoter[];
 }
 
-export function buildDemoBundle(tenantId: string): DemoBundle {
+export function buildDemoBundle(tenantId: string, profile?: UserProfile): DemoBundle {
+  if (profile) return buildContextualDemo(tenantId, profile);
   const now = '2026-08-15T12:00:00.000Z';
   const candidates: Candidate[] = [
     { id: 'demo-candidato-01', tenantId, fullName: 'Candidatura Demo Regional', district: 'Cesar', chamber: 'Gobernador', electoralLevel: 'Gobernación', department: 'Cesar', municipality: 'Valledupar', party: 'Movimiento Demostración', coalition: 'Alianza Demo', status: 'En Campaña', bio: 'Perfil completamente ficticio para demostrar indicadores y flujos.', keyProposals: ['Empleo joven', 'Conectividad rural', 'Gestión transparente'], pollingPercentage: 31.8, voteTarget: 128000, votesCommitted: 75400, updatedAt: now },

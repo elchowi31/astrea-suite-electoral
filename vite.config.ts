@@ -2,10 +2,11 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import {offlineAppPlugin} from './buildOfflineApp';
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(),offlineAppPlugin()],
     define: {
       'process.env.GOOGLE_MAPS_PLATFORM_KEY': JSON.stringify(process.env.GOOGLE_MAPS_PLATFORM_KEY || '')
     },
@@ -26,6 +27,7 @@ export default defineConfig(() => {
         output: {
           manualChunks(id) {
             if (!id.includes('node_modules')) return undefined;
+            if (id.includes('/xlsx/')) return 'spreadsheet-import';
             if (id.includes('firebase')) return 'firebase';
             if (id.includes('recharts')) return 'charts';
             if (id.includes('@vis.gl/react-google-maps')) return 'maps';

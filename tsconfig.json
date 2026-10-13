@@ -1,4 +1,5 @@
 {
+  "exclude": ["node_modules", "dist", "build", "android", "ios", ".vercel", ".firebase"],
   "compilerOptions": {
     "target": "ES2022",
     "experimentalDecorators": true,

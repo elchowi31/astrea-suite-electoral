@@ -8,6 +8,7 @@ import {
   Tenant,
   TransportVehicle,
 } from '../types';
+import { uniqueVoters } from './operations';
 
 export type InsightSeverity = 'critical' | 'warning' | 'opportunity' | 'healthy';
 
@@ -66,14 +67,13 @@ export function calculateExecutiveAnalytics(input: {
   const vehicles = inTenant(input.vehicles);
   const expenses = inTenant(input.expenses);
   const contributions = inTenant(input.contributions);
-  const voters = inTenant(input.voters);
+  const voters = uniqueVoters(inTenant(input.voters));
   const proposals = inTenant(input.proposals);
 
-  const voteTarget = candidates.reduce((sum, item) => sum + Math.max(0, item.voteTarget || 0), 0);
-  const candidateCommitted = candidates.reduce((sum, item) => sum + Math.max(0, item.votesCommitted || 0), 0);
-  const weightedVoterSupport = voters.reduce((sum, item) => sum + (item.verified ? item.supportLevel / 5 : item.supportLevel / 10), 0);
-  const committedVotes = Math.max(candidateCommitted, Math.round(weightedVoterSupport));
-  const projectedSupport = Math.max(committedVotes, Math.round(committedVotes + voters.filter((v) => !v.verified && v.supportLevel >= 3).length * 0.45));
+  // Leaders define one operational goal per responsible person. Goals for different offices are not additive.
+  const voteTarget = leaders.reduce((sum,item)=>sum+Math.max(0,item.voteTarget||0),0);
+  const committedVotes = leaders.reduce((sum,item)=>sum+Math.max(0,item.votesCommitted||0),0);
+  const projectedSupport = voters.filter(item=>item.verified).length;
   const coveragePct = clamp(ratio(projectedSupport, voteTarget));
 
   const activeLeaders = leaders.filter((item) => item.status === 'Activo' || item.status === 'Destacado').length;
@@ -116,11 +116,11 @@ export function calculateExecutiveAnalytics(input: {
   if (voteTarget === 0) {
     insights.push({ id: 'missing-target', severity: 'warning', area: 'Territorio', title: 'Falta definir la meta electoral', evidence: 'No hay una meta de votos consolidada para las candidaturas activas.', recommendation: 'Defina la meta por candidatura y territorio para habilitar proyecciones comparables.', destination: 'candidates' });
   } else if (coveragePct < 60) {
-    insights.push({ id: 'coverage-gap', severity: 'critical', area: 'Territorio', title: 'Brecha relevante frente a la meta', evidence: `La cobertura proyectada es ${coveragePct.toFixed(1)}% y faltan ${Math.max(0, voteTarget - projectedSupport).toLocaleString('es-CO')} apoyos.`, recommendation: 'Priorice los territorios con menor cobertura y asigne metas semanales a sus líderes.', destination: 'zone_projections' });
+    insights.push({ id: 'coverage-gap', severity: 'critical', area: 'Territorio', title: 'Brecha relevante frente a la meta', evidence: `La cobertura validada es ${coveragePct.toFixed(1)}% y faltan ${Math.max(0, voteTarget - projectedSupport).toLocaleString('es-CO')} apoyos.`, recommendation: 'Priorice los territorios con menor cobertura y asigne metas semanales a sus líderes.', destination: 'zone_projections' });
   } else if (coveragePct < 85) {
-    insights.push({ id: 'coverage-watch', severity: 'warning', area: 'Territorio', title: 'Meta alcanzable, pero requiere aceleración', evidence: `La cobertura proyectada está en ${coveragePct.toFixed(1)}%.`, recommendation: 'Concentre el seguimiento diario en líderes por debajo del 70% de su meta.', destination: 'leaders' });
+    insights.push({ id: 'coverage-watch', severity: 'warning', area: 'Territorio', title: 'Meta alcanzable, pero requiere aceleración', evidence: `La cobertura validada está en ${coveragePct.toFixed(1)}%.`, recommendation: 'Concentre el seguimiento diario en líderes por debajo del 70% de su meta.', destination: 'leaders' });
   } else {
-    insights.push({ id: 'coverage-healthy', severity: 'healthy', area: 'Territorio', title: 'Cobertura territorial en rango saludable', evidence: `La proyección alcanza ${coveragePct.toFixed(1)}% de la meta registrada.`, recommendation: 'Mantenga verificación de apoyos y reduzca duplicados antes de ampliar la meta.', destination: 'hierarchy_pyramid' });
+    insights.push({ id: 'coverage-healthy', severity: 'healthy', area: 'Territorio', title: 'Cobertura territorial en rango saludable', evidence: `La validación alcanza ${coveragePct.toFixed(1)}% de la meta registrada.`, recommendation: 'Mantenga verificación de apoyos y reduzca duplicados antes de ampliar la meta.', destination: 'hierarchy_pyramid' });
   }
 
   if (leadersAtRisk > 0) {

@@ -1,3 +1,4 @@
+import { EditRecordButton } from './common/EditRecordButton';
 import { createRecordId } from '../lib/recordIds';
 import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
 import React, { useState, useMemo } from 'react';
@@ -779,6 +780,7 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
                   <tr key={voter.id} className="hover:bg-slate-800/50 transition-colors">
                     <td className="p-3.5">
                       <p className="font-bold text-white">{voter.fullName}</p>
+                        <EditRecordButton collection="votantes_rasos" record={voter} />
                       <p className="text-[11px] text-slate-400 font-mono">{voter.documentNumber}</p>
                       {voter.phone && voter.phone !== 'No registrada' && (
                         <p className="text-[10px] text-emerald-400 flex items-center gap-1 mt-0.5">

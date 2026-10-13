@@ -12,6 +12,7 @@ import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { UserProfile } from '../types';
 import { accountError, createPersonalOrganization } from './userProvisioning';
 import { isPlatformAdminClaims } from './accessPolicy';
+import { authWithDeadline, authErrorMessage } from './authFeedback';
 
 // Real Firebase Auth Provider
 const googleProvider = new GoogleAuthProvider();
@@ -91,14 +92,13 @@ export async function loginWithEmailPassword(
   try {
     const cleanEmail = email.trim().toLowerCase();
     if (!pinOrPassword || pinOrPassword.length < 6) throw new Error('La contraseña debe tener al menos 6 caracteres.');
-    const cred = await signInWithEmailAndPassword(auth, cleanEmail, pinOrPassword);
+    const cred = await authWithDeadline(signInWithEmailAndPassword(auth, cleanEmail, pinOrPassword));
     const fbUser = cred.user;
-    const docSnap = await getDoc(doc(db, 'usuarios', fbUser.uid));
+    const [docSnap,claims] = await authWithDeadline(Promise.all([getDoc(doc(db, 'usuarios', fbUser.uid)),fbUser.getIdTokenResult()]));
     if (!docSnap.exists()) {
       await signOut(auth);
       throw new Error('La cuenta existe, pero todavía no tiene un perfil autorizado para esta plataforma.');
     }
-    const claims = await fbUser.getIdTokenResult();
     const profile = { ...docSnap.data(), uid: fbUser.uid } as UserProfile;
     profile.role = isPlatformAdminClaims(claims.claims) ? 'AdminGlobal' : profile.role === 'AdminGlobal' ? 'Consulta' : profile.role;
     if (!isPlatformAdminClaims(claims.claims) && (profile.active !== true || profile.accessVersion !== 2)) {
@@ -107,7 +107,7 @@ export async function loginWithEmailPassword(
     }
 
     // Record session and write user to Firestore
-    await logSessionToFirestore(profile, 'correo_password');
+    void logSessionToFirestore(profile, 'correo_password');
 
     return {
       success: true,
@@ -115,7 +115,7 @@ export async function loginWithEmailPassword(
       firebaseUser: fbUser
     };
   } catch (error: any) {
-    console.error('Error in loginWithEmailPassword:', error);
+    console.error('No se pudo iniciar sesión:', error?.code || 'error-de-acceso');
     if (error?.code === 'permission-denied') {
       return {
         success: false,
@@ -124,7 +124,7 @@ export async function loginWithEmailPassword(
     }
     return {
       success: false,
-      error: error?.message || 'Error al iniciar sesión en Firebase'
+      error: authErrorMessage(error)
     };
   }
 }
@@ -138,7 +138,7 @@ export async function registerWithEmailPassword(
 ): Promise<AuthResult> {
   try {
     const user = await createPersonalOrganization(profileData, password || '');
-    await logSessionToFirestore(user, 'registro_correo');
+    void logSessionToFirestore(user, 'registro_correo');
     return { success: true, user, firebaseUser: auth.currentUser! };
   } catch (error) { return { success: false, error: accountError(error) }; }
 }
@@ -147,13 +147,15 @@ export async function registerWithEmailPassword(
  * Sign in with Google Auth Popup
  */
 export async function loginWithGoogle(_currentTenantId: string = 'tenant-astrea-2026'): Promise<AuthResult> {
+  // Las ventanas emergentes de Google no funcionan dentro de la app instalada (WebView).
+  if ((globalThis as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()) return { success: false, error: 'En la app instalada inicie sesión con su correo y contraseña. El acceso con Google está disponible en la versión web.' };
   try {
     const cred = await signInWithPopup(auth, googleProvider);
     const fbUser = cred.user;
 
     // Check if user exists in Firestore
     const userRef = doc(db, 'usuarios', fbUser.uid);
-    const snap = await getDoc(userRef);
+    const [snap,claims] = await authWithDeadline(Promise.all([getDoc(userRef),fbUser.getIdTokenResult()]));
 
     if (!snap.exists()) {
       await signOut(auth);
@@ -163,14 +165,13 @@ export async function loginWithGoogle(_currentTenantId: string = 'tenant-astrea-
       };
     }
 
-    const claims = await fbUser.getIdTokenResult();
     const profile = { ...snap.data(), uid: fbUser.uid } as UserProfile;
     profile.role = isPlatformAdminClaims(claims.claims) ? 'AdminGlobal' : profile.role === 'AdminGlobal' ? 'Consulta' : profile.role;
     if (!isPlatformAdminClaims(claims.claims) && (profile.active !== true || profile.accessVersion !== 2)) {
       await signOut(auth);
       return { success: false, error: 'Este acceso se encuentra inactivo. Contacte al administrador de su organización.' };
     }
-    await logSessionToFirestore(profile, 'google_oauth');
+    void logSessionToFirestore(profile, 'google_oauth');
 
     return {
       success: true,
@@ -178,10 +179,10 @@ export async function loginWithGoogle(_currentTenantId: string = 'tenant-astrea-
       firebaseUser: fbUser
     };
   } catch (error: any) {
-    console.error('Google Sign In Error:', error);
+    console.error('No se pudo completar Google:', error?.code || 'error-de-acceso');
     return {
       success: false,
-      error: error?.message || 'Error al autenticar con Google'
+      error: authErrorMessage(error)
     };
   }
 }
@@ -198,15 +199,16 @@ export function observeAuthenticatedProfile(callback: (profile: UserProfile | nu
       return;
     }
     try {
-      const token = await firebaseUser.getIdTokenResult();
+      const token = await firebaseUser.getIdTokenResult().catch(error=>{if(!navigator.onLine)return null;throw error;});
       if (version !== observedVersion) return;
       unsubscribeProfile = onSnapshot(doc(db, 'usuarios', firebaseUser.uid), { includeMetadataChanges: true }, snapshot => {
         if (version !== observedVersion) return;
         if (snapshot.metadata.hasPendingWrites) return;
         if (!snapshot.exists()) { callback(null); return; }
         const profile = { ...snapshot.data(), uid: firebaseUser.uid } as UserProfile;
-        profile.role = isPlatformAdminClaims(token.claims) ? 'AdminGlobal' : profile.role === 'AdminGlobal' ? 'Consulta' : profile.role;
-        callback(isPlatformAdminClaims(token.claims) || (profile.active === true && profile.accessVersion === 2) ? profile : null);
+        const globalAccess=!!token&&isPlatformAdminClaims(token.claims);
+        profile.role = globalAccess ? 'AdminGlobal' : profile.role === 'AdminGlobal' ? 'Consulta' : profile.role;
+        callback(globalAccess || (profile.active === true && profile.accessVersion === 2) ? profile : null);
       }, () => { if (version === observedVersion) callback(null); });
     } catch {
       if (version === observedVersion) callback(null);

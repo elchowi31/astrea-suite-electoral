@@ -1,3 +1,4 @@
+import { EditRecordButton } from './common/EditRecordButton';
 import React, { useState } from 'react';
 import type { Candidate, Leader, Tenant, UserProfile, UserRole } from '../types';
 import { saveUserToFirestore } from '../lib/firebase';
@@ -52,6 +53,7 @@ export function UserManagementView({ currentUser, currentTenant, users, leaders,
     </form>
     <section className="space-y-3 rounded-2xl border border-slate-700 bg-slate-900 p-5"><h2 className="font-bold">Integrantes · {users.length}</h2>
       {users.map(user => <div key={user.uid} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-700 p-3">
+        {roles.includes(user.role) && <EditRecordButton collection="usuarios" record={user} />}
         <div className="min-w-0 flex-1"><p className="font-semibold">{user.displayName}{user.uid===currentUser.uid ? ' · Usted' : ''}</p><p className="break-all text-xs text-slate-400">{user.email} · {user.municipality || 'Sin municipio'} · {user.active===false ? 'Inactivo' : 'Activo'}</p></div>
         <select aria-label={`Rol de ${user.displayName}`} disabled={busy || user.uid===currentUser.uid || !roles.includes(user.role)} className="rounded-lg bg-slate-950 p-2 text-xs" value={user.role} onChange={e=>void update(user,{role:e.target.value as UserRole})}>{[...new Set([user.role,...roles])].map(item=><option key={item}>{item}</option>)}</select>
         <button disabled={busy || user.uid===currentUser.uid || !roles.includes(user.role)} className="rounded-lg border border-slate-600 p-2 text-xs disabled:opacity-40" onClick={()=>void update(user,{active:user.active===false || user.accessVersion!==2,accessVersion:2})}>{user.active===false || user.accessVersion!==2 ? 'Activar' : 'Desactivar'}</button>
