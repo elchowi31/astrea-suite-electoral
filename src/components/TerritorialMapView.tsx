@@ -99,7 +99,7 @@ export const TerritorialMapView: React.FC<Props> = ({ leaders = [], vehicles = [
     <header className={section}>
       <div className="flex items-center gap-3"><MapPin className="text-cyan-300" /><div><h2 className="text-xl font-bold text-white">Cobertura territorial</h2><p className="mt-1 text-xs text-slate-400">Mapa satelital, ubicaciones y rutas de {tenantName}</p></div></div>
       <div className="mt-4 flex flex-wrap gap-2" aria-label="Visor del mapa">
-        {([['satellite', 'Satelital HD'], ['streets', 'Calles'], ['google', 'Google Maps']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={view === value} className={`${button} ${view === value ? '!border-cyan-500 !bg-cyan-600 !text-white' : ''}`} onClick={() => setView(value)}>{label}</button>)}
+        {([['satellite', 'Satelital HD'], ['streets', 'Calles'], ['google', 'Google Maps']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={view === value} className={`${button} ${view === value ? '!border-cyan-500 !bg-cyan-600 !text-white' : ''}`} onClick={() => { setView(value); revealMap(); }}>{label}</button>)}
         {isTrackingAdministrator(currentUser) && <button type="button" disabled={busy} onClick={() => void useGPS()} className={button}><Navigation className="mr-1 inline h-4 w-4" />Mi ubicación GPS</button>}
         {isTrackingAdministrator(currentUser) && onOpenTracking && <button type="button" onClick={()=>onOpenTracking()} className={`${button} !border-cyan-600 !text-cyan-200`}><MapPin className="mr-1 inline h-4 w-4" />Recorridos y seguimiento</button>}
         <a href={googleLocationUrl(center)} target="_blank" rel="noreferrer" className={button}>Abrir Google Maps ↗</a>
