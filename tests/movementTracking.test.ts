@@ -51,4 +51,3 @@ test('A signal gap closes the observed segment and requires movement confirmatio
   let state=step(emptyMovement(),fix(0,0)).state;state=step(state,fix(28,20)).state;state=step(state,fix(38,30)).state;
   const result=step(state,fix(3000,600));assert.equal(result.stoppedAt,at+30_000);assert.equal(result.started,undefined);assert.equal(result.state.moving,false);
 });
-
