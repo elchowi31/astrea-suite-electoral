@@ -6,3 +6,9 @@ export function omitUndefined<T>(value: T): T {
   }
   return value;
 }
+
+/** Firestore may reorder map keys. Compare their values, not insertion order. */
+export function canonicalStoredValue(value:unknown):string {
+  const canonical=(item:unknown):unknown=>Array.isArray(item)?item.map(canonical):item&&typeof item==='object'?Object.fromEntries(Object.entries(item).filter(([,field])=>field!==undefined).sort(([a],[b])=>a.localeCompare(b)).map(([key,field])=>[key,canonical(field)])):item??null;
+  return JSON.stringify(canonical(value));
+}

@@ -1,4 +1,14 @@
-import React, { lazy, Suspense, useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
+import { EditRecordButton } from './components/common/EditRecordButton';
+import { OperationsEditingReferences } from './components/operations/OperationsEditingReferences';
+import { OperationsProvider } from './components/operations/OperationsContext';
+const OperationsOverview = lazy(()=>import('./components/operations/OperationsOverview').then(m=>({default:m.OperationsOverview})));
+const ResourcesView = lazy(()=>import('./components/operations/ResourcesView').then(m=>({default:m.ResourcesView})));
+import { DevicePersistencePanel } from './components/DevicePersistence';
+import { RouteTrackingProvider } from './components/RouteTrackingProvider';
+import {isTrackingAdministrator} from './lib/trackingPermissions';
+import {keepViewedTenant, type ViewerScope} from './lib/tenantSelection';
+const RouteOperationsView = lazy(()=>import('./components/RouteOperationsView').then(module=>({default:module.RouteOperationsView})));
 import {
   Tenant,
   UserRole,
@@ -33,17 +43,18 @@ import {
   subscribeToDemoCollection
 } from './lib/firebase';
 import { buildDemoBundle, type DemoBundle } from './data/demoSeed';
+import { demoMatchesProfile } from './data/contextualDemo';
+import { COLOMBIA_ELECTORAL_GEOGRAPHY } from './data/colombiaElectoralData';
 import { logoutFirebaseAuth, observeAuthenticatedProfile } from './lib/firebaseAuth';
 import { UserManagementView } from './components/UserManagementView';
 import { Header } from './components/Header';
 import { Sidebar, ActiveTab } from './components/Sidebar';
-import { FirestoreStatusModal } from './components/FirestoreStatusModal';
 import { AuthModal } from './components/AuthModal';
 import { LoginView } from './components/LoginView';
 import { LandingPage } from './components/LandingPage';
 import { SynapticNeuralBackground } from './components/SynapticNeuralBackground';
 import { UserGreetingBanner } from './components/UserGreetingBanner';
-import { ArrowLeft, LogIn, Sparkles, CheckCircle2, AlertCircle, RefreshCw, Database } from 'lucide-react';
+import { ArrowLeft, LogIn, Sparkles, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 
 const DashboardView = lazy(() => import('./components/DashboardView').then(module => ({ default: module.DashboardView })));
 const AdministrativeOverview = lazy(() => import('./components/AdministrativeOverview').then(module => ({ default: module.AdministrativeOverview })));
@@ -75,7 +86,7 @@ const EMPTY_TENANT: Tenant = {
   active: false
 };
 const PUBLIC_DEMO_TENANT: Tenant = { ...EMPTY_TENANT, tenantId: 'tenant-demo-publico', name: 'Astrea — Presentación Demo', active: true, createdAt: '2026-08-15T12:00:00.000Z', plan: 'Gratuito' };
-const PUBLIC_DEMO_DATA = buildDemoBundle(PUBLIC_DEMO_TENANT.tenantId);
+const PUBLIC_DEMO_DATA = buildDemoBundle(PUBLIC_DEMO_TENANT.tenantId,{uid:'demo-publico',email:'presentacion@demo.invalid',displayName:'Visitante Demo',tenantId:PUBLIC_DEMO_TENANT.tenantId,role:'AdminTenant',department:'Cesar',municipality:'Astrea',createdAt:new Date().toISOString()});
 const PUBLIC_DEMO_USER: UserProfile = { uid: 'demo-publico', email: 'presentacion@demo.invalid', displayName: 'Visitante Demo', tenantId: PUBLIC_DEMO_TENANT.tenantId, role: 'Consulta', municipality: 'Cesar', department: 'Cesar', createdAt: '2026-08-15T12:00:00.000Z', active: true };
 
 export default function App() {
@@ -84,17 +95,19 @@ export default function App() {
   const [users, setUsers] = useState<UserProfile[]>([]);
 
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const observedViewer = useRef<ViewerScope | null>(null);
   const userRole: UserRole = currentUser?.role || 'Consulta';
   const selectedTenantId = currentUser?.role === 'AdminGlobal' ? currentTenant.tenantId : currentUser?.tenantId;
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [routeToOpen,setRouteToOpen]=useState('');
+  useEffect(()=>{if(activeTab!=='routes')setRouteToOpen('');},[activeTab]);
 
   // Auth modal state
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showPublicDemo, setShowPublicDemo] = useState<boolean>(false);
 
   // Firestore modal state
-  const [showFirestoreModal, setShowFirestoreModal] = useState<boolean>(false);
   const [firestoreSyncNotice, setFirestoreSyncNotice] = useState<string | null>(null);
 
   // Collections state
@@ -113,10 +126,17 @@ export default function App() {
   const [demoBundle, setDemoBundle] = useState<DemoBundle | null>(null);
   const [demoBusy, setDemoBusy] = useState(false);
   const [demoError, setDemoError] = useState<string | null>(null);
+  const [demoEnabled, setDemoEnabled] = useState(false);
+  const [demoDepartment, setDemoDepartment] = useState('');
+  const [demoMunicipality, setDemoMunicipality] = useState('');
+  useEffect(() => {
+    setDemoEnabled(false); setDemoBundle(null); setDemoError(null);
+    setDemoDepartment(currentUser?.department?.trim() || '');
+    setDemoMunicipality(currentUser?.municipality?.trim() || '');
+  }, [currentUser?.uid, selectedTenantId, currentUser?.role, currentUser?.department, currentUser?.municipality, currentUser?.electoralLevel]);
 
   // Drive sync state
   const [driveSyncing, setDriveSyncing] = useState<boolean>(false);
-  const [lastSyncStatus, setLastSyncStatus] = useState<string>('Base de datos Firestore sincronizada en tiempo real');
 
   // Flash notification helper
   const notifyFirestoreSave = (msg: string) => {
@@ -126,10 +146,12 @@ export default function App() {
 
   useEffect(() => {
     return observeAuthenticatedProfile((profile) => {
+      const keepSelection = keepViewedTenant(observedViewer.current, profile);
+      observedViewer.current = profile ? {uid: profile.uid, role: profile.role, tenantId: profile.tenantId} : null;
       setCurrentUser(profile);
       if (profile?.tenantId) {
-        setCurrentTenant((tenant) => tenant.tenantId === profile.tenantId ? tenant : { ...EMPTY_TENANT, tenantId: profile.tenantId });
-      }
+        setCurrentTenant((tenant) => (keepSelection && tenant.tenantId) || tenant.tenantId === profile.tenantId ? tenant : { ...EMPTY_TENANT, tenantId: profile.tenantId });
+      } else setCurrentTenant(EMPTY_TENANT);
     });
   }, []);
 
@@ -184,8 +206,8 @@ export default function App() {
       setCoordinations(data);
     }, [], selectedTenantId);
 
-    const unsubDemo = selectedTenantId
-      ? subscribeToDemoCollection(selectedTenantId, setDemoBundle)
+    const unsubDemo = selectedTenantId && currentUser
+      ? subscribeToDemoCollection(selectedTenantId, currentUser.uid, setDemoBundle, setDemoError)
       : (() => { setDemoBundle(null); return () => {}; })();
 
     const voterManagers: UserRole[] = ['AdminGlobal', 'AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'JefePolitico'];
@@ -243,7 +265,6 @@ export default function App() {
   // Drive scanning action
   const handleScanDrive = async () => {
     setDriveSyncing(false);
-    setLastSyncStatus('Conecte Google Workspace con la cuenta de su organización.');
     setActiveTab('workspace');
   };
 
@@ -288,6 +309,7 @@ export default function App() {
   };
 
   const handleAddCandidate = async (newCandidate: Candidate) => {
+    requireRealWorkspace();
     try {
       await saveCandidateToFirestore(newCandidate);
       notifyFirestoreSave(`Candidato "${newCandidate.fullName}" guardado exitosamente en Firestore.`);
@@ -298,6 +320,7 @@ export default function App() {
   };
 
   const handleAddProposal = async (newProposal: Proposal) => {
+    requireRealWorkspace();
     try {
       await saveProposalToFirestore(newProposal);
       notifyFirestoreSave(`Proyecto "${newProposal.title}" registrado en Firestore.`);
@@ -308,6 +331,7 @@ export default function App() {
   };
 
   const handleAddExpense = async (newExpense: CampaignExpense) => {
+    requireRealWorkspace();
     try {
       await saveExpenseToFirestore(newExpense);
       notifyFirestoreSave(`Gasto de $${newExpense.amount.toLocaleString('es-CO')} COP registrado en Firestore.`);
@@ -318,6 +342,7 @@ export default function App() {
   };
 
   const handleUpdateExpense = async (updatedExpense: CampaignExpense) => {
+    requireRealWorkspace();
     if (updatedExpense.id.startsWith('demo-')) {
       setDemoError('Los registros demo son de solo lectura. Elimine y vuelva a crear la colección para restaurarlos.');
       return;
@@ -333,6 +358,7 @@ export default function App() {
   };
 
   const handleDeleteExpense = async (expenseId: string) => {
+    requireRealWorkspace();
     if (expenseId.startsWith('demo-')) {
       setDemoError('Elimine la colección demo completa desde el control de presentación.');
       return;
@@ -348,6 +374,7 @@ export default function App() {
   };
 
   const handleAddDonorContribution = async (newContribution: DonorContribution) => {
+    requireRealWorkspace();
     try {
       await saveDonorContributionToFirestore(newContribution);
       notifyFirestoreSave(`Aporte de "${newContribution.donorName}" por $${newContribution.amount.toLocaleString('es-CO')} COP registrado en Firestore.`);
@@ -358,6 +385,7 @@ export default function App() {
   };
 
   const handleAddLeader = async (newLeader: Leader) => {
+    requireRealWorkspace();
     try {
       await saveLeaderToFirestore(newLeader);
       notifyFirestoreSave(`Líder veredal "${newLeader.fullName}" guardado en Firestore.`);
@@ -368,6 +396,7 @@ export default function App() {
   };
 
   const handleAddVehicle = async (newVehicle: TransportVehicle) => {
+    requireRealWorkspace();
     try {
       await saveVehicleToFirestore(newVehicle);
       notifyFirestoreSave(`Vehículo placa "${newVehicle.licensePlate}" registrado en Firestore.`);
@@ -378,6 +407,7 @@ export default function App() {
   };
 
   const handleAddGrassrootsVoter = async (newVoter: GrassrootsVoter) => {
+    requireRealWorkspace();
     try {
       await saveGrassrootsVoterToFirestore(newVoter);
       notifyFirestoreSave(`Votante ${newVoter.fullName} registrado(a) y consolidado en la jerarquía electoral.`);
@@ -388,6 +418,7 @@ export default function App() {
   };
 
   const handleUpdateCoordination = async (updatedCoordination: CampaignCoordination) => {
+    requireRealWorkspace();
     if (updatedCoordination.id.startsWith('demo-')) {
       setDemoError('La estructura demo es de solo lectura y permanece aislada de la operación real.');
       return;
@@ -406,9 +437,12 @@ export default function App() {
     setDemoBusy(true);
     setDemoError(null);
     try {
-      const bundle = await createDemoCollection(currentTenant.tenantId);
+      if (!currentUser) throw new Error('Inicie sesión para cargar datos de prueba.');
+      const bundle = await createDemoCollection(currentTenant.tenantId, { ...currentUser,
+        department: currentUser.department?.trim() || demoDepartment.trim(),
+        municipality: currentUser.municipality?.trim() || demoMunicipality.trim() });
       setDemoBundle(bundle);
-      notifyFirestoreSave('Colección demo creada en Firestore. Todos los registros mostrados son ficticios.');
+      setDemoEnabled(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No fue posible crear la colección demo.';
       setDemoError(message);
@@ -421,9 +455,10 @@ export default function App() {
     setDemoBusy(true);
     setDemoError(null);
     try {
-      await deleteDemoCollection(currentTenant.tenantId);
+      if (!currentUser) return;
+      await deleteDemoCollection(currentTenant.tenantId, currentUser.uid);
       setDemoBundle(null);
-      notifyFirestoreSave('Colección demo eliminada. Los datos operativos reales no fueron modificados.');
+      setDemoEnabled(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No fue posible eliminar la colección demo.';
       setDemoError(message);
@@ -449,10 +484,13 @@ export default function App() {
     setActiveTab('ai');
   };
 
-  const realDataCount = candidates.length + districts.length + proposals.length + driveFiles.length
-    + expenses.length + donorContributions.length + leaders.length + vehicles.length
-    + coordinations.length + grassrootsVoters.length;
-  const demoActive = realDataCount === 0 && Boolean(demoBundle);
+  const demoAvailable = demoMatchesProfile(demoBundle, currentUser, currentTenant.tenantId);
+  const demoActive = demoEnabled && demoAvailable;
+  function requireRealWorkspace() {
+    if (demoActive) throw new Error('Estos datos de prueba son de solo lectura. Seleccione «Usar datos reales» antes de registrar información operativa.');
+  }
+  const demoViewUser = demoActive && currentUser ? { ...currentUser,
+    assignedCandidateId: demoBundle!.candidates[0]?.id, assignedLeaderId: demoBundle!.leaders[0]?.id } : currentUser;
   const visibleCandidates = demoActive ? demoBundle!.candidates : candidates;
   const visibleDistricts = demoActive ? demoBundle!.districts : districts;
   const visibleProposals = demoActive ? demoBundle!.proposals : proposals;
@@ -463,7 +501,6 @@ export default function App() {
   const visibleVehicles = demoActive ? demoBundle!.vehicles : vehicles;
   const visibleCoordinations = demoActive ? demoBundle!.coordinations : coordinations;
   const visibleVoters = demoActive ? demoBundle!.voters : grassrootsVoters;
-  const canManageDemo = ['AdminGlobal', 'AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'Concejal', 'JefePolitico'].includes(userRole);
 
   if (!currentUser) {
     if (showPublicDemo) {
@@ -488,7 +525,10 @@ export default function App() {
             </div>
           </header>
           <main className="mx-auto max-w-7xl p-3 sm:p-6 lg:p-8">
+            <OperationsProvider tenant={PUBLIC_DEMO_TENANT} user={PUBLIC_DEMO_USER} leaders={PUBLIC_DEMO_DATA.leaders} candidates={PUBLIC_DEMO_DATA.candidates} voters={PUBLIC_DEMO_DATA.voters} expenses={PUBLIC_DEMO_DATA.expenses} vehicles={PUBLIC_DEMO_DATA.vehicles} contributions={PUBLIC_DEMO_DATA.contributions} readOnly demo={PUBLIC_DEMO_DATA.operations}>
             <Suspense fallback={<div className="p-10 text-center text-sm text-slate-400">Cargando presentación…</div>}>
+              <OperationsOverview onNavigate={()=>{setShowPublicDemo(false);setActiveTab('login');}}/>
+              <details className="mt-4"><summary className="cursor-pointer p-3">Ver indicadores administrativos y territoriales</summary>
               <AdministrativeOverview tenantId={PUBLIC_DEMO_TENANT.tenantId} expenses={PUBLIC_DEMO_DATA.expenses} />
               <DashboardView
                 currentTenant={PUBLIC_DEMO_TENANT}
@@ -505,7 +545,9 @@ export default function App() {
                 voters={PUBLIC_DEMO_DATA.voters}
                 onNavigateTab={() => {}}
               />
+              </details>
             </Suspense>
+            </OperationsProvider>
           </main>
         </div>
       );
@@ -517,7 +559,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-500 selection:text-white relative isolate overflow-x-hidden">
+    <RouteTrackingProvider user={currentUser} tenantId={currentUser.tenantId} monitorTenantId={currentTenant.tenantId}><div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-500 selection:text-white relative isolate overflow-x-hidden">
       <SynapticNeuralBackground interactive={false} />
 
       {/* Top Navigation Header with Streamlined Toolbar & Profile Pill */}
@@ -551,9 +593,12 @@ export default function App() {
 
         {/* Content Area */}
         <main className="flex-1 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+          <OperationsProvider key={`${currentTenant.tenantId}-${demoActive?'demo':'real'}`} tenant={currentTenant} user={demoViewUser} leaders={visibleLeaders} candidates={visibleCandidates} voters={visibleVoters} expenses={visibleExpenses} vehicles={visibleVehicles} contributions={visibleContributions} readOnly={demoActive} demo={demoBundle?.operations}>
+          <OperationsEditingReferences>
+          {activeTab === 'device' && isTrackingAdministrator(currentUser) && <><DevicePersistencePanel /><div className="flex flex-wrap gap-3"><EditRecordButton collection="usuarios" record={currentUser} label="Editar mi perfil" />{['AdminTenant','AdminGlobal'].includes(currentUser.role)&&<EditRecordButton collection="organizaciones" record={currentTenant} label="Editar organización" />}</div></>}
 
           {/* Personalized User Recognition & Salutation Banner */}
-          {currentUser && activeTab !== 'login' && (
+          {currentUser && activeTab !== 'login' && activeTab !== 'routes' && (
             <UserGreetingBanner
               currentUser={currentUser}
               currentTenant={currentTenant}
@@ -561,36 +606,40 @@ export default function App() {
             />
           )}
 
-          {currentUser && activeTab !== 'login' && (realDataCount === 0 || demoBundle) && (
-            <section className={`rounded-2xl border p-4 ${demoActive ? 'border-amber-400/40 bg-amber-950/30' : 'border-blue-500/30 bg-blue-950/20'}`} aria-label="Control de datos de demostración">
+          {currentUser && (activeTab === 'dashboard' || demoActive) && activeTab !== 'login' && (
+            <details className={`rounded-xl border p-3 ${demoActive ? 'border-amber-400/40 bg-amber-950/30' : 'border-slate-800 bg-slate-900'}`} aria-label="Control de datos de demostración">
+              <summary className={`cursor-pointer text-sm font-semibold ${demoActive ? 'text-amber-200' : 'text-slate-300'}`}>{demoActive ? 'Datos de prueba activos · ver opciones' : 'Datos de prueba'}</summary>
+              <div className="pt-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className={`text-sm font-black ${demoActive ? 'text-amber-200' : 'text-blue-200'}`}>
-                    {demoActive ? 'Modo presentación — datos 100% ficticios' : demoBundle ? 'Colección demo disponible, no mezclada con datos reales' : 'Espacio real vacío'}
+                    {demoActive ? 'Datos de prueba · 100% ficticios' : 'Datos de prueba para su perfil y territorio'}
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
                     {demoActive
-                      ? 'La vista usa exclusivamente el documento aislado en Firestore /demo. Ninguna cifra representa personas o transacciones reales.'
-                      : demoBundle
-                        ? 'Al existir información operativa real, Astrea desactiva automáticamente la demostración.'
-                        : 'Cree una presentación completa en la colección /demo sin contaminar las colecciones operativas.'}
+                      ? `${demoBundle!.context!.electoralLevel} · ${demoBundle!.context!.department} · ${demoBundle!.context!.municipality}. Personas y cifras ficticias; esta vista muestra únicamente su demostración.`
+                      : `Perfil: ${currentUser.role}. Cargue su demostración personal para explorar la app. Puede volver a los datos reales en cualquier momento.`}
                   </p>
+                  {!currentUser.department?.trim() && <label className="mt-2 block text-xs text-slate-300">Departamento del entorno de prueba<input list="demo-departments" value={demoDepartment} onChange={event => { setDemoDepartment(event.target.value); if (!currentUser.municipality) setDemoMunicipality(''); }} className="ml-2 rounded-lg bg-slate-900 p-2"/><datalist id="demo-departments">{Object.keys(COLOMBIA_ELECTORAL_GEOGRAPHY).map(name => <option key={name} value={name}/>)}</datalist></label>}
+                  {!currentUser.municipality?.trim() && <label className="mt-2 block text-xs text-slate-300">Municipio del entorno de prueba<input list="demo-municipalities" value={demoMunicipality} onChange={event => setDemoMunicipality(event.target.value)} className="ml-2 rounded-lg bg-slate-900 p-2"/><datalist id="demo-municipalities">{Object.keys(COLOMBIA_ELECTORAL_GEOGRAPHY[currentUser.department || demoDepartment]?.municipios || {}).map(name => <option key={name} value={name}/>)}</datalist></label>}
                   {demoError && <p className="mt-2 text-xs font-semibold text-rose-300">{demoError}</p>}
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
-                  {!demoBundle && (
+                  {(
                     <button type="button" disabled={demoBusy} onClick={handleCreateDemo} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white transition hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60">
-                      {demoBusy ? 'Creando…' : 'Crear colección demo'}
+                      {demoBusy ? 'Cargando…' : demoAvailable ? 'Regenerar mis datos de prueba' : 'Cargar mis datos de prueba'}
                     </button>
                   )}
-                  {demoBundle && canManageDemo && (
+                  {demoAvailable && <button type="button" disabled={demoBusy} onClick={() => setDemoEnabled(!demoActive)} className="rounded-xl border border-slate-500 px-4 py-2 text-xs font-bold text-slate-200">{demoActive ? 'Usar datos reales' : 'Ver mis datos de prueba'}</button>}
+                  {demoBundle && (
                     <button type="button" disabled={demoBusy} onClick={handleDeleteDemo} className="rounded-xl border border-rose-500/40 bg-rose-950/30 px-4 py-2 text-xs font-black text-rose-200 transition hover:bg-rose-900/40 disabled:cursor-wait disabled:opacity-60">
-                      {demoBusy ? 'Eliminando…' : 'Eliminar demo'}
+                      {demoBusy ? 'Eliminando…' : 'Eliminar mis datos de prueba'}
                     </button>
                   )}
                 </div>
               </div>
-            </section>
+              </div>
+            </details>
           )}
 
           {/* Real-time Save Toast Notification */}
@@ -600,30 +649,9 @@ export default function App() {
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span className="font-semibold">{firestoreSyncNotice}</span>
               </div>
-              <span className="text-[10px] text-emerald-400/80 font-mono">Firestore Cloud • Escrito</span>
             </div>
           )}
 
-          {/* Clean Organization Status Bar */}
-          {activeTab !== 'login' && (
-            <div className="bg-slate-900/80 border border-slate-800/80 rounded-xl px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                <span className="font-medium text-slate-300">Tenant Activo: {currentTenant.name}</span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowFirestoreModal(true)}
-                  className="flex items-center gap-1.5 text-amber-300 hover:text-amber-200 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 font-medium transition cursor-pointer"
-                >
-                  <Database className="w-3 h-3 text-amber-400" />
-                  <span>Verificar Firestore</span>
-                </button>
-                <span className="hidden md:inline font-mono text-slate-400">{lastSyncStatus}</span>
-              </div>
-            </div>
-          )}
 
           {/* Dedicated Login View */}
           {(activeTab === 'login' || !currentUser) && (
@@ -650,10 +678,12 @@ export default function App() {
           )}>
           {currentUser && activeTab === 'dashboard' && (
             <div className="space-y-4">
+            <OperationsOverview onNavigate={setActiveTab}/>
+            <details className="rounded-2xl border border-slate-700 p-4"><summary className="cursor-pointer text-sm font-semibold text-slate-200">Indicadores administrativos, territoriales y documentales</summary>
             <AdministrativeOverview tenantId={currentTenant.tenantId} expenses={visibleExpenses} />
             <DashboardView
               currentTenant={currentTenant}
-              currentUser={currentUser}
+              currentUser={demoViewUser}
               userRole={userRole}
               candidates={visibleCandidates}
               districts={visibleDistricts}
@@ -666,8 +696,11 @@ export default function App() {
               voters={visibleVoters}
               onNavigateTab={setActiveTab}
             />
+            </details>
             </div>
           )}
+
+          {currentUser && activeTab === 'resources' && <ResourcesView/>}
 
           {currentUser && activeTab === 'users' && <UserManagementView currentUser={currentUser} currentTenant={currentTenant} users={users} leaders={leaders} candidates={candidates} />}
 
@@ -684,7 +717,7 @@ export default function App() {
 
           {currentUser && activeTab === 'hierarchy_pyramid' && (
             <ElectoralHierarchyRollupView
-              currentUser={currentUser}
+              currentUser={demoViewUser}
               userRole={userRole}
               grassrootsVoters={visibleVoters}
               leaders={visibleLeaders}
@@ -747,11 +780,14 @@ export default function App() {
               currentUser={currentUser}
               userRole={userRole}
               readOnly={demoActive}
+              members={[currentUser,...users]}
+              onOpenTracking={(routeId) => { setRouteToOpen(routeId||''); setDemoEnabled(false); setActiveTab('routes'); window.scrollTo({top:0,behavior:'instant'}); }}
               leaders={visibleLeaders.filter((l) => l.tenantId === currentTenant.tenantId)}
               vehicles={visibleVehicles.filter((v) => v.tenantId === currentTenant.tenantId)}
               tenantName={currentTenant.name}
             />
           )}
+          {isTrackingAdministrator(currentUser) && activeTab === 'routes' && (demoActive?<p className="rounded-xl border border-amber-700 bg-slate-900 p-4 text-sm text-amber-200">Seleccione «Usar datos reales» para gestionar recorridos y registrar GPS.</p>:<RouteOperationsView key={currentTenant.tenantId} initialRouteId={routeToOpen} user={currentUser} tenantId={currentTenant.tenantId} tenants={tenants} onSelectTenant={setCurrentTenant} users={users} vehicles={vehicles.filter(item=>item.tenantId===currentTenant.tenantId)} />)}
 
           {currentUser && activeTab === 'finances' && (
             <FinancesView
@@ -782,6 +818,8 @@ export default function App() {
               currentUser={currentUser}
               userRole={userRole}
               vehicles={visibleVehicles}
+              members={[currentUser,...users]}
+              readOnly={demoActive}
               onAddVehicle={handleAddVehicle}
             />
           )}
@@ -853,6 +891,8 @@ export default function App() {
           )}
           </Suspense>
 
+          </OperationsEditingReferences>
+          </OperationsProvider>
         </main>
 
       </div>
@@ -869,21 +909,13 @@ export default function App() {
         onLogout={handleLogout}
       />
 
-      {/* Firestore Verification & Seeding Modal */}
-      <FirestoreStatusModal
-        isOpen={showFirestoreModal}
-        onClose={() => setShowFirestoreModal(false)}
-        onRefreshData={() => {
-          notifyFirestoreSave('Datos de Colombia actualizados desde Firestore.');
-        }}
-      />
 
       {/* Footer */}
       <footer className="bg-slate-950 border-t border-slate-900 py-4 px-6 text-center text-xs text-slate-500">
-        <p>Astrea Suite Electoral • Arquitectura multi-tenant • Operación, administración e inteligencia estadística</p>
+        <p>Astrea Suite Electoral</p>
         <p className="mt-1 text-slate-400">Desarrollada por Wilson José Arias</p>
       </footer>
 
-    </div>
+    </div></RouteTrackingProvider>
   );
 }

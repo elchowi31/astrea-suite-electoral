@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { BarChart3, Bot, Building2, Calculator, ChevronRight, CircleDollarSign, ClipboardList, FileSpreadsheet, FileText, FolderSync, LayoutDashboard, Layers, LogOut, Map, MapPin, Menu, ShieldCheck, Target, Truck, Users, X } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { getRoleHierarchyLevel, getTerritorialScope } from '../lib/permissions';
+import {isTrackingAdministrator} from '../lib/trackingPermissions';
 
-export type ActiveTab = 'users' | 'dashboard' | 'campaign_structure' | 'hierarchy_pyramid' | 'login' | 'simulator' | 'costs_report' | 'zone_projections' | 'workspace' | 'map' | 'finances' | 'leaders' | 'transport' | 'candidates' | 'districts' | 'proposals' | 'drive' | 'ai' | 'tenants';
+export type ActiveTab = 'resources' | 'device' | 'routes' | 'users' | 'dashboard' | 'campaign_structure' | 'hierarchy_pyramid' | 'login' | 'simulator' | 'costs_report' | 'zone_projections' | 'workspace' | 'map' | 'finances' | 'leaders' | 'transport' | 'candidates' | 'districts' | 'proposals' | 'drive' | 'ai' | 'tenants';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -18,7 +19,7 @@ interface SidebarProps {
   onLogout?: () => void;
 }
 
-type MenuItem = { id: ActiveTab; label: string; shortLabel?: string; icon: any; badge?: number; minLevel?: number; globalOnly?: boolean };
+type MenuItem = { id: ActiveTab; label: string; shortLabel?: string; icon: any; badge?: number; minLevel?: number; globalOnly?: boolean; trackingAdminOnly?: boolean };
 type MenuGroup = { label: string; tone: string; items: MenuItem[] };
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, driveFileCount, candidateCount, leaderCount = 0, vehicleCount = 0, voterCount = 0, currentUser = null, userRole = 'Consulta', onLogout }) => {
@@ -33,7 +34,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, driveF
       { id: 'hierarchy_pyramid', label: 'Base territorial', shortLabel: 'Territorio', icon: Layers, badge: voterCount, minLevel: 10 },
       { id: 'leaders', label: 'Líderes y metas', icon: Target, badge: leaderCount, minLevel: 10 },
       { id: 'map', label: 'Mapa territorial', icon: Map, minLevel: 10 },
+      { id: 'routes', label: 'Recorridos y seguimiento', icon: MapPin, trackingAdminOnly: true },
+      { id: 'device', label: 'Mi dispositivo', icon: ShieldCheck, trackingAdminOnly: true },
       { id: 'transport', label: 'Transporte', icon: Truck, badge: vehicleCount, minLevel: 10 },
+      { id: 'resources', label: 'Solicitudes y jornadas', icon: ClipboardList, minLevel: 10 },
     ] },
     { label: 'Administración', tone: 'text-amber-300', items: [
       { id: 'users', label: 'Usuarios y accesos', icon: Users, minLevel: 35 },
@@ -52,7 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, driveF
       { id: 'ai', label: 'Asistente de análisis', icon: Bot, minLevel: 50 },
     ] },
   ];
-  const allowedGroups = groups.map((group) => ({ ...group, items: group.items.filter((item) => item.globalOnly ? scope.isGlobalAdmin : level >= (item.minLevel || 0)) })).filter((group) => group.items.length > 0);
+  const allowedGroups = groups.map((group) => ({ ...group, items: group.items.filter((item) => item.trackingAdminOnly ? isTrackingAdministrator(currentUser) : item.globalOnly ? scope.isGlobalAdmin : level >= (item.minLevel || 0)) })).filter((group) => group.items.length > 0);
   const allAllowed = allowedGroups.flatMap((group) => group.items);
   const go = (id: ActiveTab) => { onTabChange(id); setMobileOpen(false); };
   const mobileQuick = ['dashboard', 'campaign_structure', 'hierarchy_pyramid', 'finances'].map((id) => allAllowed.find((item) => item.id === id)).filter(Boolean) as MenuItem[];

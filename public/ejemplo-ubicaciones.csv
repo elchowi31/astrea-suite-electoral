@@ -1,0 +1,4 @@
+nombre,latitud,longitud,tipo,ruta,orden
+Astrea centro,9.4981,-73.9785,punto,,
+Inicio recorrido,9.4981,-73.9785,ruta,Recorrido de ejemplo,1
+Fin recorrido,9.499,-73.979,ruta,Recorrido de ejemplo,2

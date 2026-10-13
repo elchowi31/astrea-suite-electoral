@@ -1,5 +1,7 @@
+import { EditRecordButton } from './common/EditRecordButton';
 import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
 import { persistEntity, saveCommitteeTask, saveCoordinationToFirestore, subscribeToCollection } from '../lib/firebase';
+import { updateCommitteeRecord } from '../lib/recordEditing';
 import React, { useEffect, useState } from 'react';
 import {
   Tenant,
@@ -503,6 +505,7 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                     </div>
                     <div>
                       <h2 className="text-base font-bold text-white tracking-tight">{coord.title}</h2>
+                        <EditRecordButton collection="comites_coordinaciones" record={coord} />
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs font-semibold text-indigo-400 flex items-center gap-1">
                           <UserCheck className="w-3.5 h-3.5" />
@@ -570,6 +573,7 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                             <div className="flex items-center gap-2">
                               <h4 className="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors">
                                 {committee.name}
+                                {!coord.id.startsWith('demo-')&&<EditRecordButton collection="comites" record={{...committee,tenantId:currentTenant.tenantId}} savePatch={(patch,original)=>updateCommitteeRecord(currentTenant.tenantId,coord.id,committee.id,undefined,patch,original)} />}
                               </h4>
                               {committee.status === 'Activo' && (
                                 <span className="px-2 py-0.5 text-[9px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md">
@@ -930,7 +934,7 @@ export const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                 </div>
 
                 <FormSaveStatus saving={saving} error={saveError} />
-                <div className="space-y-2">{(activeCommitteeModal.committee.tasks || []).map(task=><div key={task.id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-800 p-3"><div><p className="text-xs text-white">{task.title}</p><p className="text-[10px] text-slate-400">{task.assignedTo} {task.dueDate}</p></div><button disabled={saving} onClick={()=>void runSave(()=>saveTask(task))} className="rounded-lg border border-slate-600 p-2 text-xs text-cyan-200">{task.completed ? 'Reabrir' : 'Completar'}</button></div>)}</div>
+                <div className="space-y-2">{(activeCommitteeModal.committee.tasks || []).map(task=><div key={task.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-800 p-3"><div><p className="text-xs text-white">{task.title}</p><p className="text-[10px] text-slate-400">{task.assignedTo} {task.dueDate}</p></div><EditRecordButton collection="tareas" record={task} savePatch={(patch,original)=>updateCommitteeRecord(currentTenant.tenantId,activeCommitteeModal.coordination.id,activeCommitteeModal.committee.id,task.id,patch,original)} /><button disabled={saving} onClick={()=>void runSave(()=>saveTask(task))} className="rounded-lg border border-slate-600 p-2 text-xs text-cyan-200">{task.completed ? 'Reabrir' : 'Completar'}</button></div>)}</div>
 
                 {/* Add Quick Task Input */}
                 <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-2">

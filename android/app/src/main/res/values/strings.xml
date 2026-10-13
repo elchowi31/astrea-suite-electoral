@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Astrea Suite</string>
+    <string name="title_activity_main">Astrea Suite</string>
+    <string name="package_name">co.proyectosconenergia.astrea</string>
+    <string name="custom_url_scheme">co.proyectosconenergia.astrea</string>
+    <string name="capacitor_background_geolocation_notification_channel_name">Seguimiento de recorridos</string>
+    <string name="capacitor_background_geolocation_notification_color">#22d3ee</string>
+    <string name="capacitor_background_geolocation_notification_icon">drawable/ic_tracking</string>
+</resources>

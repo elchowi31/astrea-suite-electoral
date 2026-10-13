@@ -1,3 +1,4 @@
+import { EditRecordButton } from './common/EditRecordButton';
 import { createRecordId } from '../lib/recordIds';
 import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
 import React, { useState, useEffect, useMemo } from 'react';
@@ -56,6 +57,8 @@ import {
   CartesianGrid
 } from 'recharts';
 
+import { useOperations } from './operations/OperationsContext';
+
 interface FinancesViewProps {
   currentTenant: Tenant;
   currentUser?: UserProfile | null;
@@ -78,6 +81,7 @@ const RUBROS_LIST: FinancialRubro[] = [
   'Honorarios y Testigos Electorales',
   'Sedes y Logística',
   'Eventos, Mítines y Tarimas'
+  ,'Tecnología y Asesoría Jurídica','Caja Menor e Imprevistos'
 ];
 
 const COLORS_RUBRO: Record<string, string> = {
@@ -102,6 +106,14 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
   onNavigateTransport,
 }) => {
   const scope = getTerritorialScope(currentUser, userRole);
+  const operation = useOperations();
+  const [expenseLeader,setExpenseLeader]=useState('');
+  const [expenseCandidate,setExpenseCandidate]=useState('');
+  const [expenseEvent,setExpenseEvent]=useState('');
+  const [expenseDate,setExpenseDate]=useState(new Date().toISOString().slice(0,10));
+  const [expenseStatus,setExpenseStatus]=useState<CampaignExpense['status']>('Pendiente');
+  const [expenseQuantity,setExpenseQuantity]=useState('1');
+  const [expenseUnit,setExpenseUnit]=useState('servicio');
   // Navigation Sub-tabs
   const { saving, saveError, submit, runSave } = useFirestoreForm();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'aportantes' | 'gastos' | 'topes_cne'>('dashboard');
@@ -257,8 +269,8 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
   }, [tenantExpenses]);
 
   const saldoNeto = totalAportes - totalGastos;
-  const cneTopeLegalEstimado = 280000000; // COP $280M tope alcaldía/asamblea intermedia CNE 2026
-  const pctTopeAlcanzado = Math.min(100, (totalGastos / cneTopeLegalEstimado) * 100);
+  const cneTopeLegalEstimado = currentTenant.budgetCap || 0;
+  const pctTopeAlcanzado = cneTopeLegalEstimado>0?Math.min(100, (totalGastos / cneTopeLegalEstimado) * 100):0;
 
   // Data for Charts: Comparativa Aportes vs Gastos por Rubro
   const chartDataRubros = useMemo(() => {
@@ -328,7 +340,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
   // Handlers
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newExpDesc.trim() || !Number.isFinite(Number(newExpAmount)) || Number(newExpAmount) <= 0) return;
+    if (!newExpDesc.trim() || !Number.isFinite(Number(newExpAmount)) || Number(newExpAmount) <= 0 || !Number.isFinite(Number(expenseQuantity)) || Number(expenseQuantity)<=0 || !expenseDate) throw new Error('Complete concepto, fecha, cantidad y un valor mayor que cero.');
 
     const expense: CampaignExpense = {
       id: createRecordId(currentTenant.tenantId, generatedExpDocId || 'gasto'),
@@ -337,8 +349,10 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
       rubro: newExpRubro,
       description: newExpDesc,
       amount: parseFloat(newExpAmount),
-      date: new Date().toISOString().split('T')[0],
-      status: 'Pendiente',
+      date: expenseDate,
+      status: expenseStatus,
+      responsibleLeaderId:expenseLeader,candidateId:expenseCandidate,eventId:expenseEvent,
+      quantity:Number(expenseQuantity),unitMeasure:expenseUnit,unitCost:Number(newExpAmount)/Number(expenseQuantity),
       supplier: newExpSupplier.trim(),
       invoiceNumber: newExpInvoice.trim(),
       department: newExpDept,
@@ -558,10 +572,10 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
         {/* Tope CNE */}
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-2 relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tope Legal CNE 2026</span>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Presupuesto configurado</span>
             <span className="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg"><ShieldCheck className="w-4 h-4" /></span>
           </div>
-          <div className="text-2xl font-black text-amber-300 font-mono tracking-tight">{formatCOP(cneTopeLegalEstimado)}</div>
+          <div className="text-2xl font-black text-amber-300 font-mono tracking-tight">{cneTopeLegalEstimado > 0 ? formatCOP(cneTopeLegalEstimado) : 'Sin configurar'}</div>
           <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
             <div className="bg-amber-400 h-full rounded-full" style={{ width: `${pctTopeAlcanzado}%` }} />
           </div>
@@ -972,6 +986,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                     <tr key={contrib.id} className="hover:bg-slate-850 transition">
                       <td className="p-3.5">
                         <div className="font-bold text-slate-100">{contrib.donorName}</div>
+                        <EditRecordButton collection="aportes" record={contrib} />
                         <div className="text-[10px] font-mono text-slate-400">{contrib.donorDocument} • {contrib.donorType}</div>
                       </td>
                       <td className="p-3.5">
@@ -1061,6 +1076,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                     <tr key={exp.id} className="hover:bg-slate-850 transition">
                       <td className="p-3.5">
                         <div className="font-bold text-slate-100">{exp.description}</div>
+                        <EditRecordButton collection="gastos" record={exp} />
                         <div className="text-[10px] font-mono text-slate-400 mt-0.5">{exp.id}</div>
                       </td>
                       <td className="p-3.5">
@@ -1106,31 +1122,31 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
           <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-4">
             <h3 className="font-bold text-white text-base flex items-center gap-2 border-b border-slate-800 pb-3">
               <ShieldCheck className="w-5 h-5 text-amber-400" />
-              Auditoría Preventiva y Validación de Topes Individuales (Ley Estatutaria 1475 de 2011)
+              Control documental y presupuesto
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 space-y-2">
-                <span className="text-xs font-bold text-slate-400 uppercase">Límite por Donante Individual (10%)</span>
-                <div className="text-xl font-black text-amber-300 font-mono">{formatCOP(cneTopeLegalEstimado * 0.1)}</div>
+                <span className="text-xs font-bold text-slate-400 uppercase">Presupuesto general configurado</span>
+                <div className="text-xl font-black text-amber-300 font-mono">{cneTopeLegalEstimado ? formatCOP(cneTopeLegalEstimado) : 'Sin configurar'}</div>
                 <p className="text-[11px] text-slate-400">
-                  Ningún aportante privado puede superar el 10% del tope total fijado por el CNE.
+                  Defina el presupuesto en la organización y documente por separado la fuente del límite aplicable.
                 </p>
               </div>
 
               <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 space-y-2">
-                <span className="text-xs font-bold text-slate-400 uppercase">Obligación de Bancarización</span>
-                <div className="text-xl font-black text-blue-400 font-mono">100% de Aportes Mayores a 2 SMMLV</div>
+                <span className="text-xs font-bold text-slate-400 uppercase">Gastos con soporte</span>
+                <div className="text-xl font-black text-blue-400 font-mono">{tenantExpenses.filter(e=>e.invoiceNumber).length} de {tenantExpenses.length} registros</div>
                 <p className="text-[11px] text-slate-400">
-                  Todo aporte superior a ~$2.6M COP debe ingresar exclusivamente por cheque o transferencia a la Cuenta Única de Campaña.
+                  Revise factura, proveedor, responsable y fecha antes de cerrar la conciliación.
                 </p>
               </div>
 
               <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 space-y-2">
                 <span className="text-xs font-bold text-slate-400 uppercase">Reportes Cuentas Claras</span>
-                <div className="text-xl font-black text-emerald-400 font-mono">Tiempo Real Semanal</div>
+                <div className="text-xl font-black text-emerald-400 font-mono">{tenantContributions.filter(c=>c.cneStatus==='Reportado Cuentas Claras').length} reportados</div>
                 <p className="text-[11px] text-slate-400">
-                  Los ingresos y gastos deben transmitirse digitalmente durante el transcurso de la campaña.
+                  Estado declarado en cada aporte. Registrar aquí un dato no lo transmite automáticamente a Cuentas Claras.
                 </p>
               </div>
             </div>
@@ -1374,7 +1390,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800 space-y-2">
               <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
                 <Sparkles className="w-3 h-3 text-emerald-400" />
-                Tarifas de Referencia en el Cesar:
+                Seleccione el tipo de recurso:
               </span>
               <div className="flex flex-wrap gap-1.5">
                 <button
@@ -1409,6 +1425,15 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             </div>
 
             <form onSubmit={event => submit(event, handleSaveExpense)} className="space-y-4"><FormSaveStatus saving={saving} error={saveError} /><fieldset disabled={saving} className="contents">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-xs text-slate-300">Líder responsable<select aria-label="Líder responsable del gasto" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-800 p-2 text-white" value={expenseLeader} onChange={e=>{setExpenseLeader(e.target.value);setExpenseCandidate(operation.leaders.find(l=>l.id===e.target.value)?.assignedCandidateId||'');}}><option value="">Gasto compartido / sin líder</option>{operation.leaders.map(l=><option key={l.id} value={l.id}>{l.fullName}</option>)}</select></label>
+                <label className="text-xs text-slate-300">Aspirante responsable<select aria-label="Aspirante responsable del gasto" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-800 p-2 text-white" value={expenseCandidate} onChange={e=>setExpenseCandidate(e.target.value)}><option value="">Sin aspirante</option>{operation.candidates.map(c=><option key={c.id} value={c.id}>{c.fullName}</option>)}</select></label>
+                <label className="text-xs text-slate-300">Jornada o evento<select aria-label="Jornada del gasto" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-800 p-2 text-white" value={expenseEvent} onChange={e=>setExpenseEvent(e.target.value)}><option value="">Operación general</option>{operation.events.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                <label className="text-xs text-slate-300">Fecha del gasto<input required type="date" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-800 p-2 text-white" value={expenseDate} onChange={e=>setExpenseDate(e.target.value)}/></label>
+                <label className="text-xs text-slate-300">Estado del gasto<select className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-800 p-2 text-white" value={expenseStatus} onChange={e=>setExpenseStatus(e.target.value as CampaignExpense['status'])}>{['Pendiente','Aprobado','Pagado'].map(s=><option key={s}>{s}</option>)}</select></label>
+                <label className="text-xs text-slate-300">Cantidad<input required type="number" min={0.01} step="any" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-800 p-2 text-white" value={expenseQuantity} onChange={e=>setExpenseQuantity(e.target.value)}/></label>
+                <label className="text-xs text-slate-300">Unidad de medida<input required className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-800 p-2 text-white" value={expenseUnit} onChange={e=>setExpenseUnit(e.target.value)}/></label>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Descripción / Concepto *</label>

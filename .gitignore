@@ -12,3 +12,12 @@ coverage/
 .vercel/
 docs/evidence/
 scripts/diagnose-firebase-access.cjs
+*.apk
+*.aab
+*.jks
+*.keystore
+android/keystore.properties
+*.apk.sha256
+*.aab.sha256
+.vercel
+.env*

@@ -1,3 +1,4 @@
+import { EditRecordButton } from './common/EditRecordButton';
 import React, { useState, useMemo } from 'react';
 import { District, Tenant } from '../types';
 import {
@@ -255,6 +256,7 @@ export const DistrictsView: React.FC<DistrictsViewProps> = ({
                       {dist.region}
                     </span>
                     <h4 className="font-bold text-slate-100 text-sm mt-1.5">{dist.name}</h4>
+                        <EditRecordButton collection="distritos" record={dist} />
                   </div>
                   <span className="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">
                     {dist.projectedSupport}%

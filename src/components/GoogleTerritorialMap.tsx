@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { APIProvider, AdvancedMarker, Map, Pin, useMap } from '@vis.gl/react-google-maps';
 import { googleLocationUrl, type Coordinate, type TerritoryPoint } from '../lib/territorialMaps';
+import type { GeographicLayer } from '../lib/geographicImport';
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_PLATFORM_KEY || '';
 interface Props {
   center: Coordinate; points: TerritoryPoint[]; route: Coordinate[]; pickedLocation: Coordinate | null;
   onSelectPoint: (point: TerritoryPoint) => void; onPickLocation: (point: Coordinate) => void;
+  geographicLayers?: GeographicLayer[]; fitCoordinates?:Coordinate[];
 }
-const GoogleOverlays: React.FC<Pick<Props, 'center' | 'route'>> = ({ center, route }) => {
+const GoogleOverlays: React.FC<Pick<Props, 'center' | 'route' | 'geographicLayers'|'fitCoordinates'>> = ({ center, route, geographicLayers=[], fitCoordinates }) => {
   const map = useMap();
   useEffect(() => { map?.panTo({ lat: center.latitude, lng: center.longitude }); }, [map, center]);
   useEffect(() => {
@@ -16,6 +18,15 @@ const GoogleOverlays: React.FC<Pick<Props, 'center' | 'route'>> = ({ center, rou
     const bounds = new google.maps.LatLngBounds(); route.forEach(point => bounds.extend({ lat: point.latitude, lng: point.longitude })); map.fitBounds(bounds, 35);
     return () => line.setMap(null);
   }, [map, route]);
+  useEffect(()=> {
+    if(!map)return; const shapes:(google.maps.Polyline|google.maps.Polygon)[]=[];
+    for(const layer of geographicLayers) for(const feature of layer.features) for(const geometry of feature.geometries) {
+      if(geometry.type==='Point')continue; const path=geometry.coordinates.map(point=>({lat:point.latitude,lng:point.longitude}));
+      const shape=geometry.type==='Polygon' ? new google.maps.Polygon({map,paths:[path,...(geometry.holes||[]).map(hole=>hole.coordinates.map(point=>({lat:point.latitude,lng:point.longitude})))],strokeColor:'#f59e0b',strokeWeight:3,fillColor:'#f59e0b',fillOpacity:0.12}) : new google.maps.Polyline({map,path,strokeColor:'#f59e0b',strokeWeight:4}); shapes.push(shape);
+    }
+    return ()=>shapes.forEach(shape=>shape.setMap(null));
+  },[map,geographicLayers]);
+  useEffect(()=>{if(!map||!fitCoordinates?.length)return;const bounds=new google.maps.LatLngBounds();fitCoordinates.forEach(point=>bounds.extend({lat:point.latitude,lng:point.longitude}));map.fitBounds(bounds,35);if(fitCoordinates.length===1)map.setZoom(17);},[map,fitCoordinates]);
   return null;
 };
 export const GoogleTerritorialMap: React.FC<Props> = props => {
@@ -35,10 +46,10 @@ export const GoogleTerritorialMap: React.FC<Props> = props => {
         mapTypeId="hybrid" mapId={import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID'} gestureHandling="greedy"
         onClick={event => { if (event.detail.latLng) props.onPickLocation({ latitude: event.detail.latLng.lat, longitude: event.detail.latLng.lng }); }}>
         {props.points.map(point => <AdvancedMarker key={point.id} position={{ lat: point.latitude, lng: point.longitude }} title={`Ver ${point.name}`} onClick={() => props.onSelectPoint(point)}>
-          <Pin background={point.type === 'leader' ? '#059669' : '#2563eb'} borderColor="#fff" glyphColor="#fff" />
+          <Pin background={point.type === 'import' ? '#d97706' : point.type === 'leader' ? '#059669' : '#2563eb'} borderColor="#fff" glyphColor="#fff" />
         </AdvancedMarker>)}
         {props.pickedLocation && <AdvancedMarker position={{ lat: props.pickedLocation.latitude, lng: props.pickedLocation.longitude }} title="Ubicación seleccionada"><Pin background="#f59e0b" /></AdvancedMarker>}
-        <GoogleOverlays center={props.center} route={props.route} />
+        <GoogleOverlays center={props.center} route={props.route} geographicLayers={props.geographicLayers} fitCoordinates={props.fitCoordinates}/>
       </Map>
     </div>
   </APIProvider>;

@@ -1,3 +1,4 @@
+import { EditRecordButton } from './common/EditRecordButton';
 import { createRecordId } from '../lib/recordIds';
 import { parseLocation } from '../lib/territorialMaps';
 import { LocationPicker } from './common/LocationPicker';
@@ -133,8 +134,8 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
       setFormError('Ingrese el nombre y una meta de votos mayor que cero.');
       return;
     }
-    if (committed < 0 || committed > target) {
-      setFormError('Los votos fidelizados deben estar entre cero y la meta.');
+    if (!Number.isInteger(committed) || committed < 0) {
+      setFormError('Ingrese un número entero de votos mayor o igual que cero. Puede superar la meta.');
       return;
     }
     let location;
@@ -310,6 +311,7 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
                       />
                       <div>
                         <h4 className="font-bold text-slate-100 text-sm leading-tight">{lead.fullName}</h4>
+                        <EditRecordButton collection="lideres" record={lead} />
                         <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
                           <MapPin className="w-3 h-3 text-slate-500" />
                           {lead.municipality} • {lead.veredaOrBarrio || lead.commune}
@@ -367,7 +369,7 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
                 <div className="border-t border-slate-800/80 pt-2 flex items-center justify-between text-[11px]">
                   <span className="text-slate-500">Caja Operativa:</span>
                   <span className="font-mono font-bold text-amber-300">
-                    {formatCOP(lead.budgetAllocated || 2000000)}
+                    {formatCOP(lead.budgetAllocated || 0)}
                   </span>
                 </div>
               </div>

@@ -110,3 +110,15 @@ test('rate limiting rejects excess requests from a single authenticated user', a
   for (let i = 0; i < 42; i++) status = (await request({}, token({ sub: 'quota-test-user' }))).status;
   assert.equal(status, 429);
 });
+
+test('The installed app (https://localhost) may call the API with its token; other origins get no CORS grant', async () => {
+  const preflight = await nativeFetch(`${base}/api/ai/analyze-document`, { method: 'OPTIONS', headers: { Origin: 'https://localhost', 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'authorization,content-type' } });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('access-control-allow-origin'), 'https://localhost');
+  assert.match(preflight.headers.get('access-control-allow-headers') || '', /Authorization/);
+  const foreign = await nativeFetch(`${base}/api/ai/analyze-document`, { method: 'OPTIONS', headers: { Origin: 'https://evil.example', 'Access-Control-Request-Method': 'POST' } });
+  assert.equal(foreign.status, 403);
+  assert.equal(foreign.headers.get('access-control-allow-origin'), null);
+  const unauthenticated = await nativeFetch(`${base}/api/ai/analyze-document`, { method: 'POST', headers: { Origin: 'https://localhost', 'Content-Type': 'application/json' }, body: '{}' });
+  assert.equal(unauthenticated.status, 401);
+});

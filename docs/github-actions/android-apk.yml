@@ -1,0 +1,31 @@
+# Compila el APK de Astrea en la nube de GitHub (gratis para repositorios públicos y con minutos incluidos en privados).
+# Ejecución: pestaña «Actions» › «Android APK» › «Run workflow». El APK queda en «Artifacts».
+name: Android APK
+on:
+  workflow_dispatch:
+  push:
+    tags: ['android-v*']
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npm test
+      - run: npm run build:frontend
+        env:
+          VITE_GOOGLE_MAPS_PLATFORM_KEY: ${{ secrets.VITE_GOOGLE_MAPS_PLATFORM_KEY }}
+          VITE_GOOGLE_MAPS_MAP_ID: ${{ secrets.VITE_GOOGLE_MAPS_MAP_ID }}
+      - run: npx cap add android || npx cap sync android
+      - run: node scripts/setup-android.mjs && npx cap sync android
+      - run: chmod +x android/gradlew && cd android && ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: astrea-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk

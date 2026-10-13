@@ -1,6 +1,11 @@
+import { EditRecordButton } from './common/EditRecordButton';
 import { createRecordId } from '../lib/recordIds';
 import { parseLocation, googleDirectionsUrl, googleLocationUrl, validLocation } from '../lib/territorialMaps';
 import { LocationPicker } from './common/LocationPicker';
+import {ElectionTransportRoutes} from './ElectionTransportRoutes';
+import {TransportControlCenter} from './operations/TransportControlCenter';
+import {FleetTrackingPanel} from './FleetTrackingPanel';
+import {isTrackingAdministrator} from '../lib/trackingPermissions';
 import React, { useState, useEffect } from 'react';
 import { Tenant, TransportVehicle, UserProfile, UserRole } from '../types';
 import { getTerritorialScope, filterVehiclesByScope } from '../lib/permissions';
@@ -37,6 +42,8 @@ interface TransportViewProps {
   currentUser?: UserProfile | null;
   userRole?: UserRole;
   vehicles: TransportVehicle[];
+  members?:UserProfile[];
+  readOnly?:boolean;
   onAddVehicle: (vehicle: TransportVehicle) => Promise<void>;
 }
 
@@ -45,6 +52,8 @@ export const TransportView: React.FC<TransportViewProps> = ({
   currentUser = null,
   userRole = 'Alcalde',
   vehicles,
+  members=[],
+  readOnly=false,
   onAddVehicle,
 }) => {
   const scope = getTerritorialScope(currentUser, userRole);
@@ -124,7 +133,7 @@ export const TransportView: React.FC<TransportViewProps> = ({
   });
 
   // Totals
-  const totalMobilizationCapacity = scopedVehicles.reduce((acc, curr) => acc + curr.capacity, 0);
+  const totalMobilizationCapacity = scopedVehicles.filter(v=>v.status!=='En Mantenimiento').reduce((acc, curr) => acc + curr.capacity, 0);
   const totalDailyVehicleCost = scopedVehicles.reduce((acc, curr) => acc + curr.dailyCost, 0);
   const totalFuelBudget = scopedVehicles.reduce((acc, curr) => acc + curr.fuelBudget, 0);
   const totalFleetCost = totalDailyVehicleCost + totalFuelBudget;
@@ -180,10 +189,14 @@ export const TransportView: React.FC<TransportViewProps> = ({
     <div className="space-y-6">
       
       {/* AUTHOR HEADER */}
-      <AuthorHeader 
+      <AuthorHeader
         title="Gestión de Transporte, Rutas Veredales & Vales Día D"
         subtitle="Logística de Movilización Votantes • Control Flota Cesar • Alertas de Cobertura RURAL"
       />
+
+      <TransportControlCenter/>
+      {isTrackingAdministrator(currentUser)&&!readOnly&&<details className="rounded-2xl border border-slate-700 p-4"><summary className="cursor-pointer font-semibold">Ubicación y seguimiento de la flota</summary><FleetTrackingPanel key={currentTenant.tenantId} tenantId={currentTenant.tenantId} user={currentUser!} members={members} vehicles={scopedVehicles} /></details>}
+      {!readOnly&&<ElectionTransportRoutes tenant={currentTenant} user={currentUser} vehicles={vehicles}/>}
 
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -292,6 +305,7 @@ export const TransportView: React.FC<TransportViewProps> = ({
                     </span>
                     <h4 className="font-bold text-slate-100 text-base font-mono mt-1">
                       Placa: {veh.licensePlate}
+                        <EditRecordButton collection="vehiculos" record={veh} />
                     </h4>
                   </div>
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">

@@ -1,4 +1,5 @@
 import { createRecordId } from '../lib/recordIds';
+import {EditRecordButton} from './common/EditRecordButton';
 import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
 import React, { useState, useMemo } from 'react';
 import {
@@ -542,13 +543,7 @@ export const CampaignCostsReportView: React.FC<CampaignCostsReportViewProps> = (
                         </td>
 
                         <td className="py-3.5 px-4 text-right whitespace-nowrap space-x-1">
-                          <button
-                            onClick={() => handleOpenEditModal(exp)}
-                            className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-slate-800 rounded-lg transition"
-                            title="Editar gasto"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
+                          <EditRecordButton collection="gastos" record={exp} />
                           <button
                             onClick={() => void runSave(() => handleDelete(exp.id))}
                             className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition"

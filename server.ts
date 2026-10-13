@@ -4,6 +4,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import apiHandler from './api/index.ts';
+import vercelConfig from './vercel.json' with { type: 'json' };
 import { config } from 'dotenv';
 
 config({ path: '.env.local', override: true, quiet: true });
@@ -14,7 +15,8 @@ const PORT = Number.isInteger(parsedPort) && parsedPort > 0 ? parsedPort : 3000;
 const currentModulePath = fileURLToPath(import.meta.url);
 const isProduction = process.env.NODE_ENV === 'production'
   || (path.basename(currentModulePath) === 'server.mjs' && path.basename(path.dirname(currentModulePath)) === 'build');
-const productionContentSecurityPolicy = "default-src 'self'; script-src 'self' https://maps.googleapis.com https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com wss://*.firebaseio.com; frame-src https://accounts.google.com https://*.firebaseapp.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+// Una sola política de seguridad: la misma de Vercel (incluye OSRM para rutas y gstatic para Google Maps).
+const productionContentSecurityPolicy = vercelConfig.headers.flatMap(rule => rule.headers).find(header => header.key === 'Content-Security-Policy')!.value;
 
 app.disable('x-powered-by');
 app.use((_req, res, next) => {
@@ -55,6 +57,11 @@ async function configureFrontend() {
 
   const distPath = path.join(process.cwd(), 'dist');
   app.use('/assets', express.static(path.join(distPath, 'assets'), { immutable: true, maxAge: '1y', fallthrough: false }));
+  // Archivos de la raíz de dist: service worker, manifiesto, iconos y CSV de ejemplo. Sin ellos la app no se instala ni funciona sin conexión.
+  app.use(express.static(distPath, { index: false, setHeaders: (res, filePath) => {
+    if (filePath.endsWith('service-worker.js')) { res.setHeader('Cache-Control', 'no-cache'); res.setHeader('Service-Worker-Allowed', '/'); }
+    if (filePath.endsWith('.webmanifest')) res.setHeader('Content-Type', 'application/manifest+json');
+  } }));
   app.get(/.*/, (req, res) => {
     if (path.extname(req.path) && req.path !== '/index.html') {
       res.status(404).end();

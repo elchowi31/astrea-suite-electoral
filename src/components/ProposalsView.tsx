@@ -1,3 +1,4 @@
+import { EditRecordButton } from './common/EditRecordButton';
 import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
 import { createRecordId } from '../lib/recordIds';
 import React, { useState, useEffect } from 'react';
@@ -178,6 +179,7 @@ export const ProposalsView: React.FC<ProposalsViewProps> = ({
                 </div>
 
                 <h4 className="font-bold text-slate-100 text-sm leading-snug">{prop.title}</h4>
+                        <EditRecordButton collection="propuestas" record={prop} />
                 <div className="text-[10px] font-mono text-slate-400 mt-1">Doc: {prop.id}</div>
                 <p className="text-xs text-slate-400 mt-2 line-clamp-2">{prop.summary}</p>
 

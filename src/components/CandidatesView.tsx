@@ -1,3 +1,4 @@
+import { EditRecordButton } from './common/EditRecordButton';
 import { createRecordId } from '../lib/recordIds';
 import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
 import React, { useState, useEffect } from 'react';
@@ -295,6 +296,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
                     {cand.electoralLevel || cand.chamber}
                   </span>
                   <h3 className="font-bold text-slate-100 text-base leading-snug">{cand.fullName}</h3>
+                        <EditRecordButton collection="candidatos" record={cand} />
                   <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
                     <MapPin className="w-3 h-3 text-slate-500 shrink-0" /> {cand.department} • {cand.municipality}
                   </p>

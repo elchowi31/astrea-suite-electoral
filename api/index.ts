@@ -182,8 +182,20 @@ async function authorize(req: ApiRequest, res: ServerResponse) {
   }
 }
 
+// Orígenes de la app instalada (Capacitor). La API se autoriza con token Bearer, no con cookies.
+const NATIVE_APP_ORIGINS = new Set(['https://localhost', 'capacitor://localhost', 'http://localhost']);
+
 export default async function handler(req: ApiRequest, res: ServerResponse) {
   const pathname = new URL(req.url || '/', 'https://astrea.local').pathname;
+  const origin = String(req.headers.origin || '');
+  if (NATIVE_APP_ORIGINS.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Max-Age', '600');
+  }
+  if (req.method === 'OPTIONS') { res.statusCode = NATIVE_APP_ORIGINS.has(origin) ? 204 : 403; res.end(); return; }
 
   if (req.method === 'GET' && pathname === '/api/health') {
     return json(res, 200, { status: 'ok', service: 'Astrea Suite Electoral API', timestamp: new Date().toISOString() });

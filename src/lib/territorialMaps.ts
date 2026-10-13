@@ -2,13 +2,13 @@ import type { Leader, TransportVehicle } from '../types';
 
 export type Coordinate = { latitude: number; longitude: number };
 export type TerritoryPoint = Coordinate & {
-  id: string; recordId: string; type: 'leader' | 'vehicle'; name: string;
+  id: string; recordId: string; type: 'leader' | 'vehicle' | 'import'; name: string;
   subtitle: string; municipality: string; status: string; capturedAt?: string;
 };
 export type RouteStop = Coordinate & { name: string };
 export type TerritorialRoute = {
   name: string; stops: RouteStop[]; geometry: Coordinate[];
-  distanceMeters: number; durationSeconds: number; provider: 'OSRM'; calculatedAt: string;
+  distanceMeters: number; durationSeconds: number; provider: 'OSRM' | 'Archivo'; calculatedAt: string;
 };
 export const ASTREA_CENTER: Coordinate = { latitude: 9.4981, longitude: -73.9785 };
 

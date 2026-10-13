@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { UserProfile, UserRole, ElectoralLevel, Tenant } from '../types';
 import { CESAR_MUNICIPALITIES } from '../data/geography';
+import { PasswordInput } from './common/PasswordInput';
 import {
   loginWithEmailPassword,
   registerWithEmailPassword,
@@ -12,7 +13,6 @@ import { filterUsersByScope, getRoleHierarchyLevel } from '../lib/permissions';
 import { SynapticNeuralBackground } from './SynapticNeuralBackground';
 import {
   User,
-  Lock,
   Mail,
   UserCheck,
   UserPlus,
@@ -102,7 +102,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
       if (result.success && result.user) {
         setFeedbackMsg({
           type: 'success',
-          text: `¡Bienvenido(a)! Sesión autenticada en Firebase y registrada en Firestore para ${result.user.displayName}.`
+          text: `¡Bienvenido(a), ${result.user.displayName}!`
         });
         onLogin(result.user);
       } else {
@@ -463,28 +463,21 @@ export const LoginView: React.FC<LoginViewProps> = ({
                     className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl pl-10 pr-3 py-2.5 text-xs focus:outline-none focus:border-blue-500"
                   />
                 </div>
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  Autentica directamente contra Firebase Authentication (<code className="text-amber-300 font-mono">gen-lang-client-0498782352</code>).
-                </span>
               </div>
 
               <div>
-                <label id="lbl-login-password" className="block text-xs font-bold text-slate-300 mb-1">
+                <label id="lbl-login-password" htmlFor="input-login-password" className="block text-xs font-bold text-slate-300 mb-1">
                   Contraseña o PIN de Seguridad
                 </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
-                  <input
+                  <PasswordInput
                     id="input-login-password"
-                    type="password"
                     autoComplete="current-password"
                     required
                     placeholder="Ingrese su contraseña o PIN"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl pl-10 pr-3 py-2.5 text-xs focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-blue-500"
                   />
-                </div>
               </div>
               <button
                 type="button"
@@ -507,12 +500,12 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Autenticando en Firebase...</span>
+                    <span>Verificando acceso…</span>
                   </>
                 ) : (
                   <>
                     <KeyRound className="w-4 h-4" />
-                    <span>Iniciar Sesión en Firebase Authentication</span>
+                    <span>Iniciar sesión</span>
                   </>
                 )}
               </button>
@@ -652,12 +645,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
               {/* Password */}
               <div>
-                <label id="lbl-reg-pass" className="block text-slate-300 font-bold mb-1">Contraseña de Acceso</label>
-                <input
+                <label id="lbl-reg-pass" htmlFor="input-reg-pass" className="block text-slate-300 font-bold mb-1">Contraseña de Acceso</label>
+                <PasswordInput
                   id="input-reg-pass"
-                  type="password"
                   autoComplete="new-password"
-                  required
+                  required minLength={8}
                   placeholder="Mínimo 8 caracteres"
                   value={regPassword}
                   onChange={(e) => setRegPassword(e.target.value)}

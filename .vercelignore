@@ -9,3 +9,12 @@ scripts
 firebase-blueprint.json
 bun.lock
 *.log
+android
+ios
+*.apk
+*.aab
+*.jks
+*.keystore
+build
+.data-cache
+.firebase

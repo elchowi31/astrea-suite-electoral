@@ -1,3 +1,4 @@
+import { EditRecordButton } from './common/EditRecordButton';
 import React, { useState } from 'react';
 import { DriveFileItem, Tenant } from '../types';
 import { FolderGit2, RefreshCw, FileText, Sparkles, ExternalLink, Download, CheckCircle2, AlertCircle, FileCheck2, Loader2 } from 'lucide-react';
@@ -113,6 +114,7 @@ export const DriveView: React.FC<DriveViewProps> = ({
                       </span>
                       <h3 className="font-bold text-slate-100 text-sm leading-snug group-hover:text-blue-300 transition-colors">
                         {file.name}
+                        <EditRecordButton collection="archivos_drive" record={file} />
                       </h3>
                     </div>
                   </div>

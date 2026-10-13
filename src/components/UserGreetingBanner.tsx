@@ -63,17 +63,6 @@ export const UserGreetingBanner: React.FC<UserGreetingBannerProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-400 bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/20 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-400" />
-                Perfil Reconocido
-              </span>
-
-              <span className="text-[11px] font-bold text-emerald-300 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
-                <Lock className="w-3 h-3" />
-                Aislamiento por {currentTenant.tenantId}
-              </span>
-            </div>
 
             {/* Formal Greeting */}
             <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex flex-wrap items-center gap-1.5">
@@ -121,7 +110,7 @@ export const UserGreetingBanner: React.FC<UserGreetingBannerProps> = ({
             className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-2xl shadow-lg shadow-blue-600/30 transition cursor-pointer"
           >
             <UserCheck className="w-4 h-4" />
-            <span>Cambiar Usuario / Iniciar Sesión</span>
+            <span>Cambiar cuenta</span>
           </button>
         </div>
 

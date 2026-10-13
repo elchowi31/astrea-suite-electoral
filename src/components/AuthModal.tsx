@@ -4,6 +4,7 @@ import { CESAR_MUNICIPALITIES } from '../data/geography';
 import { generarIdDocumentoLegible } from '../lib/slugify';
 import { filterUsersByScope, getRoleHierarchyLevel } from '../lib/permissions';
 import { loginWithEmailPassword, registerWithEmailPassword, logSessionToFirestore } from '../lib/firebaseAuth';
+import { PasswordInput } from './common/PasswordInput';
 import {
   User,
   Lock,
@@ -246,15 +247,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             {/* Direct Login Form */}
             <form onSubmit={handleManualLogin} className="space-y-3 pt-2 border-t border-slate-800">
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Correo Electrónico (Firebase Auth)</label>
+                <label htmlFor="modal-login-email" className="block text-xs font-bold text-slate-300 mb-1">Correo electrónico</label>
                 <input
+                  id="modal-login-email"
                   type="email"
+                  autoComplete="username"
                   required
                   placeholder="usuario@organizacion.co"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
                 />
+              </div>
+
+              <div>
+                <label htmlFor="modal-login-password" className="block text-xs font-bold text-slate-300 mb-1">Contraseña</label>
+                <PasswordInput id="modal-login-password" required autoComplete="current-password" placeholder="Ingrese su contraseña"
+                  value={loginPin} onChange={event=>setLoginPin(event.target.value)}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"/>
               </div>
 
               <div className="flex justify-between items-center pt-2">
@@ -278,7 +288,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   className="ml-auto px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs shadow-lg transition flex items-center gap-2 cursor-pointer"
                 >
                   {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  <span>Autenticar en Firebase</span>
+                  <span>{loading ? 'Verificando acceso…' : 'Iniciar sesión'}</span>
                 </button>
               </div>
             </form>
@@ -368,6 +378,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-2.5 py-1.5 text-xs"
                 />
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="modal-register-password" className="block text-slate-300 font-bold mb-1">Contraseña *</label>
+              <PasswordInput id="modal-register-password" required minLength={8} autoComplete="new-password"
+                placeholder="Mínimo 8 caracteres" value={loginPin} onChange={event=>setLoginPin(event.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-2.5 py-1.5 text-xs" />
             </div>
 
             <div className="pt-3 border-t border-slate-800 flex justify-end">
