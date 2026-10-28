@@ -1,26 +1,39 @@
-import { doc, runTransaction, type Transaction } from 'firebase/firestore';
+import { doc, runTransaction, type DocumentReference } from 'firebase/firestore';
+import {verifySavedRecord} from './saveVerification';
 import { auth, db } from './firebase';
 import { canCoordinate, overlaps, passengerTotal, validateEvent, validateRequest, RESOURCE_CATALOG, TRANSPORT_RESOURCE, type OperationalEvent, type ResourceRequest, type TransportTrip, type LeaderProgressReport } from './operations';
 import type { TransportVehicle, UserProfile } from '../types';
 import { stockAvailable, stockMissing, releasableTrip, queueIsFresh } from './operations';
 
-const reference = (collection: string, id: string) => doc(db,collection,id);
-function actor(user: UserProfile, tenantId: string) {
-  if(auth.currentUser?.uid!==user.uid || (user.tenantId!==tenantId && user.role!=='AdminGlobal'))throw new Error('Inicie sesión en esta organización.');
+export interface OperationTransaction<R> {
+  get(ref:R):Promise<{data():any;exists():boolean;ref:R}>;
+  set(ref:R,data:Record<string,any>):unknown;
+  update(ref:R,data:Record<string,any>):unknown;
 }
-function audit(tx: Transaction, tenantId: string, user: UserProfile, entity: string, id: string, metadata:Record<string,string|number>={}) {
+export interface OperationStorage<R> {
+  reference(collection:string,id:string):R;
+  transaction(callback:(tx:OperationTransaction<R>)=>Promise<void>):Promise<void>;
+  actorUid():string|undefined;
+}
+/** Same validation and transitions for real records and the persistent personal sandbox. */
+export function createOperationsStore<R>(storage:OperationStorage<R>) {
+const {reference,transaction}=storage;
+function actor(user: UserProfile, tenantId: string) {
+  if(storage.actorUid()!==user.uid || (user.tenantId!==tenantId && user.role!=='AdminGlobal'))throw new Error('Inicie sesión en esta organización.');
+}
+function audit(tx: OperationTransaction<R>, tenantId: string, user: UserProfile, entity: string, id: string, metadata:Record<string,string|number>={}) {
   const auditId=crypto.randomUUID();tx.set(reference('auditoria',auditId),{id:auditId,tenantId,actorId:user.uid,entity,entityId:id,action:'update',metadata,createdAt:new Date().toISOString()});
 }
-export async function saveEvent(event: OperationalEvent, user: UserProfile) {
+async function saveEvent(event: OperationalEvent, user: UserProfile) {
   actor(user,event.tenantId);validateEvent(event);
-  await runTransaction(db,async tx=>{const ref=reference('jornadas_operativas',event.id);const existing=(await tx.get(ref)).data();
+  await transaction(async tx=>{const ref=reference('jornadas_operativas',event.id);const existing=(await tx.get(ref)).data();
     if(existing && (existing.tenantId!==event.tenantId || !canCoordinate(user)))throw new Error('Solo coordinación puede editar la jornada.');
     tx.set(ref,{...event,createdBy:existing?.createdBy||user.uid,createdAt:existing?.createdAt||event.createdAt});audit(tx,event.tenantId,user,'jornadas_operativas',event.id);
   });
 }
-export async function saveRequest(request: ResourceRequest, user: UserProfile, onlyCreate=false) {
+async function saveRequest(request: ResourceRequest, user: UserProfile, onlyCreate=false) {
   actor(user,request.tenantId);validateRequest(request);
-  await runTransaction(db,async tx=>{
+  await transaction(async tx=>{
     const ref=reference('solicitudes_recursos',request.id);const old=(await tx.get(ref)).data() as ResourceRequest|undefined;
     if(onlyCreate&&old)throw new Error('Este líder ya tiene una solicitud generada desde el listado. Revísela en Solicitudes y jornadas; registre un ajuste manual si hace falta.');
     if(old && (old.tenantId!==request.tenantId || old.status!=='Pendiente' || old.reservedPassengers>0 || (old.createdBy!==user.uid && !canCoordinate(user))))throw new Error('Solo puede editar solicitudes pendientes sin asignaciones.');
@@ -30,9 +43,9 @@ export async function saveRequest(request: ResourceRequest, user: UserProfile, o
     tx.set(ref,{...request,status:'Pendiente',createdBy:old?.createdBy||user.uid,createdAt:old?.createdAt||request.createdAt,reservedPassengers:0,arrivedPassengers:0,expenseId:''});audit(tx,request.tenantId,user,'solicitudes_recursos',request.id);
   });
 }
-export async function changeRequest(request: ResourceRequest, status: ResourceRequest['status'], user: UserProfile) {
+async function changeRequest(request: ResourceRequest, status: ResourceRequest['status'], user: UserProfile) {
   actor(user,request.tenantId);if(!canCoordinate(user))throw new Error('Coordinación debe aprobar o entregar recursos.');
-  await runTransaction(db,async tx=>{
+  await transaction(async tx=>{
     const ref=reference('solicitudes_recursos',request.id);const data=(await tx.get(ref)).data() as ResourceRequest|undefined;
     if(!data||data.tenantId!==request.tenantId||data.status!==request.status)throw new Error('La solicitud cambió. Revise su estado actualizado.');
     if(!((data.status==='Pendiente'&&['Aprobada','Rechazada'].includes(status))||(data.status==='Aprobada'&&['Entregada','Rechazada'].includes(status))))throw new Error('El cambio de estado no está permitido.');
@@ -43,9 +56,9 @@ export async function changeRequest(request: ResourceRequest, status: ResourceRe
   });
 }
 /** Deterministic expense id and transaction make repeated clicks safe; a request is never also counted as paid. */
-export async function requestToExpense(request: ResourceRequest, user: UserProfile) {
+async function requestToExpense(request: ResourceRequest, user: UserProfile) {
   actor(user,request.tenantId);if(!canCoordinate(user))throw new Error('Coordinación debe registrar este gasto.');
-  await runTransaction(db,async tx=>{
+  await transaction(async tx=>{
     const ref=reference('solicitudes_recursos',request.id);const data=(await tx.get(ref)).data() as ResourceRequest|undefined;
     if(!data||data.tenantId!==request.tenantId||!['Aprobada','Entregada'].includes(data.status)||data.amount<=0)throw new Error('Apruebe una solicitud con valor antes de registrar su gasto.');
     const id=`${request.id}--gasto`;const expenseRef=reference('gastos',id);const existing=await tx.get(expenseRef);
@@ -63,12 +76,12 @@ function bookingDays(trip: TransportTrip) {
   return [...new Set([new Date(start).toISOString().slice(0,10),new Date(end-1).toISOString().slice(0,10)])];
 }
 type Booking = {tripId:string;startAt:string;endAt:string};
-export async function saveProgressReport(report: LeaderProgressReport, user: UserProfile) {
+async function saveProgressReport(report: LeaderProgressReport, user: UserProfile) {
   actor(user,report.tenantId);
   if(!Number.isInteger(report.reportedVoters)||report.reportedVoters<0||report.reportedVoters>1000000)throw new Error('Indique el total acumulado de votantes reportados, entre 0 y 1.000.000.');
   if(report.id!==`${report.tenantId}--${report.eventId}--${report.leaderId}`)throw new Error('Identificador de reporte inválido.');
   if(!canCoordinate(user)&&user.assignedLeaderId!==report.leaderId)throw new Error('Solo puede reportar por el líder asignado a su cuenta.');
-  await runTransaction(db,async tx=>{
+  await transaction(async tx=>{
     const ref=reference('reportes_jornada',report.id);const previous=(await tx.get(ref)).data();
     const event=(await tx.get(reference('jornadas_operativas',report.eventId))).data();const leader=(await tx.get(reference('lideres',report.leaderId))).data();
     if(event?.tenantId!==report.tenantId||leader?.tenantId!==report.tenantId)throw new Error('Seleccione una jornada y líder de esta organización.');
@@ -78,11 +91,11 @@ export async function saveProgressReport(report: LeaderProgressReport, user: Use
     audit(tx,report.tenantId,user,'reportes_jornada',report.id,{previous:previous?.reportedVoters||0,current:report.reportedVoters,revision:report.revision+1});
   });
 }
-export async function saveTrip(trip: TransportTrip, user: UserProfile) {
+async function saveTrip(trip: TransportTrip, user: UserProfile) {
   actor(user,trip.tenantId);if(!canCoordinate(user))throw new Error('Coordinación debe asignar el transporte.');
   if(!trip.origin.trim()||!trip.destination.trim()||!trip.allocations.length||trip.allocations.length>5||new Set(trip.allocations.map(a=>a.requestId)).size!==trip.allocations.length)throw new Error('Complete origen, destino y de una a cinco solicitudes distintas.');
   const days=bookingDays(trip);
-  await runTransaction(db,async tx=>{
+  await transaction(async tx=>{
     const ref=reference('viajes_operativos',trip.id);const old=(await tx.get(ref)).data() as TransportTrip|undefined;
     if(old && (old.tenantId!==trip.tenantId || ['Finalizado','Cancelado'].includes(old.status) || old.vehicleId!==trip.vehicleId || old.eventId!==trip.eventId || old.startAt!==trip.startAt || old.endAt!==trip.endAt || JSON.stringify(old.allocations.map(a=>[a.requestId,a.passengers]))!==JSON.stringify(trip.allocations.map(a=>[a.requestId,a.passengers]))))throw new Error('Cancele el viaje programado para cambiar vehículo, horario o pasajeros.');
     if(!old&&trip.status!=='Programado')throw new Error('Un viaje nuevo debe estar programado.');
@@ -115,9 +128,9 @@ export async function saveTrip(trip: TransportTrip, user: UserProfile) {
   });
 }
 
-export async function confirmResourceCount(request:ResourceRequest,values:{waitingPassengers?:number;consumedQuantity?:number;confirmedSurplus?:number},user:UserProfile) {
+async function confirmResourceCount(request:ResourceRequest,values:{waitingPassengers?:number;consumedQuantity?:number;confirmedSurplus?:number},user:UserProfile) {
   actor(user,request.tenantId);
-  await runTransaction(db,async tx=>{
+  await transaction(async tx=>{
     const ref=reference('solicitudes_recursos',request.id);const r=(await tx.get(ref)).data() as ResourceRequest;
     if(!r||r.tenantId!==request.tenantId||!['Aprobada','Entregada'].includes(r.status)||(!canCoordinate(user)&&user.assignedLeaderId!==r.leaderId))throw new Error('El responsable o coordinación debe confirmar este conteo.');
     let update:Record<string,number|string>;
@@ -130,9 +143,9 @@ export async function confirmResourceCount(request:ResourceRequest,values:{waiti
   });
 }
 
-export async function transferResource(source:ResourceRequest,target:ResourceRequest,quantity:number,note:string,user:UserProfile,operationId:string) {
+async function transferResource(source:ResourceRequest,target:ResourceRequest,quantity:number,note:string,user:UserProfile,operationId:string) {
   actor(user,source.tenantId);if(!canCoordinate(user)||!Number.isFinite(quantity)||quantity<=0||!note.trim()||!operationId.startsWith(`${source.tenantId}--`))throw new Error('Coordinación debe indicar cantidad, motivo e identificador de la cesión.');
-  await runTransaction(db,async tx=>{
+  await transaction(async tx=>{
     const log=reference('auditoria',operationId);if((await tx.get(log)).exists())return;
     const refs=[reference('solicitudes_recursos',source.id),reference('solicitudes_recursos',target.id)];
     const [a,b]=(await Promise.all(refs.map(ref=>tx.get(ref)))).map(s=>s.data() as ResourceRequest);
@@ -145,9 +158,9 @@ export async function transferResource(source:ResourceRequest,target:ResourceReq
   });
 }
 
-export async function reassignTrip(trip:TransportTrip,target:ResourceRequest,passengers:number,origin:string,destination:string,note:string,user:UserProfile) {
+async function reassignTrip(trip:TransportTrip,target:ResourceRequest,passengers:number,origin:string,destination:string,note:string,user:UserProfile) {
   actor(user,trip.tenantId);if(!canCoordinate(user)||!origin.trim()||!destination.trim()||!note.trim()||!Number.isInteger(passengers)||passengers<=0)throw new Error('Complete recogida, destino, pasajeros y motivo de la reasignación.');
-  await runTransaction(db,async tx=>{
+  await transaction(async tx=>{
     const ref=reference('viajes_operativos',trip.id);const current=(await tx.get(ref)).data() as TransportTrip;
     const assignment=(t:TransportTrip)=>JSON.stringify(t.allocations.map(a=>[a.requestId,a.passengers,a.arrived]));
     if(!current||current.tenantId!==trip.tenantId||current.status!==trip.status||current.vehicleId!==trip.vehicleId||current.startAt!==trip.startAt||current.endAt!==trip.endAt||assignment(current)!==assignment(trip))throw new Error('El viaje cambió. Actualice la propuesta.');
@@ -166,3 +179,22 @@ export async function reassignTrip(trip:TransportTrip,target:ResourceRequest,pas
     audit(tx,current.tenantId,user,'viajes_operativos',current.id,{operation:'reasignacion',previousRequests:current.allocations.map(a=>a.requestId).join(','),targetId:target.id,passengers,note:note.trim().slice(0,500)});
   });
 }
+
+return {saveEvent,saveRequest,changeRequest,requestToExpense,saveProgressReport,saveTrip,confirmResourceCount,transferResource,reassignTrip};
+}
+const realStore=createOperationsStore<DocumentReference>({
+  reference:(collection,id)=>doc(db,collection,id),
+  actorUid:()=>auth.currentUser?.uid,
+  transaction:async callback=>{
+    const writes=await runTransaction(db,async tx=>{
+      const writes=new Map<string,{ref:DocumentReference;data:Record<string,any>}>();
+      const remember=(ref:DocumentReference,data:Record<string,any>)=>{
+        if(ref.parent.id!=='auditoria')writes.set(ref.path,{ref,data:{...writes.get(ref.path)?.data,...data}});
+      };
+      await callback({get:ref=>tx.get(ref),set:(ref,data)=>{remember(ref,data);tx.set(ref,data);},update:(ref,data)=>{remember(ref,data);tx.update(ref,data);}});
+      return [...writes.values()];
+    });
+    for(const {ref,data} of writes)await verifySavedRecord(ref,data);
+  }
+});
+export const {saveEvent,saveRequest,changeRequest,requestToExpense,saveProgressReport,saveTrip,confirmResourceCount,transferResource,reassignTrip}=realStore;

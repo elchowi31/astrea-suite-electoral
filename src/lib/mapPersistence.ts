@@ -1,3 +1,4 @@
+import {verifySavedRecord} from './saveVerification';
 import { doc, runTransaction } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { validLocation, type Coordinate, type TerritorialRoute } from './territorialMaps';
@@ -15,6 +16,7 @@ async function updateMapFields(collectionName: 'lideres' | 'vehiculos', id: stri
     transaction.set(doc(db, 'auditoria', auditId), { id: auditId, tenantId, actorId: actor.uid,
       entity: collectionName, entityId: id, action: 'update', createdAt: updatedAt });
   });
+  await verifySavedRecord(reference,fields);
 }
 export async function saveTerritorialLocation(type: 'leader' | 'vehicle', id: string, tenantId: string, location: Coordinate, source: 'GPS' | 'Mapa' | 'Manual' = 'Mapa') {
   if (!validLocation(location)) throw new Error('La ubicación no es válida.');

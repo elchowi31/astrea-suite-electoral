@@ -1,16 +1,16 @@
 import React,{useState} from 'react';
 import {canCoordinate,queueIsFresh,stockAvailable,stockMissing,suggestReallocation,TRANSPORT_RESOURCE,type OperationalEvent,type ResourceRequest} from '../../lib/operations';
-import {confirmResourceCount,reassignTrip,transferResource,saveRequest} from '../../lib/operationsStore';
+import {useOperationsActions} from './useOperationsActions';
 import {useOperations} from './OperationsContext';
 import {Panel,Field,button,secondary,input} from './OperationsUI';
 
 export function RebalancingPanel({event}:{event?:OperationalEvent}){
-  const data=useOperations();const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
+  const data=useOperations();const {confirmResourceCount,reassignTrip,transferResource,saveRequest,editable}=useOperationsActions();const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
   const [count,setCount]=useState<{request:ResourceRequest;waiting:number;consumed:number;surplus:number}|null>(null);
   const [transfer,setTransfer]=useState<{source:ResourceRequest;targetId:string;quantity:number;note:string;operationId:string}|null>(null);
   const [move,setMove]=useState<(ReturnType<typeof suggestReallocation>[number]&{origin:string;destination:string;note:string})|null>(null);
   if(!event)return null;
-  const manager=canCoordinate(data.user),editable=!data.readOnly&&!!data.user;
+  const manager=canCoordinate(data.user);
   const needs=data.requests.filter(r=>r.eventId===event.id&&r.status!=='Rechazada');
   const name=(r:ResourceRequest)=>data.leaders.find(l=>l.id===r.leaderId)?.fullName||data.candidates.find(c=>c.id===r.candidateId)?.fullName||r.description;
   const proposals=suggestReallocation(event,needs,data.trips,data.vehicles);

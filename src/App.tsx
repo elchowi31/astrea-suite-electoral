@@ -149,6 +149,8 @@ export default function App() {
     setFirestoreSyncNotice(msg);
     setTimeout(() => setFirestoreSyncNotice(null), 4000);
   };
+  useEffect(()=>{const verified=(event:Event)=>{const receipt=(event as CustomEvent).detail;notifyFirestoreSave(`Guardado y verificado en Firestore · ${receipt.demo?'datos de prueba':'datos reales'} · ${new Date(receipt.verifiedAt).toLocaleTimeString('es-CO')}`);};window.addEventListener('astrea:save-verified',verified);return()=>window.removeEventListener('astrea:save-verified',verified);},[]);
+
 
   useEffect(() => {
     return observeAuthenticatedProfile((profile) => {
@@ -558,6 +560,43 @@ export default function App() {
     return <LoginView users={users} currentUser={null} tenants={tenants} currentTenant={currentTenant} onLogin={handleLogin} onRegister={handleRegisterUser} onLogout={handleLogout} onContinueToApp={() => setActiveTab('dashboard')} onBackToLanding={() => setActiveTab('dashboard')} />;
   }
 
+  const demoControls = currentUser && (activeTab === 'dashboard' || demoActive) && activeTab !== 'login' && (
+            <details className={`${activeTab==='dashboard'?'manager-data-controls':'rounded-xl border p-3'} ${demoActive ? 'border-amber-400/40 bg-amber-950/30' : 'border-slate-800 bg-slate-900'}`} aria-label="Control de datos de demostración">
+              <summary className={`cursor-pointer text-sm font-semibold ${demoActive ? 'text-amber-200' : 'text-slate-300'}`}>{demoActive ? 'Datos de prueba activos · ver opciones' : 'Datos de prueba'}</summary>
+              <div className={activeTab==='dashboard'?'manager-data-body':'pt-3'}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className={`text-sm font-black ${demoActive ? 'text-amber-200' : 'text-blue-200'}`}>
+                    {demoActive ? 'Datos de prueba · 100% ficticios' : 'Datos de prueba para su perfil y territorio'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {demoActive
+                      ? `${demoBundle!.context!.electoralLevel} · ${demoBundle!.context!.department} · ${demoBundle!.context!.municipality}. Puede editar y guardar las fichas. Los cambios se conservan en su entorno de prueba.`
+                      : `Perfil: ${currentUser.role}. Cargue su demostración personal para explorar la app. Puede volver a los datos reales en cualquier momento.`}
+                  </p>
+                  {!currentUser.department?.trim() && <label className="mt-2 block text-xs text-slate-300">Departamento del entorno de prueba<input list="demo-departments" value={demoDepartment} onChange={event => { setDemoDepartment(event.target.value); if (!currentUser.municipality) setDemoMunicipality(''); }} className="ml-2 rounded-lg bg-slate-900 p-2"/><datalist id="demo-departments">{Object.keys(COLOMBIA_ELECTORAL_GEOGRAPHY).map(name => <option key={name} value={name}/>)}</datalist></label>}
+                  {!currentUser.municipality?.trim() && <label className="mt-2 block text-xs text-slate-300">Municipio del entorno de prueba<input list="demo-municipalities" value={demoMunicipality} onChange={event => setDemoMunicipality(event.target.value)} className="ml-2 rounded-lg bg-slate-900 p-2"/><datalist id="demo-municipalities">{Object.keys(COLOMBIA_ELECTORAL_GEOGRAPHY[currentUser.department || demoDepartment]?.municipios || {}).map(name => <option key={name} value={name}/>)}</datalist></label>}
+                  {demoError && <p className="mt-2 text-xs font-semibold text-rose-300">{demoError}</p>}
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  {(
+                    <button type="button" disabled={demoBusy} onClick={handleCreateDemo} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white transition hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60">
+                      {demoBusy ? 'Cargando…' : demoAvailable ? 'Regenerar mis datos de prueba' : 'Cargar mis datos de prueba'}
+                    </button>
+                  )}
+                  {demoAvailable && <button type="button" disabled={demoBusy} onClick={() => setDemoEnabled(!demoActive)} className="rounded-xl border border-slate-500 px-4 py-2 text-xs font-bold text-slate-200">{demoActive ? 'Usar datos reales' : 'Ver mis datos de prueba'}</button>}
+                  {demoBundle && (
+                    <button type="button" disabled={demoBusy} onClick={handleDeleteDemo} className="rounded-xl border border-rose-500/40 bg-rose-950/30 px-4 py-2 text-xs font-black text-rose-200 transition hover:bg-rose-900/40 disabled:cursor-wait disabled:opacity-60">
+                      {demoBusy ? 'Eliminando…' : 'Eliminar mis datos de prueba'}
+                    </button>
+                  )}
+                </div>
+              </div>
+              {demoActive&&demoBundle&&<DemoDataEditor bundle={demoBundle}/>}
+              </div>
+            </details>
+          );
+
   return (
     <RouteTrackingProvider user={currentUser} tenantId={currentUser.tenantId} monitorTenantId={currentTenant.tenantId}><div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-500 selection:text-white relative isolate overflow-x-hidden">
       <SynapticNeuralBackground interactive={false} />
@@ -607,42 +646,7 @@ export default function App() {
             />
           )}
 
-          {currentUser && (activeTab === 'dashboard' || demoActive) && activeTab !== 'login' && (
-            <details className={`rounded-xl border p-3 ${demoActive ? 'border-amber-400/40 bg-amber-950/30' : 'border-slate-800 bg-slate-900'}`} aria-label="Control de datos de demostración">
-              <summary className={`cursor-pointer text-sm font-semibold ${demoActive ? 'text-amber-200' : 'text-slate-300'}`}>{demoActive ? 'Datos de prueba activos · ver opciones' : 'Datos de prueba'}</summary>
-              <div className="pt-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className={`text-sm font-black ${demoActive ? 'text-amber-200' : 'text-blue-200'}`}>
-                    {demoActive ? 'Datos de prueba · 100% ficticios' : 'Datos de prueba para su perfil y territorio'}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {demoActive
-                      ? `${demoBundle!.context!.electoralLevel} · ${demoBundle!.context!.department} · ${demoBundle!.context!.municipality}. Puede editar y guardar las fichas. Los cambios se conservan en su entorno de prueba.`
-                      : `Perfil: ${currentUser.role}. Cargue su demostración personal para explorar la app. Puede volver a los datos reales en cualquier momento.`}
-                  </p>
-                  {!currentUser.department?.trim() && <label className="mt-2 block text-xs text-slate-300">Departamento del entorno de prueba<input list="demo-departments" value={demoDepartment} onChange={event => { setDemoDepartment(event.target.value); if (!currentUser.municipality) setDemoMunicipality(''); }} className="ml-2 rounded-lg bg-slate-900 p-2"/><datalist id="demo-departments">{Object.keys(COLOMBIA_ELECTORAL_GEOGRAPHY).map(name => <option key={name} value={name}/>)}</datalist></label>}
-                  {!currentUser.municipality?.trim() && <label className="mt-2 block text-xs text-slate-300">Municipio del entorno de prueba<input list="demo-municipalities" value={demoMunicipality} onChange={event => setDemoMunicipality(event.target.value)} className="ml-2 rounded-lg bg-slate-900 p-2"/><datalist id="demo-municipalities">{Object.keys(COLOMBIA_ELECTORAL_GEOGRAPHY[currentUser.department || demoDepartment]?.municipios || {}).map(name => <option key={name} value={name}/>)}</datalist></label>}
-                  {demoError && <p className="mt-2 text-xs font-semibold text-rose-300">{demoError}</p>}
-                </div>
-                <div className="flex shrink-0 flex-wrap gap-2">
-                  {(
-                    <button type="button" disabled={demoBusy} onClick={handleCreateDemo} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white transition hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60">
-                      {demoBusy ? 'Cargando…' : demoAvailable ? 'Regenerar mis datos de prueba' : 'Cargar mis datos de prueba'}
-                    </button>
-                  )}
-                  {demoAvailable && <button type="button" disabled={demoBusy} onClick={() => setDemoEnabled(!demoActive)} className="rounded-xl border border-slate-500 px-4 py-2 text-xs font-bold text-slate-200">{demoActive ? 'Usar datos reales' : 'Ver mis datos de prueba'}</button>}
-                  {demoBundle && (
-                    <button type="button" disabled={demoBusy} onClick={handleDeleteDemo} className="rounded-xl border border-rose-500/40 bg-rose-950/30 px-4 py-2 text-xs font-black text-rose-200 transition hover:bg-rose-900/40 disabled:cursor-wait disabled:opacity-60">
-                      {demoBusy ? 'Eliminando…' : 'Eliminar mis datos de prueba'}
-                    </button>
-                  )}
-                </div>
-              </div>
-              </div>
-              {demoActive&&demoBundle&&<DemoDataEditor bundle={demoBundle}/>}
-            </details>
-          )}
+          {activeTab!=='dashboard' && demoControls}
 
           {/* Real-time Save Toast Notification */}
           {firestoreSyncNotice && (
@@ -680,7 +684,7 @@ export default function App() {
           )}>
           {currentUser && activeTab === 'dashboard' && (
             <div className="space-y-4">
-            <DashboardView onNavigateTab={setActiveTab} />
+            <DashboardView onNavigateTab={setActiveTab} dataControls={demoControls}/>
             <details className="rounded-2xl border border-slate-700 bg-slate-900/80 p-4" onToggle={event=>setShowOperationalDetails(event.currentTarget.open)}><summary className="cursor-pointer text-sm font-semibold text-slate-200">Planillas, control de jornada y detalle administrativo</summary>
             {showOperationalDetails && <div className="mt-4 space-y-4"><OperationsOverview onNavigate={setActiveTab}/><AdministrativeOverview tenantId={currentTenant.tenantId} expenses={visibleExpenses}/></div>}
             </details>

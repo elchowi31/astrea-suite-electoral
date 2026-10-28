@@ -1,3 +1,4 @@
+import {verifySavedRecord} from './saveVerification';
 import { initializeApp, getApps } from 'firebase/app';
 import { connectAuthEmulator, getAuth, indexedDBLocalPersistence, initializeAuth } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
@@ -40,7 +41,7 @@ import { prepareDemoPresentation } from '../data/demoPresentation';
 import { omitUndefined } from './serialization';
 import { localDataEnabled } from './deviceStorage';
 
-const emulatorMode = import.meta.env?.VITE_FIREBASE_EMULATORS === 'true';
+const emulatorMode = import.meta.env?.VITE_FIREBASE_EMULATORS === 'true' || (typeof process!=='undefined' && process.env.ASTREA_FIREBASE_TEST_EMULATORS==='true');
 export const app = getApps().find(item => item.name === '[DEFAULT]') || initializeApp(emulatorMode ? { ...firebaseConfig, projectId: 'demo-astrea' } : firebaseConfig);
 
 // Use firestoreDatabaseId if specified, or default database
@@ -67,7 +68,7 @@ export async function saveCommitteeTask(tenantId: string, coordinationId: string
   if (!actorId) throw new Error('Inicie sesión para guardar la tarea.');
   const reference=doc(db,'comites_coordinaciones',coordinationId);
   const auditId=crypto.randomUUID();
-  await runTransaction(db,async transaction=>{
+  const saved=await runTransaction(db,async transaction=>{
     const snapshot=await transaction.get(reference);
     const coordination=snapshot.data() as CampaignCoordination | undefined;
     if (!coordination || coordination.tenantId!==tenantId || !coordination.committees.some(item=>item.id===committeeId)) throw new Error('No se encontró el comité de esta organización.');
@@ -79,7 +80,9 @@ export async function saveCommitteeTask(tenantId: string, coordinationId: string
     });
     transaction.update(reference,{committees,updatedBy:actorId});
     transaction.set(doc(db,'auditoria',auditId),{id:auditId,tenantId,actorId,entity:'comites_coordinaciones',entityId:coordinationId,action:'update',createdAt:new Date().toISOString()});
+    return {committees};
   });
+  await verifySavedRecord(reference,saved);
 }
 
 export async function authenticatedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
@@ -100,12 +103,13 @@ export async function persistEntity<T extends { tenantId: string }>(collectionNa
   if (entityId.startsWith('demo-') && collectionName !== 'demo') throw new Error('Los registros de demostración son de solo lectura.');
   const now = new Date().toISOString();
   const batch = writeBatch(db);
-  batch.set(doc(db, collectionName, entityId), {
+  const stored = {
     ...omitUndefined(data),
     ...((data as any).createdBy || ['organizaciones','usuarios'].includes(collectionName) ? {} : { createdBy: actor.uid }),
     updatedAt: now,
     updatedBy: actor?.uid || 'unknown'
-  }, { merge: true });
+  };
+  batch.set(doc(db, collectionName, entityId), stored, {merge:true});
   if (actor) {
     const auditId = crypto.randomUUID();
     batch.set(doc(db, 'auditoria', auditId), {
@@ -120,6 +124,7 @@ export async function persistEntity<T extends { tenantId: string }>(collectionNa
     });
   }
   await batch.commit();
+  await verifySavedRecord(doc(db,collectionName,entityId),stored);
 }
 
 export async function removeEntity(collectionName: string, entityId: string, tenantId?: string): Promise<void> {
@@ -512,6 +517,7 @@ export async function createDemoCollection(tenantId: string, profile: UserProfil
   if (auth.currentUser?.uid !== profile.uid) throw new Error('Mantenga su sesión activa para cargar los datos de prueba.');
   const bundle = buildDemoBundle(tenantId, profile);
   await setDoc(doc(db, 'demo', bundle.id), omitUndefined(bundle));
+  await verifySavedRecord(doc(db,'demo',bundle.id),omitUndefined(bundle) as unknown as Record<string,unknown>);
   return bundle;
 }
 
