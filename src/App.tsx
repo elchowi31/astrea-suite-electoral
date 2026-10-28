@@ -120,6 +120,7 @@ export default function App() {
   const [driveFiles, setDriveFiles] = useState<DriveFileItem[]>([]);
 
   // Campaign operational & finance state
+  const [showOperationalDetails, setShowOperationalDetails] = useState(false);
   const [expenses, setExpenses] = useState<CampaignExpense[]>([]);
   const [donorContributions, setDonorContributions] = useState<DonorContribution[]>([]);
   const [leaders, setLeaders] = useState<Leader[]>([]);
@@ -525,7 +526,7 @@ export default function App() {
         <div className="min-h-screen bg-[#030712] text-slate-100 relative isolate overflow-x-hidden">
           <SynapticNeuralBackground interactive />
           <header className="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 px-4 py-3 backdrop-blur">
-            <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mx-auto flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-300">Presentación interactiva</p>
                 <h1 className="text-lg font-black text-white">Astrea Suite Electoral</h1>
@@ -541,28 +542,10 @@ export default function App() {
               </div>
             </div>
           </header>
-          <main className="mx-auto max-w-7xl p-3 sm:p-6 lg:p-8">
+          <main className="mx-auto w-full p-3 sm:p-5 lg:p-6">
             <OperationsProvider tenant={PUBLIC_DEMO_TENANT} user={PUBLIC_DEMO_USER} leaders={PUBLIC_DEMO_DATA.leaders} candidates={PUBLIC_DEMO_DATA.candidates} voters={PUBLIC_DEMO_DATA.voters} expenses={PUBLIC_DEMO_DATA.expenses} vehicles={PUBLIC_DEMO_DATA.vehicles} contributions={PUBLIC_DEMO_DATA.contributions} readOnly demo={PUBLIC_DEMO_DATA.operations}>
             <Suspense fallback={<div className="p-10 text-center text-sm text-slate-400">Cargando presentación…</div>}>
-              <OperationsOverview onNavigate={()=>{setShowPublicDemo(false);setActiveTab('login');}}/>
-              <details className="mt-4"><summary className="cursor-pointer p-3">Ver indicadores administrativos y territoriales</summary>
-              <AdministrativeOverview tenantId={PUBLIC_DEMO_TENANT.tenantId} expenses={PUBLIC_DEMO_DATA.expenses} />
-              <DashboardView
-                currentTenant={PUBLIC_DEMO_TENANT}
-                currentUser={PUBLIC_DEMO_USER}
-                userRole="Consulta"
-                candidates={PUBLIC_DEMO_DATA.candidates}
-                districts={PUBLIC_DEMO_DATA.districts}
-                proposals={PUBLIC_DEMO_DATA.proposals}
-                driveFiles={PUBLIC_DEMO_DATA.driveFiles}
-                expenses={PUBLIC_DEMO_DATA.expenses}
-                contributions={PUBLIC_DEMO_DATA.contributions}
-                leaders={PUBLIC_DEMO_DATA.leaders}
-                vehicles={PUBLIC_DEMO_DATA.vehicles}
-                voters={PUBLIC_DEMO_DATA.voters}
-                onNavigateTab={() => {}}
-              />
-              </details>
+              <DashboardView onNavigateTab={() => { setShowPublicDemo(false); setActiveTab('login'); }} />
             </Suspense>
             </OperationsProvider>
           </main>
@@ -592,7 +575,7 @@ export default function App() {
       />
 
       {/* Main Body Layout */}
-      <div className="flex-1 flex flex-col md:flex-row">
+      <div className="min-w-0 flex-1 flex flex-col md:flex-row">
 
         {/* Sidebar */}
         <Sidebar
@@ -609,14 +592,14 @@ export default function App() {
         />
 
         {/* Content Area */}
-        <main className="flex-1 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+        <main className="app-content min-w-0 flex-1 p-3 sm:p-5 lg:p-6 w-full space-y-5">
           <OperationsProvider key={`${currentTenant.tenantId}-${demoActive?'demo':'real'}`} tenant={currentTenant} user={demoViewUser} leaders={visibleLeaders} candidates={visibleCandidates} voters={visibleVoters} expenses={visibleExpenses} vehicles={visibleVehicles} contributions={visibleContributions} readOnly={demoActive} demo={demoBundle?.operations}>
           <DemoEditing.Provider value={demoActive&&demoBundle?{bundle:demoBundle,realReferences:{candidatos:candidates.map(c=>({id:c.id,name:c.fullName})),lideres:leaders.map(l=>({id:l.id,name:l.fullName})),aportes:donorContributions.map(c=>({id:c.id,name:c.donorName})),vehiculos:vehicles.map(v=>({id:v.id,name:v.licensePlate}))},onPromoted:()=>{setDemoEnabled(false);notifyFirestoreSave('Ficha guardada en datos reales.');}}:null}>
           <OperationsEditingReferences>
           {activeTab === 'device' && isTrackingAdministrator(currentUser) && <><DevicePersistencePanel /><div className="flex flex-wrap gap-3"><EditRecordButton collection="usuarios" record={currentUser} label="Editar mi perfil" />{['AdminTenant','AdminGlobal'].includes(currentUser.role)&&<EditRecordButton collection="organizaciones" record={currentTenant} label="Editar organización" />}</div></>}
 
           {/* Personalized User Recognition & Salutation Banner */}
-          {currentUser && activeTab !== 'login' && activeTab !== 'routes' && (
+          {currentUser && activeTab !== 'login' && activeTab !== 'routes' && activeTab !== 'dashboard' && (
             <UserGreetingBanner
               currentUser={currentUser}
               currentTenant={currentTenant}
@@ -697,24 +680,9 @@ export default function App() {
           )}>
           {currentUser && activeTab === 'dashboard' && (
             <div className="space-y-4">
-            <OperationsOverview onNavigate={setActiveTab}/>
-            <details className="rounded-2xl border border-slate-700 p-4"><summary className="cursor-pointer text-sm font-semibold text-slate-200">Indicadores administrativos, territoriales y documentales</summary>
-            <AdministrativeOverview tenantId={currentTenant.tenantId} expenses={visibleExpenses} />
-            <DashboardView
-              currentTenant={currentTenant}
-              currentUser={demoViewUser}
-              userRole={userRole}
-              candidates={visibleCandidates}
-              districts={visibleDistricts}
-              proposals={visibleProposals}
-              driveFiles={visibleDriveFiles}
-              expenses={visibleExpenses}
-              contributions={visibleContributions}
-              leaders={visibleLeaders}
-              vehicles={visibleVehicles}
-              voters={visibleVoters}
-              onNavigateTab={setActiveTab}
-            />
+            <DashboardView onNavigateTab={setActiveTab} />
+            <details className="rounded-2xl border border-slate-700 bg-slate-900/80 p-4" onToggle={event=>setShowOperationalDetails(event.currentTarget.open)}><summary className="cursor-pointer text-sm font-semibold text-slate-200">Planillas, control de jornada y detalle administrativo</summary>
+            {showOperationalDetails && <div className="mt-4 space-y-4"><OperationsOverview onNavigate={setActiveTab}/><AdministrativeOverview tenantId={currentTenant.tenantId} expenses={visibleExpenses}/></div>}
             </details>
             </div>
           )}

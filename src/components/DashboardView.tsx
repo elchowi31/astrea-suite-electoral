@@ -1,112 +1,84 @@
-import React, { useMemo } from 'react';
-import { AlertTriangle, ArrowRight, BadgeCheck, BarChart3, CircleDollarSign, ClipboardCheck, Database, Gauge, MapPinned, ShieldCheck, Sparkles, Target, Truck, Users } from 'lucide-react';
-import { CampaignExpense, Candidate, District, DonorContribution, DriveFileItem, GrassrootsVoter, Leader, Proposal, Tenant, TransportVehicle, UserProfile, UserRole } from '../types';
-import { calculateExecutiveAnalytics } from '../lib/analytics';
-import { getTerritorialScope } from '../lib/permissions';
-import { AuthorHeader } from './common/AuthorHeader';
+import React, { useMemo, useState } from 'react';
+import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { ArrowUpRight, BarChart3, CheckCheck, ChevronDown, CircleHelp, ClipboardList, FileText, FilterX, Printer, ShieldCheck, Truck, Users } from 'lucide-react';
+import { useOperations } from './operations/OperationsContext';
+import { buildManagerDashboard, dashboardMunicipalities, filterDashboard, FINANCIAL_COLORS, PRINT_CATEGORY, scopeDashboard } from '../lib/managerDashboard';
+import type { ActiveTab } from './Sidebar';
 
-interface DashboardViewProps {
-  currentTenant: Tenant;
-  currentUser?: UserProfile | null;
-  userRole?: UserRole;
-  candidates: Candidate[];
-  districts: District[];
-  proposals: Proposal[];
-  driveFiles: DriveFileItem[];
-  expenses?: CampaignExpense[];
-  contributions?: DonorContribution[];
-  leaders?: Leader[];
-  vehicles?: TransportVehicle[];
-  voters?: GrassrootsVoter[];
-  onNavigateTab: (tab: any) => void;
+const number = (n: number) => new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(n);
+const money = (n: number | null, compact = false) => n === null ? 'Sin base' : new Intl.NumberFormat('es-CO', { style:'currency', currency:'COP', notation:compact?'compact':'standard', maximumFractionDigits:compact?1:0 }).format(n);
+const rate = (n: number | null) => n === null ? 'Sin base' : `${n.toLocaleString('es-CO',{maximumFractionDigits:1})}%`;
+const tooltipStyle = { backgroundColor:'#0f172a',border:'1px solid #475569',borderRadius:10,color:'#f1f5f9',fontSize:12 };
+const axis = {fontSize:11, fill:'#94a3b8'};
+
+type Row = {name:string;value:number;color?:string;target?:number};
+function Empty({children='Sin registros para este filtro.'}:{children?:React.ReactNode}) {return <div className="manager-empty"><BarChart3 size={22}/><p>{children}</p></div>;}
+function MiniChart({values,color,label,bars=false,hasData=true}:{values:(number|null)[];color:string;label:string;bars?:boolean;hasData?:boolean}) {
+  const finite = values.filter((n):n is number=>n!==null&&Number.isFinite(n));
+  if(!hasData||!finite.length)return <div className="manager-mini-empty">Sin registros en esta ventana</div>;
+  const max=Math.max(1,...finite),width=240,height=42,space=width/Math.max(1,values.length);
+  const points=values.map((v,i)=>v===null?null:[(i+.5)*space,height-3-v/max*(height-7)]);
+  const segments:number[][][]=[];points.forEach(p=>{if(!p){segments.push([]);}else{if(!segments.length)segments.push([]);segments[segments.length-1].push(p);}});
+  return <svg className="manager-mini" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={label}><title>{label}</title>
+    <path d={`M0 ${height-2}H${width}`} stroke="#334155" strokeWidth="1"/>
+    {bars?points.map((p,i)=>p&&<rect key={i} x={i*space+space*.18} y={p[1]} width={space*.64} height={Math.max(1,height-3-p[1])} fill={color} rx="2"/>):segments.filter(s=>s.length).map((segment,i)=><g key={i}><path d={`M${segment[0][0]} ${height} L${segment.map(p=>p.join(' ')).join(' L')} L${segment[segment.length-1][0]} ${height}Z`} fill={color} opacity=".09"/><polyline points={segment.map(p=>p.join(',')).join(' ')} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke"/>{segment.length===1&&<circle cx={segment[0][0]} cy={segment[0][1]} r="2" fill={color}/>}</g>)}
+  </svg>;
 }
-
-const formatCOP = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
-const formatNumber = (value: number) => new Intl.NumberFormat('es-CO').format(Math.round(value));
-
-export const DashboardView: React.FC<DashboardViewProps> = ({
-  currentTenant,
-  currentUser = null,
-  userRole = 'Consulta',
-  candidates,
-  districts,
-  proposals,
-  driveFiles,
-  expenses = [],
-  contributions = [],
-  leaders = [],
-  vehicles = [],
-  voters = [],
-  onNavigateTab,
-}) => {
-  const scope = getTerritorialScope(currentUser, userRole);
-  const analytics = useMemo(() => calculateExecutiveAnalytics({ tenant: currentTenant, candidates, leaders, vehicles, expenses, contributions, voters, proposals }), [currentTenant, candidates, leaders, vehicles, expenses, contributions, voters, proposals]);
-  const healthTone = analytics.healthScore >= 80 ? 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10' : analytics.healthScore >= 60 ? 'text-amber-300 border-amber-500/30 bg-amber-500/10' : 'text-rose-300 border-rose-500/30 bg-rose-500/10';
-  const kpis = [
-    { label: 'Cobertura de meta', value: `${analytics.coveragePct.toFixed(1)}%`, detail: `${formatNumber(analytics.projectedSupport)} validados · faltan ${formatNumber(analytics.remainingVotes)}`, icon: Target, tone: 'text-cyan-300 bg-cyan-500/10 border-cyan-500/20', progress: analytics.coveragePct, destination: 'zone_projections' },
-    { label: 'Equipo activo', value: `${analytics.activeLeaders} líderes`, detail: `${analytics.leadersAtRisk} en seguimiento · productividad ${analytics.leaderProductivity}%`, icon: Users, tone: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20', progress: analytics.leaderProductivity, destination: 'leaders' },
-    { label: 'Capacidad logística', value: `${analytics.transportCoveragePct.toFixed(0)}%`, detail: `${formatNumber(analytics.transportCapacity)} cupos · ${formatNumber(analytics.transportDemand)} solicitudes`, icon: Truck, tone: 'text-amber-300 bg-amber-500/10 border-amber-500/20', progress: analytics.transportCoveragePct, destination: 'transport' },
-    { label: 'Saldo operativo', value: formatCOP(analytics.availableBalance), detail: `${formatCOP(analytics.totalSpent)} registrados · soportes ${analytics.documentedExpensePct.toFixed(0)}%`, icon: CircleDollarSign, tone: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20', progress: analytics.documentedExpensePct, destination: 'finances' },
+function Bars({rows,format=number,targets=false}:{rows:Row[];format?:(n:number)=>string;targets?:boolean}){
+  const max=Math.max(1,...rows.flatMap(r=>[r.value,r.target||0]));
+  if(!rows.length)return <Empty/>;
+  return <div className="manager-bars">{rows.map((r,i)=><div className="manager-bar-row" key={`${r.name}-${i}`}>
+    <span className="manager-bar-name" title={r.name}>{r.name}</span><div className="manager-bar-track" aria-hidden="true"><span style={{width:`${Math.min(100,r.value/max*100)}%`,background:r.color||'#22d3ee'}}/>{targets&&!!r.target&&<i style={{left:`${Math.min(99,r.target/max*100)}%`}}/>}</div><span className="manager-bar-number">{format(r.value)}{targets&&<small>{r.target?`Meta ${number(r.target)}`:'Sin meta'}</small>}</span>
+  </div>)}</div>;
+}
+function Panel({title,subtitle,children,action,className=''}:{title:string;subtitle:string;children:React.ReactNode;action?:React.ReactNode;className?:string;key?:React.Key}){
+  return <section className={`manager-panel ${className}`} aria-label={title}><div className="manager-panel-head"><div><h2>{title}</h2><p>{subtitle}</p></div>{action}</div>{children}</section>;
+}
+export function DashboardView({onNavigateTab}:{onNavigateTab:(tab:ActiveTab)=>void}){
+  const data=useOperations();
+  const [municipality,setMunicipality]=useState(''),[leaderId,setLeaderId]=useState(''),[days,setDays]=useState(28),[territoryPage,setTerritoryPage]=useState(0),[teamPage,setTeamPage]=useState(0);
+  const scoped=useMemo(()=>scopeDashboard(data),[data]);
+  const municipalities=dashboardMunicipalities(scoped);
+  const selectedMunicipality=municipalities.includes(municipality)?municipality:'';
+  const eligibleLeaders=scoped.leaders.filter(l=>!selectedMunicipality||l.municipality===selectedMunicipality);
+  const selectedLeader=eligibleLeaders.some(l=>l.id===leaderId)?leaderId:'';
+  const filtered=useMemo(()=>filterDashboard(scoped,selectedMunicipality,selectedLeader),[scoped,selectedMunicipality,selectedLeader]);
+  const model=useMemo(()=>buildManagerDashboard(filtered,days),[filtered,days]);
+  const hasSeries=model.historyRecords>0, hasExpenses=model.daily.some(d=>d.spent>0), printSeries=model.daily.some(d=>d.printCost>0);
+  const open=(tab:ActiveTab,label='Ver módulo')=><button type="button" className="manager-link" onClick={()=>onNavigateTab(tab)} aria-label={`${label}: ${tab}`}>{label}<ArrowUpRight size={14}/></button>;
+  const operationalUnavailable=data.loading||!!data.error;
+  const cards=[
+    {title:'Confirmados',value:number(model.confirmed),detail:`Fichas verificadas · meta ${model.target?number(model.target):'sin definir'}`,icon:CheckCheck,color:'#22d3ee',values:model.daily.map(d=>d.confirmed),caption:'Verificados por fecha de alta',hasData:hasSeries,tab:'hierarchy_pyramid'},
+    {title:'Conversión',value:rate(model.conversion),detail:`Verificados / ${number(model.registered)} registros únicos`,icon:BarChart3,color:'#34d399',values:model.daily.map(d=>d.conversion),caption:'Validación actual de cada cohorte',hasData:hasSeries,tab:'hierarchy_pyramid'},
+    {title:'Por verificar',value:number(model.pending),detail:'Fichas pendientes de validación',icon:Users,color:'#a78bfa',values:model.daily.map(d=>d.pending),caption:'Pendientes por fecha de alta',hasData:hasSeries,bars:true,tab:'hierarchy_pyramid'},
+    {title:'Transporte',value:operationalUnavailable?'—':rate(model.coverage),detail:operationalUnavailable?'Esperando datos de operación':model.demand?`${number(model.shortage)} cupos de ida pendientes`:'Sin solicitudes de ida',icon:Truck,color:'#10b981',values:model.transportRows.map(r=>r.value),caption:'Solicitados: pendientes / aprobados / entregados',hasData:!operationalUnavailable&&model.demand>0,bars:true,tab:'transport'},
+    {title:'Costo / confirmado',value:money(model.unitCost,true),detail:'Gastos registrados / fichas verificadas',icon:FileText,color:'#60a5fa',values:model.daily.map(d=>d.unitCost),caption:'Gasto diario / altas hoy verificadas',hasData:hasSeries&&hasExpenses,tab:'finances'},
+    {title:'Litografía',value:money(model.printCost,true),detail:'Material impreso y camisetas',icon:Printer,color:FINANCIAL_COLORS[PRINT_CATEGORY],values:model.daily.map(d=>d.printCost),caption:'Gasto del rubro por fecha',hasData:printSeries,bars:true,tab:'finances'},
   ];
-  const severityClass = { critical: 'border-rose-500/30 bg-rose-500/[0.07]', warning: 'border-amber-500/30 bg-amber-500/[0.07]', opportunity: 'border-cyan-500/30 bg-cyan-500/[0.07]', healthy: 'border-emerald-500/30 bg-emerald-500/[0.07]' } as const;
-
-  return (
-    <div className="space-y-5 pb-20 md:pb-0">
-      <AuthorHeader title="Centro de control" subtitle="Una vista gerencial basada únicamente en los registros de la organización activa" />
-
-      <section className="grid grid-cols-1 xl:grid-cols-[1.35fr_.65fr] gap-4">
-        <div className="relative overflow-hidden rounded-3xl border border-cyan-500/20 bg-gradient-to-br from-slate-900 via-slate-900 to-cyan-950/40 p-5 sm:p-6 shadow-2xl">
-          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
-          <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="max-w-2xl">
-              <div className="mb-3 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em]">
-                <span className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-2.5 py-1 text-cyan-200">{currentTenant.name}</span>
-                <span className="rounded-full border border-slate-700 bg-slate-950/70 px-2.5 py-1 text-slate-300">{scope.scopeLevel}</span>
-                <span className="rounded-full border border-slate-700 bg-slate-950/70 px-2.5 py-1 text-slate-300">Confianza {analytics.confidence}</span>
-              </div>
-              <h2 className="text-2xl font-black tracking-tight text-white sm:text-3xl">{analytics.insights.some((item) => item.severity === 'critical') ? 'Hay decisiones que requieren atención hoy.' : 'La operación está bajo control.'}</h2>
-              <p className="mt-2 text-sm leading-relaxed text-slate-300">La lectura combina avance territorial, productividad del equipo, capacidad logística, soportes financieros y calidad de los datos. Cada alerta muestra la evidencia que la origina.</p>
-            </div>
-            <div className={`flex min-w-40 items-center gap-4 self-stretch rounded-2xl border p-4 ${healthTone}`}>
-              <div className="relative grid h-20 w-20 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(currentColor ${analytics.healthScore * 3.6}deg, rgba(100,116,139,.2) 0deg)` }}>
-                <div className="grid h-16 w-16 place-items-center rounded-full bg-slate-950"><span className="text-2xl font-black text-white">{analytics.healthScore}</span></div>
-              </div>
-              <div><p className="text-[10px] font-black uppercase tracking-wider opacity-80">Salud operativa</p><p className="mt-1 text-xs text-slate-300">Índice explicable de 0 a 100</p></div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-xl">
-          <div className="flex items-center gap-3"><div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-2.5 text-emerald-300"><ShieldCheck className="h-5 w-5" /></div><div><p className="text-xs font-black uppercase tracking-wider text-slate-400">Calidad y gobierno</p><p className="text-lg font-black text-white">{analytics.dataQualityPct}% completo</p></div></div>
-          <div className="mt-5 space-y-3 text-xs"><MetricLine label="Soportes de gastos" value={analytics.documentedExpensePct} /><MetricLine label="Propuestas aprobadas" value={analytics.proposalProgressPct} /><MetricLine label="Cobertura logística" value={analytics.transportCoveragePct} /></div>
-          <button onClick={() => onNavigateTab('costs_report')} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2.5 text-xs font-bold text-slate-200 transition hover:border-cyan-500/40 hover:text-white">Ver control administrativo <ArrowRight className="h-3.5 w-3.5" /></button>
-        </div>
-      </section>
-
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis.map((kpi) => { const Icon = kpi.icon; return (
-          <button key={kpi.label} onClick={() => onNavigateTab(kpi.destination)} className="group rounded-2xl border border-slate-800 bg-slate-900 p-4 text-left shadow-lg transition hover:-translate-y-0.5 hover:border-slate-700">
-            <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{kpi.label}</p><p className="mt-1 text-xl font-black text-white">{kpi.value}</p></div><div className={`rounded-xl border p-2.5 ${kpi.tone}`}><Icon className="h-5 w-5" /></div></div>
-            <p className="mt-2 min-h-8 text-[11px] leading-relaxed text-slate-400">{kpi.detail}</p><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-500" style={{ width: `${Math.min(100, Math.max(0, kpi.progress))}%` }} /></div>
-          </button>
-        ); })}
-      </section>
-
-      <section className="rounded-3xl border border-slate-800 bg-slate-900 p-5 shadow-xl">
-        <div className="flex flex-col gap-2 border-b border-slate-800 pb-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><div className="rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 p-2.5 text-white"><Sparkles className="h-5 w-5" /></div><div><h3 className="font-black text-white">Prioridades sugeridas por los datos</h3><p className="text-xs text-slate-400">Reglas estadísticas transparentes; no sustituyen la decisión del equipo.</p></div></div><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Actualización en tiempo real</span></div>
-        <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {analytics.insights.map((insight) => (
-            <article key={insight.id} className={`rounded-2xl border p-4 ${severityClass[insight.severity]}`}><div className="flex items-start gap-3"><AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${insight.severity === 'critical' ? 'text-rose-400' : insight.severity === 'healthy' ? 'text-emerald-400' : 'text-amber-400'}`} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="text-[9px] font-black uppercase tracking-wider text-slate-400">{insight.area}</span><h4 className="text-sm font-bold text-white">{insight.title}</h4></div><p className="mt-1 text-xs leading-relaxed text-slate-300">{insight.evidence}</p><p className="mt-2 text-xs leading-relaxed text-cyan-200"><strong>Siguiente paso:</strong> {insight.recommendation}</p><button onClick={() => onNavigateTab(insight.destination)} className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-bold text-white hover:text-cyan-200">Abrir módulo <ArrowRight className="h-3 w-3" /></button></div></div></article>
-          ))}
-        </div>
-      </section>
-
-
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-3"><QuickModule icon={Gauge} title="Operación territorial" detail={`${leaders.length} líderes · ${voters.length} registros de base`} onClick={() => onNavigateTab('campaign_structure')} /><QuickModule icon={ClipboardCheck} title="Administración" detail={`${expenses.length} gastos · ${contributions.length} aportes`} onClick={() => onNavigateTab('finances')} /><QuickModule icon={Database} title="Conectividad" detail={`${driveFiles.length} archivos · ${districts.length} territorios`} onClick={() => onNavigateTab('workspace')} /></section>
-      <div className="flex flex-col gap-2 rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-[11px] text-slate-500 sm:flex-row sm:items-center sm:justify-between"><span className="flex items-center gap-2"><BadgeCheck className="h-4 w-4 text-emerald-400" /> Aislamiento activo: {scope.scopeTitle}</span><span>La confianza aumenta con volumen, completitud, soportes y verificación.</span></div>
+  const pageCount=Math.max(1,Math.ceil(model.territoryRows.length/6)),page=Math.min(territoryPage,pageCount-1);
+  const teamCount=Math.max(1,Math.ceil(model.leaderRows.length/6)),team=Math.min(teamPage,teamCount-1);
+  const pages=(current:number,count:number,set:(n:number)=>void)=><div className="manager-pages"><button type="button" disabled={current===0} onClick={()=>set(current-1)}>Anterior</button><span>{current+1} / {count}</span><button type="button" disabled={current+1>=count} onClick={()=>set(current+1)}>Siguiente</button></div>;
+  return <div className="manager-dashboard" aria-label="Matriz gerencial">
+    <header className="manager-heading"><div><p className="manager-eyebrow"><BarChart3 size={16}/>CENTRO DE DIRECCIÓN ELECTORAL</p><h1>Matriz gerencial</h1><p className="manager-subtitle">{data.tenant.name} · información del ámbito autorizado</p></div><div className="manager-heading-actions"><span className={`manager-mode ${data.readOnly?'is-demo':''}`}>{data.readOnly?'Datos de prueba · ficticios':'Datos de la organización'}</span>{open('resources','Solicitudes')}{open('hierarchy_pyramid','Ver registros')}</div></header>
+    <div className="manager-filters"><label>Municipio<select value={selectedMunicipality} onChange={e=>{setMunicipality(e.target.value);setLeaderId('');setTerritoryPage(0);setTeamPage(0);}}><option value="">Todos los disponibles</option>{municipalities.map(m=><option key={m}>{m}</option>)}</select></label><label>Responsable<select value={selectedLeader} onChange={e=>{setLeaderId(e.target.value);setTerritoryPage(0);setTeamPage(0);}}><option value="">Todos los líderes</option>{eligibleLeaders.map(l=><option key={l.id} value={l.id}>{l.fullName}</option>)}</select></label><label>Ventana de minigráficos<select value={days} onChange={e=>setDays(Number(e.target.value))}><option value={28}>Últimos 28 días</option><option value={56}>Últimas 8 semanas</option></select></label>{(municipality||leaderId)&&<button type="button" className="manager-link" onClick={()=>{setMunicipality('');setLeaderId('');setTerritoryPage(0);setTeamPage(0);}}><FilterX size={14}/>Limpiar</button>}<details className="manager-definitions"><summary><CircleHelp size={15}/>Cómo leer el tablero</summary><p>Los KPI muestran el acumulado del filtro territorial. La ventana temporal solo cambia los minigráficos y la tendencia. «Confirmados» son fichas verificadas, no votos emitidos. La conversión es verificados / registros únicos; «Por verificar» no significa indecisión política. Las series reflejan el estado actual de las fichas agrupadas por fecha de alta, no la fecha histórica de su verificación.</p><p>Transporte: cupos reservados / solicitados de ida, por jornada; una persona puede tener varias solicitudes. Se excluyen regresos, rechazos y jornadas canceladas. El minigráfico de transporte muestra estados actuales. Litografía conserva el rubro «Material Impreso y Camisetas». Las metas corresponden a líderes; las metas de candidaturas no se suman.</p><p>{model.duplicates} fichas duplicadas excluidas · {model.undatedRecords} fichas sin fecha válida para la serie. Los registros financieros no se editan desde los gráficos: use el módulo correspondiente.</p></details></div>
+    {data.loading&&<p role="status" className="manager-notice">Cargando solicitudes, jornadas y viajes…</p>}{data.error&&<p role="alert" className="manager-error">{data.error} Los indicadores operativos no están disponibles hasta completar la carga.</p>}
+    <section className="manager-kpis" aria-label="Indicadores principales">{cards.map(({icon:Icon,...c})=><button type="button" className="manager-kpi" key={c.title} onClick={()=>onNavigateTab(c.tab as ActiveTab)} title={`${c.title}: ${c.detail}. Abrir módulo.`}><div className="manager-kpi-title"><h2>{c.title}</h2><Icon size={17} style={{color:c.color}}/></div><strong className="manager-kpi-value">{c.value}</strong><p>{c.detail}</p><MiniChart values={c.values} color={c.color} label={c.caption} bars={c.bars} hasData={c.hasData}/><small>{c.caption}</small></button>)}</section>
+    <div className="manager-primary">
+      <Panel title="Meta electoral por territorio" subtitle="Fichas verificadas frente a metas de líderes." className="manager-territory" action={open('leaders')}><Bars rows={model.territoryRows.slice(page*6,page*6+6)} targets/>{pageCount>1&&pages(page,pageCount,setTerritoryPage)}<p className="manager-footnote">Las marcas indican metas; «Sin meta» no equivale a cero avance.</p></Panel>
+      <Panel title="Embudo electoral" subtitle="Registros y condiciones documentadas; cada nivel es un subconjunto."><div className="manager-funnel" role="img" aria-label={model.funnel.map(r=>`${r.name}: ${r.value}`).join('. ')}>{model.funnel.map((r,i)=><div key={r.name} className="manager-funnel-row" style={{width:`${100-i*9}%`,background:r.color}}><span>{r.name}</span><strong>{number(r.value)}</strong></div>)}</div><p className="manager-footnote">Último nivel: verificados con consentimiento que no requieren transporte. No certifica asistencia.</p></Panel>
+      <Panel title="Cobertura de transporte" subtitle="Reservas sobre solicitudes de ida por jornada." action={open('transport')}>{operationalUnavailable?<Empty>Datos operativos no disponibles.</Empty>:<><div className="manager-gauge" role="img" aria-label={`Cobertura ${rate(model.coverage)}; ${model.reserved} reservados de ${model.demand} solicitados`} style={{background:`conic-gradient(#10b981 ${Math.min(100,model.coverage||0)}%, #1e293b 0)`}}><div><strong>{rate(model.coverage)}</strong><span>COBERTURA</span></div></div><div className="manager-gauge-values"><span><b>{number(model.reserved)}</b>reservados</span><span><b>{number(model.demand)}</b>solicitados</span><span><b className="manager-amber">{number(model.shortage)}</b>pendientes</span></div></>}</Panel>
     </div>
-  );
-};
-
-const MetricLine = ({ label, value }: { label: string; value: number }) => <div><div className="mb-1 flex items-center justify-between"><span className="text-slate-400">{label}</span><strong className="text-white">{value.toFixed(0)}%</strong></div><div className="h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.min(100, Math.max(0, value))}%` }} /></div></div>;
-const QuickModule = ({ icon: Icon, title, detail, onClick }: { icon: any; title: string; detail: string; onClick: () => void }) => <button onClick={onClick} className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 text-left transition hover:border-cyan-500/30 hover:bg-slate-800/80"><div className="rounded-xl bg-slate-800 p-2.5 text-cyan-300"><Icon className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h3 className="text-sm font-bold text-white">{title}</h3><p className="truncate text-[11px] text-slate-400">{detail}</p></div><ArrowRight className="h-4 w-4 text-slate-500" /></button>;
+    <div className="manager-secondary">
+      <Panel title="Tendencia de confirmación" subtitle="Altas por fecha; verificación actual de cada cohorte.">{hasSeries?<div className="manager-chart" role="img" aria-label={`Altas y fichas verificadas por fecha en ${days} días`}><ResponsiveContainer width="100%" height="100%"><AreaChart data={model.daily} margin={{top:12,right:12,left:-12,bottom:0}}><CartesianGrid vertical={false} stroke="#253147" strokeDasharray="3 4"/><XAxis dataKey="date" tick={axis} minTickGap={38} tickFormatter={v=>v.slice(5)}/><YAxis tick={axis} allowDecimals={false}/><Tooltip contentStyle={tooltipStyle} formatter={(v,name)=>[number(Number(v)),name]}/><Area name="Registrados" dataKey="registered" stroke="#64748b" fill="#64748b" fillOpacity={.04} strokeWidth={1} isAnimationActive={false}/><Area name="Hoy verificados" dataKey="confirmed" stroke="#22d3ee" fill="#22d3ee" fillOpacity={.12} strokeWidth={2} isAnimationActive={false}/></AreaChart></ResponsiveContainer></div>:<Empty>No hay altas en los últimos {days} días. Los KPI conservan el acumulado.</Empty>}<div className="manager-legend"><span><i style={{background:'#64748b'}}/>Registrados</span><span><i style={{background:'#22d3ee'}}/>Hoy verificados</span></div></Panel>
+      <Panel title="Composición de costos" subtitle="Rubros y colores del módulo financiero original." action={open('finances')}>{model.spent>0?<div className="manager-costs"><div className="manager-donut" role="img" aria-label={`Gastos registrados ${money(model.spent)}`}><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={model.categories} dataKey="value" nameKey="name" innerRadius="70%" outerRadius="92%" stroke="none" isAnimationActive={false}>{model.categories.map(r=><Cell key={r.name} fill={r.color}/>)}</Pie><Tooltip formatter={v=>money(Number(v))} contentStyle={tooltipStyle}/></PieChart></ResponsiveContainer><div className="manager-donut-label"><strong>{money(model.spent,true)}</strong><small>REGISTRADO</small></div></div><ul className="manager-cost-list">{model.categories.map(r=><li key={r.name}><i style={{background:r.color}}/><span>{r.name}</span><b title={money(r.value)}>{money(r.value,true)}</b></li>)}</ul></div>:<Empty>No hay gastos registrados para este filtro.</Empty>}</Panel>
+    </div>
+    <details className="manager-section" open><summary><span><strong>Operación y recursos</strong><small>Presupuesto, impresos, jornadas y responsables</small></span><span className="manager-section-hint">5 gráficos <ChevronDown size={16}/></span></summary><div className="manager-detail-grid">
+      <Panel title="Presupuesto y ejecución" subtitle="Asignado a líderes frente a gastos atribuidos a esos líderes." action={open('finances')}><Bars rows={[{name:'Asignado a líderes',value:model.budget,color:'#64748b'},{name:'Gasto directo registrado',value:model.directSpent,color:'#22d3ee'}]} format={n=>money(n,true)}/><p className="manager-footnote">{model.budget?'No incluye gastos compartidos sin responsable.':'Sin presupuesto asignado. No se calcula cumplimiento.'}</p></Panel>
+      <Panel title="Litografía y material impreso" subtitle="Importes del rubro original según estado de pago." action={open('finances')} >{model.printCost?<Bars rows={model.printRows} format={n=>money(n,true)}/>:<Empty>Sin gastos de material impreso y camisetas.</Empty>}<p className="manager-footnote">No se estiman cantidades de piezas a partir del gasto.</p></Panel>
+      <Panel title="Jornadas operativas" subtitle="Actividades registradas por estado." action={open('resources')}>{operationalUnavailable?<Empty>Datos operativos no disponibles.</Empty>:filtered.events.length?<Bars rows={model.eventRows}/>:<Empty>Sin jornadas en el ámbito seleccionado.</Empty>}</Panel>
+      <Panel title="Avance de líderes" subtitle="Fichas verificadas / meta; sin sumar reportes declarados." className="manager-leaders" action={open('leaders')}><Bars rows={model.leaderRows.slice(team*6,team*6+6)} targets/>{teamCount>1&&pages(team,teamCount,setTeamPage)}</Panel>
+      <Panel title="Solicitudes por estado" subtitle="Conteo de solicitudes, no de personas." className="manager-requests" action={open('resources')}>{operationalUnavailable?<Empty>Datos operativos no disponibles.</Empty>:filtered.requests.length?<Bars rows={model.requestRows}/>:<Empty>Sin solicitudes en el ámbito seleccionado.</Empty>}</Panel>
+    </div></details>
+    <div className="manager-footer"><span><ShieldCheck size={14}/>Ámbito y organización activos · {model.duplicates} duplicados excluidos</span><span>Las cifras resumen registros; no representan votos emitidos.</span></div>
+  </div>;
+}

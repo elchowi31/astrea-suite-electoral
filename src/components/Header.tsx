@@ -43,10 +43,10 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-30 shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+      <div className="w-full px-3 sm:px-5 lg:px-6 h-16 flex items-center justify-between gap-3">
 
         {/* Left: Suite Brand & Tenant Selector */}
-        <div className="flex items-center gap-3.5">
+        <div className="flex min-w-0 items-center gap-3.5">
           <div
             onClick={scope.isGlobalAdmin ? onNavigateToTenants : undefined}
             className={`flex items-center gap-2.5 group ${scope.isGlobalAdmin ? 'cursor-pointer' : ''}`}
@@ -72,7 +72,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Clean Tenant Switcher / Party Actions */}
-          {scope.isGlobalAdmin && <div className="hidden md:flex items-center gap-1.5 pl-3 border-l border-slate-800">
+          {scope.isGlobalAdmin && <div className="hidden lg:flex items-center gap-1.5 pl-3 border-l border-slate-800">
             <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <select
               value={currentTenant.tenantId}
@@ -117,7 +117,7 @@ export const Header: React.FC<HeaderProps> = ({
               {userPrefix}
             </div>
 
-            <div className="hidden sm:block">
+            <div className="hidden xl:block">
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-bold text-white group-hover:text-blue-300 transition leading-tight">
                   {userPrefix} {userName}
