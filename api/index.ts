@@ -185,7 +185,7 @@ export async function authorize(req: ApiRequest, res: ServerResponse) {
 }
 
 // Orígenes de la app instalada (Capacitor). La API se autoriza con token Bearer, no con cookies.
-const NATIVE_APP_ORIGINS = new Set(['https://localhost', 'capacitor://localhost', 'http://localhost']);
+export const NATIVE_APP_ORIGINS = new Set(['https://localhost', 'capacitor://localhost', 'http://localhost']);
 
 export default async function handler(req: ApiRequest, res: ServerResponse) {
   const pathname = new URL(req.url || '/', 'https://astrea.local').pathname;

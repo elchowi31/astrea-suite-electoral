@@ -1,11 +1,18 @@
 import type {IncomingMessage,ServerResponse} from 'node:http';
-import {authorize,parseBody,readAuthorizedDocument,FIREBASE_PROJECT_ID,FIRESTORE_DATABASE_ID} from './index.js';
+import {authorize,parseBody,readAuthorizedDocument,FIREBASE_PROJECT_ID,FIRESTORE_DATABASE_ID,NATIVE_APP_ORIGINS} from './index.js';
 import {isPlatformAdminClaims} from '../src/lib/accessPolicy.js';
 import {AgentError} from '../src/lib/requestAgent.js';
 import {validatePilotConfig} from '../src/server/whatsappPilotCore.js';
 import {runWhatsappPilot} from '../src/server/whatsappPilot.js';
 
 export default async function handler(req:IncomingMessage,res:ServerResponse){
+ const origin=String(req.headers.origin||'');
+ if(NATIVE_APP_ORIGINS.has(origin)){
+  res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');
+  res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type');
+  res.setHeader('Access-Control-Allow-Methods','POST, OPTIONS');res.setHeader('Access-Control-Max-Age','600');
+ }
+ if(req.method==='OPTIONS'){res.statusCode=NATIVE_APP_ORIGINS.has(origin)?204:403;res.end();return;}
  const respond=(status:number,error:string)=>{if(res.headersSent){res.end();return;}res.statusCode=status;res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify({success:false,error}));};
  if(req.method!=='POST')return respond(405,'Método no permitido.');
  const user=await authorize(req,res);if(!user)return;

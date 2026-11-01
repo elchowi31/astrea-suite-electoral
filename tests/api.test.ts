@@ -151,3 +151,11 @@ test('WhatsApp pilot cannot start anonymously, as an ordinary user, or with inva
  assert.equal((await call(token({sub:'pilot-admin',admin:true}),{})).status,400);
  assert.equal((await call(token({sub:'pilot-admin',admin:true}),{phone:'573001234567',tenantId:'tenant-a',leaderId:'unknown-leader',eventId:'unknown-event',municipality:'Astrea'})).status,403);
 });
+test('WhatsApp pilot accepts only supported native preflights and still requires authentication',async()=>{
+ for(const origin of ['https://localhost','http://localhost','capacitor://localhost']){
+  const r=await nativeFetch(`${base}/api/whatsapp/pilot`,{method:'OPTIONS',headers:{Origin:origin,'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'authorization,content-type'}});
+  assert.equal(r.status,204);assert.equal(r.headers.get('Access-Control-Allow-Origin'),origin);
+  const denied=await nativeFetch(`${base}/api/whatsapp/pilot`,{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:'{}'});assert.equal(denied.status,401);assert.equal(denied.headers.get('Access-Control-Allow-Origin'),origin);
+ }
+ const foreign=await nativeFetch(`${base}/api/whatsapp/pilot`,{method:'OPTIONS',headers:{Origin:'https://other.example'}});assert.equal(foreign.status,403);assert.equal(foreign.headers.get('Access-Control-Allow-Origin'),null);
+});
