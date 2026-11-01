@@ -19,8 +19,8 @@ type TokenPayload = {
   email_verified?: boolean;
 };
 
-const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId;
-const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId || '(default)';
+export const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId;
+export const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId || '(default)';
 const MAX_BODY_BYTES = 32 * 1024;
 let certCache: { expiresAt: number; certificates: Record<string, string> } = { expiresAt: 0, certificates: {} };
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
@@ -85,7 +85,7 @@ async function verifyFirebaseToken(token: string): Promise<TokenPayload> {
   return payload as TokenPayload;
 }
 
-async function parseBody(req: ApiRequest): Promise<Record<string, unknown>> {
+export async function parseBody(req: ApiRequest): Promise<Record<string, unknown>> {
   if (req.body !== undefined) {
     if (!isRecord(req.body)) throw new Error('INVALID_JSON');
     if (Buffer.byteLength(JSON.stringify(req.body)) > MAX_BODY_BYTES) throw new Error('PAYLOAD_TOO_LARGE');
@@ -127,7 +127,7 @@ async function generate(prompt: string) {
 
 // Firestore evaluates the same tenant rules as the browser, using the caller's
 // Firebase ID token. This works without a shared privileged server credential.
-async function readAuthorizedDocument(path: string, token: string): Promise<Record<string, unknown> | null> {
+export async function readAuthorizedDocument(path: string, token: string): Promise<Record<string, unknown> | null> {
   const response = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/${encodeURIComponent(FIRESTORE_DATABASE_ID)}/documents/${path}`, {
     headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000)
   });
@@ -163,7 +163,7 @@ function enforceRateLimit(subject: string): boolean {
   return bucket.count <= 40;
 }
 
-async function authorize(req: ApiRequest, res: ServerResponse) {
+export async function authorize(req: ApiRequest, res: ServerResponse) {
   const authorization = req.headers.authorization || '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
   if (!token) {
@@ -185,7 +185,7 @@ async function authorize(req: ApiRequest, res: ServerResponse) {
 }
 
 // Orígenes de la app instalada (Capacitor). La API se autoriza con token Bearer, no con cookies.
-const NATIVE_APP_ORIGINS = new Set(['https://localhost', 'capacitor://localhost', 'http://localhost']);
+export const NATIVE_APP_ORIGINS = new Set(['https://localhost', 'capacitor://localhost', 'http://localhost']);
 
 export default async function handler(req: ApiRequest, res: ServerResponse) {
   const pathname = new URL(req.url || '/', 'https://astrea.local').pathname;

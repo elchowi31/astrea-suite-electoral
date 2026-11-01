@@ -5,6 +5,7 @@ import {initializeTestEnvironment,assertFails,assertSucceeds} from '@firebase/ru
 import {doc,setDoc,getDoc,updateDoc,collection,getDocs,query,where} from 'firebase/firestore';
 import {createAgentBackend} from '../src/server/requestAgent';
 import type {AgentTurn} from '../src/lib/requestAgent';
+import {pilotIntake} from '../src/server/whatsappPilotCore';
 const enabled=process.env.ASTREA_AGENT_EMULATOR==='true';
 test('Agent REST API: Firestore transactions, rules, reload, deduplication and tenant isolation',{skip:!enabled,timeout:120000},async t=>{
  assert.equal(process.env.GCLOUD_PROJECT,'demo-astrea');
@@ -66,6 +67,19 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
    await env.withSecurityRulesDisabled(async ctx=>setDoc(doc(ctx.firestore(),'jornadas_operativas','agent-event'),{id:'agent-event',tenantId,name:'Jornada de prueba',status:'Cancelado'}));
    await assert.rejects(backend().turn({...confirmation,conversationId:another.conversationId}),/jornada/);
    const reload=await backend().turn({...another,action:'resume',patch:undefined});assert.equal(reload.conversation.status,'review');assert.equal(reload.conversation.requestId,'');
+  });
+  await t.test('WhatsApp intake persists a confirmed request and notes without duplicating a retried confirmation',async()=>{
+   await env.withSecurityRulesDisabled(async ctx=>updateDoc(doc(ctx.firestore(),'jornadas_operativas','agent-event'),{status:'Planificado'}));
+   let active=true;
+   const intake=pilotIntake({projectId:'demo-astrea',databaseId:'(default)',token:a.token,uid:a.uid,config:{phone:'573000000000',tenantId,leaderId:'agent-leader',eventId:'agent-event',municipality:'Astrea'},runId:'test-run',origin:'http://127.0.0.1:8088',checkActive:async()=>{if(!active)throw new Error('Disabled');}});
+   await intake('573001234567','inbound-1','Necesito 3 almuerzos');
+   const review=await intake('573001234567','inbound-2','PRUEBA logística, no entregar');assert.match(review.reply,/Revise antes/);
+   const confirmed=await intake('573001234567','inbound-3','confirmar');assert.ok(confirmed.requestId);
+   const replay=await intake('573001234567','inbound-3','confirmar');assert.match(replay.reply,new RegExp(confirmed.requestId));
+   const db=env.authenticatedContext(a.uid,{email:'agent@test.invalid'}).firestore();
+   const record=(await getDoc(doc(db,'solicitudes_recursos',confirmed.requestId))).data()!;
+   assert.equal(record.quantity,3);assert.equal(record.amount,0);assert.equal(record.status,'Pendiente');assert.equal(record.leaderId,'agent-leader');assert.match(record.notes,/573001234567/);assert.match(record.notes,/PRUEBA WHATSAPP/);
+   active=false;await assert.rejects(intake('573009999999','inbound-4','Necesito 2 almuerzos'),/Disabled/);
   });
   await t.test('draft and receipt reads respect profile revocation, tenant changes and admin claims',async()=>{
    const db=env.authenticatedContext(a.uid,{email:'agent@test.invalid'}).firestore();

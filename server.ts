@@ -4,6 +4,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import apiHandler from './api/index.ts';
+import whatsappPilotHandler from './api/whatsapp-pilot.ts';
 import vercelConfig from './vercel.json' with { type: 'json' };
 import { config } from 'dotenv';
 
@@ -31,7 +32,7 @@ app.use((_req, res, next) => {
 // Local development uses the exact same API handler as the Vercel function.
 // This keeps authentication, request limits, and error handling consistent.
 app.all(/^\/api(?:\/.*)?$/, (req, res) => {
-  void apiHandler(req, res).catch((error: unknown) => {
+  void (req.path === '/api/whatsapp/pilot' ? whatsappPilotHandler : apiHandler)(req, res).catch((error: unknown) => {
     console.error('Unhandled API error:', error);
     if (!res.headersSent) res.status(500).json({ success: false, error: 'Error interno.' });
   });
