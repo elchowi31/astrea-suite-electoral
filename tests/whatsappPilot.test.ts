@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {validatePilotConfig,incomingPilotText,pilotLease} from '../src/server/whatsappPilotCore';
-import {encodeFields,decodeFields} from '../src/server/requestAgent';
+import {encodeFields,decodeFields,createAgentBackend} from '../src/server/requestAgent';
 
 test('pilot requires explicit scope and international phone',()=>{
  const config={phone:'+57 300 123 4567',tenantId:'team-a',leaderId:'leader-a',eventId:'event-a',municipality:'Astrea'};
@@ -30,4 +30,17 @@ test('serverless lease allows one instance, rejects races and fences stale relea
  await second.release();assert.equal(decodeFields(record.fields).expiresAt,0);
  record=null;
  const results=await Promise.allSettled([make().acquire(),make().acquire()]);assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+});
+test('reception resolves exact scoped references without the 500-row catalog limit',async()=>{
+ const fetcher:typeof fetch=async(input)=>{
+  const path=String(input);assert.ok(!path.includes(':runQuery'),'a scoped session must not depend on catalog ordering');
+  if(path.endsWith('/lideres/owner'))return new Response(JSON.stringify({fields:encodeFields({id:'owner',tenantId:'tenant',fullName:'Wilson José Arias'})}));
+  if(path.endsWith('/jornadas_operativas/event'))return new Response(JSON.stringify({fields:encodeFields({id:'event',tenantId:'tenant',name:'Recepción WhatsApp',status:'Planificado'})}));
+  if(path.endsWith('/lideres/foreign'))return new Response(JSON.stringify({fields:encodeFields({id:'foreign',tenantId:'another',fullName:'Otro'})}));
+  return new Response('{}',{status:404});
+ };
+ const backend=createAgentBackend({projectId:'test',databaseId:'test',token:'test',uid:'admin',tenantId:'tenant',leaderIds:['owner','foreign'],eventIds:['event'],fetcher});
+ const result=await backend.turn({conversationId:'scoped-conversation',messageId:'scoped-message',revision:0,action:'resume'});
+ assert.deepEqual(result.context.leaders,[{id:'owner',name:'Wilson José Arias'}]);
+ assert.deepEqual(result.context.events,[{id:'event',name:'Recepción WhatsApp'}]);
 });

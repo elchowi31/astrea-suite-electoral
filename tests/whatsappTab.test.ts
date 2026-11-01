@@ -44,6 +44,29 @@ test('Firestore checkpoint survives a new invocation, serializes writes and refu
  assert.equal(resumed.state.inbox[0].messageId,'in-1','already accepted work remains pending');
  fail=true;await assert.rejects(resumed.save(),/conservar/);
 });
+test('durable receipts prevent replay beyond 1000 messages without growing the session cache',async()=>{
+ const records=new Map<string,any>();let revision=0;
+ const root='projects/test/databases/test/documents';
+ const fetcher:typeof fetch=async(url,init)=>{
+  if(init?.method!=='POST'){
+   const path=new URL(String(url)).pathname.replace('/v1/','');const value=records.get(path);
+   return new Response(JSON.stringify(value||{}),{status:value?200:404});
+  }
+  const write=JSON.parse(String(init.body)).writes[0],previous=records.get(write.update.name),guard=write.currentDocument;
+  if((guard.exists===false&&previous)||(guard.updateTime&&guard.updateTime!==previous?.updateTime))return new Response('{}',{status:409});
+  const record={fields:write.update.fields,updateTime:String(++revision)};records.set(write.update.name,record);
+  return new Response(JSON.stringify({writeResults:[{updateTime:record.updateTime}]}));
+ };
+ const options={base:`https://firestore.test/v1/${root}`,uid:'admin',token:'test',config,session,fetcher};
+ const first=await loadWhatsappSession(options);
+ for(let i=0;i<1002;i++)await first.markHandled(`message-${i}`);
+ assert.equal(first.state.handled.length,500);assert.ok(!first.state.handled.includes('message-0'));
+ await first.save();const second=await loadWhatsappSession(options);
+ assert.equal(await second.wasHandled('message-0'),true);assert.equal(await second.wasHandled('message-1001'),true);
+ assert.equal(await second.wasHandled('not-received'),false);
+ await second.markHandled('message-0');await second.save();
+ assert.equal(records.size,1003,'one session and one durable receipt per message');
+});
 const response=(events:unknown[])=>new Response(events.map(e=>JSON.stringify(e)+'\n').join(''),{headers:{'Content-Type':'application/x-ndjson'}});
 test('tab renews with fresh authorized requests and unchanged session; stop prevents another request',async()=>{
  const abort=new AbortController();const bodies:unknown[]=[];const events:string[]=[];let calls=0;
@@ -60,6 +83,6 @@ test('rotation closes socket without logout and signals renewal only after check
  const persisted=state();persisted.creds.registered=true;persisted.inbox=[{phone:'573009999999',jid:'573009999999@s.whatsapp.net',messageId:'pending',text:'confirmar',result:{reply:'Guardado',requestId:'request-1'}}];
  let logouts=0,sends=0;const ev=new EventEmitter();
  const socket={ev,user:{id:config.phone+'@s.whatsapp.net'},end(){order.push('socket-end');},logout:async()=>{logouts++;},sendMessage:async()=>{sends++;}};
- await runWhatsappPilot({projectId:'test',databaseId:'test',token:'test',uid:'admin',config,session,res:res as any,checkActive:async()=>{}},{segmentMs:25,makeSocket:(()=>{queueMicrotask(()=>ev.emit('connection.update',{connection:'open'}));return socket;}) as any,loadSession:(async()=>({state:persisted,auth:{creds:persisted.creds,keys:{}},save:async()=>{order.push('save');},flush:async()=>{order.push('flush');}})) as any,lease:(()=>({owner:'lease',acquire:async()=>{},release:async()=>{order.push('release');}})) as any});
+ await runWhatsappPilot({projectId:'test',databaseId:'test',token:'test',uid:'admin',config,session,res:res as any,checkActive:async()=>{}},{segmentMs:25,makeSocket:(()=>{queueMicrotask(()=>ev.emit('connection.update',{connection:'open'}));return socket;}) as any,loadSession:(async()=>({state:persisted,auth:{creds:persisted.creds,keys:{}},save:async()=>{order.push('save');},markHandled:async(id:string)=>{persisted.handled.push(id);},wasHandled:async(id:string)=>persisted.handled.includes(id),flush:async()=>{order.push('flush');}})) as any,lease:(()=>({owner:'lease',acquire:async()=>{},release:async()=>{order.push('release');}})) as any});
  assert.equal(logouts,0);assert.equal(sends,1);assert.equal(persisted.inbox.length,0);assert.ok(persisted.handled.includes('pending'));assert.ok(order.indexOf('renew')>order.indexOf('flush'));assert.ok(order.indexOf('renew')>order.indexOf('release'));assert.equal(events.at(-1).type,'renew');
 });

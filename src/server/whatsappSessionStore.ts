@@ -7,7 +7,7 @@ import {writeCheckpoint} from './firestoreCheckpoint.js';
 
 export type TabSession={id:string;key:string;resumeId:string};
 export type InboxItem={phone:string;jid:string;text:string;messageId:string;result?:{reply:string;requestId?:string}};
-export type SessionState={version:1;startedAt:number;resumeId?:string;creds:AuthenticationState['creds'];keys:Record<string,unknown>;conversations:Record<string,string>;inbox:InboxItem[];handled:string[]};
+export type SessionState={version:1;receiptsVersion?:1;startedAt:number;resumeId?:string;creds:AuthenticationState['creds'];keys:Record<string,unknown>;conversations:Record<string,string>;inbox:InboxItem[];handled:string[]};
 export function validateTabSession(value:unknown):TabSession{
  const v=value as TabSession;
  if(!v||!/^\w{32}$/.test(v.id)||! /^[a-f0-9]{64}$/.test(v.key)||! /^[a-f0-9]{32}$/.test(v.resumeId))throw new AgentError('Actualice la plataforma para iniciar la conexión de WhatsApp.');
@@ -44,7 +44,7 @@ export async function loadWhatsappSession(options:{base:string;token:string;uid:
  const record=got.ok?await got.json():null;
  const fields=record?decodeFields(record.fields):null;
  if(fields&&fields.binding!==binding)throw new AgentError('Esta vinculación pertenece a otro ámbito.',403);
- const state:SessionState=fields?openSession(fields.ciphertext,options.session.key,binding):{version:1,startedAt:Date.now(),creds:initAuthCreds(),keys:{},conversations:{},inbox:[],handled:[]};
+ const state:SessionState=fields?openSession(fields.ciphertext,options.session.key,binding):{version:1,receiptsVersion:1,startedAt:Date.now(),creds:initAuthCreds(),keys:{},conversations:{},inbox:[],handled:[]};
  let revision=record?.updateTime||'';
  let writes=Promise.resolve();
  const save=()=>{
@@ -67,5 +67,31 @@ export async function loadWhatsappSession(options:{base:string;token:string;uid:
  // Move the cutoff forward before connecting so offline messages from a manual
  // pause are excluded, without discarding previously accepted pending work.
  if(!record||state.resumeId!==options.session.resumeId){state.resumeId=options.session.resumeId;state.startedAt=Date.now();await save();}
- return {state,auth,save,flush:()=>writes};
+ // Durable receipts allow an unbounded number of processed messages without
+ // growing the encrypted session document or losing replay protection.
+ const receiptPath=(id:string)=>`${path}/handled/${createHash('sha256').update(id).digest('hex')}`;
+ const wasHandled=async(id:string)=>{
+  if(state.handled.includes(id))return true;
+  const result=await request(`${options.base}/${receiptPath(id)}`,{headers,signal:AbortSignal.timeout(12000)});
+  if(result.status===404)return false;
+  if(!result.ok)throw new AgentError('No se pudo comprobar el recibo del mensaje en Firestore.',503);
+  if(decodeFields((await result.json()).fields).binding!==binding)throw new AgentError('El recibo pertenece a otra sesión.',403);
+  return true;
+ };
+ const markHandled=async(id:string)=>{
+  const saved=await writeCheckpoint({base:options.base,path:receiptPath(id),headers,request,revision:'',fields:encodeFields({binding,handledAt:new Date().toISOString()})});
+  if(!saved.ok){
+   // A replay after a lost response is safe only with a verified durable receipt.
+   const check=await request(`${options.base}/${receiptPath(id)}`,{headers,signal:AbortSignal.timeout(12000)});
+   if(!check.ok||decodeFields((await check.json()).fields).binding!==binding)throw new AgentError('No se pudo confirmar el recibo del mensaje.',503);
+  }
+  state.handled=[...state.handled.filter(value=>value!==id),id].slice(-500);
+ };
+ // Upgrade earlier sessions before their in-document receipt cache is trimmed.
+ if(!state.receiptsVersion){
+  const legacy=[...state.handled];
+  for(let index=0;index<legacy.length;index+=20)await Promise.all(legacy.slice(index,index+20).map(markHandled));
+  state.receiptsVersion=1;await save();
+ }
+ return {state,auth,save,wasHandled,markHandled,flush:()=>writes};
 }

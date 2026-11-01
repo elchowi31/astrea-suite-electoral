@@ -17,7 +17,7 @@ export default async function handler(req:IncomingMessage,res:ServerResponse){
  const respond=(status:number,error:string)=>{if(res.headersSent){res.end();return;}res.statusCode=status;res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify({success:false,error}));};
  if(req.method!=='POST')return respond(405,'Método no permitido.');
  const user=await authorize(req,res);if(!user)return;
- if(!isPlatformAdminClaims(user))return respond(403,'La prueba de WhatsApp está disponible para el administrador global.');
+ if(!isPlatformAdminClaims(user))return respond(403,'La recepción de WhatsApp está disponible para el administrador global.');
  if(!String(req.headers['content-type']||'').startsWith('application/json'))return respond(415,'Se requiere contenido JSON.');
  try{
   const body=await parseBody(req);
@@ -34,5 +34,5 @@ export default async function handler(req:IncomingMessage,res:ServerResponse){
   await checkActive();
   const session=validateTabSession(body.session);
   await runWhatsappPilot({projectId:FIREBASE_PROJECT_ID,databaseId:FIRESTORE_DATABASE_ID,token,uid:user.sub,config,session,res,checkActive});
- }catch(e){respond(e instanceof AgentError?e.status:503,e instanceof AgentError?e.message:'No se pudo iniciar la prueba de WhatsApp.');}
+ }catch(e){respond(e instanceof AgentError?e.status:503,e instanceof AgentError?e.message:'No se pudo iniciar la recepción de WhatsApp.');}
 }

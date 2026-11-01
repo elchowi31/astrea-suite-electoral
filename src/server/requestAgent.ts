@@ -32,13 +32,18 @@ export function createAgentBackend(options:{projectId:string;databaseId:string;t
     const d=transaction?(await call(':batchGet',{documents:[`${root}/${path}`],transaction}))?.find((row:any)=>row.found)?.found:await call(`/${path}`);
     return d?decodeFields(d.fields):undefined;
   }
-  async function catalog(collectionId:string,label:string){
+  async function catalog(collectionId:string,label:string,ids?:string[]){
+    if(ids)return (await Promise.all([...new Set(ids)].map(async id=>{
+      if(!/^[\w-]{1,120}$/.test(id))return undefined;
+      const record=await read(`${collectionId}/${id}`);
+      return record?.id===id&&record.tenantId===tenantId&&record[label]&&!['Cancelado','Finalizado'].includes(record.status)?{id,name:record[label]}:undefined;
+    }))).filter(Boolean);
     const rows=await call(':runQuery',{structuredQuery:{from:[{collectionId}],where:{fieldFilter:{field:{fieldPath:'tenantId'},op:'EQUAL',value:{stringValue:tenantId}}},select:{fields:['id',label,'status','tenantId'].map(fieldPath=>({fieldPath}))},limit:500}});
     return (rows||[]).filter((r:any)=>r.document).map((r:any)=>decodeFields(r.document.fields)).filter((r:any)=>r.tenantId===tenantId&&r.id&&r[label]&&!['Cancelado','Finalizado'].includes(r.status)).map((r:any)=>({id:r.id,name:r[label]}));
   }
   async function turn(input:AgentTurn){
     validateAgentTurn(input);
-    const [leaders,events]=await Promise.all([catalog('lideres','fullName'),catalog('jornadas_operativas','name')]);
+    const [leaders,events]=await Promise.all([catalog('lideres','fullName',options.leaderIds),catalog('jornadas_operativas','name',options.eventIds)]);
     const context:AgentContext={uid,tenantId,leaders:options.leaderIds?leaders.filter(l=>options.leaderIds!.includes(l.id)):leaders,events:options.eventIds?events.filter(e=>options.eventIds!.includes(e.id)):events};
     const makeRequest=(c:AgentConversation)=>({...agentRequest(c),...(options.requestNotes?{notes:options.requestNotes}:{})});
     const path=`usuarios/${uid}/agent_conversations/${input.conversationId}`;

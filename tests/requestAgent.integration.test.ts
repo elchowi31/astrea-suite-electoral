@@ -79,7 +79,7 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
    const replay=await intake('573001234567','inbound-3','confirmar');assert.match(replay.reply,new RegExp(confirmed.requestId));
    const db=env.authenticatedContext(a.uid,{email:'agent@test.invalid'}).firestore();
    const record=(await getDoc(doc(db,'solicitudes_recursos',confirmed.requestId))).data()!;
-   assert.equal(record.quantity,3);assert.equal(record.amount,0);assert.equal(record.status,'Pendiente');assert.equal(record.leaderId,'agent-leader');assert.match(record.notes,/573001234567/);assert.match(record.notes,/PRUEBA WHATSAPP/);
+   assert.equal(record.quantity,3);assert.equal(record.amount,0);assert.equal(record.status,'Pendiente');assert.equal(record.leaderId,'agent-leader');assert.match(record.notes,/573001234567/);assert.match(record.notes,/WHATSAPP/);assert.doesNotMatch(record.notes,/PRUEBA|no ejecutar como operación real/);
    active=false;await assert.rejects(intake('573009999999','inbound-4','Necesito 2 almuerzos'),/Disabled/);
   });
   await t.test('WhatsApp rotation restores encrypted authentication and a second conversation from actual emulator documents',async()=>{
