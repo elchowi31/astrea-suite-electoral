@@ -122,3 +122,24 @@ test('The installed app (https://localhost) may call the API with its token; oth
   const unauthenticated = await nativeFetch(`${base}/api/ai/analyze-document`, { method: 'POST', headers: { Origin: 'https://localhost', 'Content-Type': 'application/json' }, body: '{}' });
   assert.equal(unauthenticated.status, 401);
 });
+
+test('request agent requires identity, active operational role and exact tenant',async()=>{
+ const call=(body:unknown,authorization=token({sub:'agent-api-user'}))=>nativeFetch(`${base}/api/agent/turn`,{method:'POST',headers:{Authorization:`Bearer ${authorization}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ assert.equal((await call({},'')).status,401);
+ assert.equal((await call({tenantId:'tenant-b'})).status,403);
+ role='Consulta';assert.equal((await call({tenantId:'tenant-a'})).status,403);role='AdminTenant';
+ active=false;assert.equal((await call({tenantId:'tenant-a'})).status,403);active=true;
+ assert.equal((await call({tenantId:'tenant-a',action:'confirm'})).status,400);
+});
+test('request agent preserves platform-admin claims while still requiring an active organization',async()=>{
+ const call=(claims:Record<string,unknown>)=>nativeFetch(`${base}/api/agent/turn`,{method:'POST',headers:{Authorization:`Bearer ${token({sub:'agent-admin-test',...claims})}`,'Content-Type':'application/json'},body:JSON.stringify({tenantId:'tenant-a',action:'confirm'})});
+ try{
+  active=false;
+  // 400 is input validation after authorization; these incomplete turns never write.
+  assert.equal((await call({admin:true})).status,400);
+  assert.equal((await call({email:'expcal@expcal.net',email_verified:true})).status,400);
+  assert.equal((await call({email:'expcal@expcal.net',email_verified:false})).status,403);
+  profileExists=false;assert.equal((await call({admin:true})).status,400);
+  tenantActive=false;assert.equal((await call({admin:true})).status,403);
+ }finally{active=true;profileExists=true;tenantActive=true;}
+});

@@ -1,4 +1,4 @@
-import type { Leader, TransportVehicle } from '../types';
+import type { Leader, TransportVehicle } from '../types.js';
 
 export type Coordinate = { latitude: number; longitude: number };
 export type TerritoryPoint = Coordinate & {
@@ -48,7 +48,7 @@ export function googleDirectionsUrl(stops: Coordinate[]): string {
 }
 export async function calculateRoadRoute(stops: RouteStop[], signal?: AbortSignal): Promise<TerritorialRoute> {
   googleDirectionsUrl(stops); // Validate both the count and all coordinates before contacting a provider.
-  const base = import.meta.env?.VITE_ROUTING_SERVICE_URL || 'https://router.project-osrm.org';
+  const base = (import.meta as ImportMeta & {env?:Record<string,string>}).env?.VITE_ROUTING_SERVICE_URL || 'https://router.project-osrm.org';
   const coordinates = stops.map(point => `${point.longitude},${point.latitude}`).join(';');
   const response = await fetch(`${base.replace(/\/$/, '')}/route/v1/driving/${coordinates}?overview=full&geometries=geojson&steps=false`,
     { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000) });
