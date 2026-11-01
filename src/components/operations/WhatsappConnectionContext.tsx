@@ -1,21 +1,31 @@
 import React,{createContext,useContext,useEffect,useRef,useState} from 'react';
-import {authenticatedFetch} from '../../lib/firebase';
+import {authenticatedFetch,db} from '../../lib/firebase';
+import {defaultWhatsappConfig,loadWhatsappConfig,saveWhatsappConfig,type WhatsappConfig as Config} from '../../lib/whatsappSetup';
 import {runWhatsappTab,type WhatsappEvent} from '../../lib/whatsappTabConnection';
 import {useOperations} from './OperationsContext';
 
-type Config={phone:string;leaderId:string;eventId:string;municipality:string};
-type Connection={running:boolean;connected:boolean;status:string;code:string;error:string;saved:string[];start:(config:Config)=>Promise<void>;stop:()=>void;reset:()=>void;wake:boolean;config:Config;setConfig:React.Dispatch<React.SetStateAction<Config>>};
+type Connection={running:boolean;busy:boolean;connected:boolean;status:string;code:string;error:string;saved:string[];save:(config:Config)=>Promise<Config|undefined>;start:(config:Config)=>Promise<void>;stop:()=>void;reset:()=>void;wake:boolean;config:Config;setConfig:React.Dispatch<React.SetStateAction<Config>>};
 const Context=createContext<Connection|null>(null);
 const randomHex=(bytes:number)=>Array.from(crypto.getRandomValues(new Uint8Array(bytes)),b=>b.toString(16).padStart(2,'0')).join('');
 export function WhatsappConnectionProvider({children}:{children:React.ReactNode}){
  const {user,tenant,readOnly}=useOperations();
- const [config,setConfig]=useState<Config>({phone:'',leaderId:'',eventId:'',municipality:''});
+ const [config,setConfig]=useState<Config>(()=>defaultWhatsappConfig(user));
+ const [busy,setBusy]=useState(true);const preparing=useRef(false),generation=useRef(0);
  const [running,setRunning]=useState(false),[connected,setConnected]=useState(false),[status,setStatus]=useState('Sin conexión'),[code,setCode]=useState(''),[error,setError]=useState(''),[saved,setSaved]=useState<string[]>([]),[wake,setWake]=useState(false);
  const controller=useRef<AbortController|null>(null),identity=useRef<{id:string;key:string;scope:string}|null>(null),mounted=useRef(true);
  const stop=()=>{controller.current?.abort();setConnected(false);setCode('');};
  const reset=()=>{stop();identity.current=null;setSaved([]);setError('');setStatus('Nueva vinculación preparada. Retire la anterior desde Dispositivos vinculados de WhatsApp.');};
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;controller.current?.abort();identity.current=null;};},[]);
- useEffect(()=>{stop();identity.current=null;setSaved([]);setStatus('Sin conexión');},[tenant.tenantId,user?.uid,user?.role,readOnly]);
+ useEffect(()=>{
+  const current=++generation.current;let cancelled=false;
+  stop();identity.current=null;preparing.current=false;setSaved([]);setError('');setStatus('Sin conexión');setConfig(defaultWhatsappConfig(user));
+  if(readOnly||user?.role!=='AdminGlobal'){setBusy(false);return;}
+  setBusy(true);
+  void loadWhatsappConfig(db,user,tenant.tenantId).then(value=>{if(!cancelled&&generation.current===current)setConfig(value);})
+   .catch(()=>{if(!cancelled&&generation.current===current)setError('No se pudo cargar la configuración guardada. Revise la conexión antes de guardar.');})
+   .finally(()=>{if(!cancelled&&generation.current===current)setBusy(false);});
+  return()=>{cancelled=true;};
+ },[tenant.tenantId,user?.uid,user?.role,readOnly]);
  useEffect(()=>{
   if(!running)return;
   let lock:WakeLockSentinel|null=null,cancelled=false;
@@ -24,9 +34,19 @@ export function WhatsappConnectionProvider({children}:{children:React.ReactNode}
   void acquire();document.addEventListener('visibilitychange',visible);
   return()=>{cancelled=true;document.removeEventListener('visibilitychange',visible);void lock?.release();setWake(false);};
  },[running]);
- async function start(config:Config){
-  if(controller.current||readOnly||user?.role!=='AdminGlobal')return;
-  const normalized={...config,phone:config.phone.replace(/[+\s()-]/g,''),municipality:config.municipality.trim(),tenantId:tenant.tenantId};
+ async function save(input:Config){
+  if(controller.current||preparing.current||busy||readOnly||user?.role!=='AdminGlobal')return;
+  const current=generation.current;preparing.current=true;setBusy(true);setError('');setStatus('Guardando configuración en Firestore…');
+  try{
+   const verified=await saveWhatsappConfig(db,user,tenant.tenantId,input);
+   if(!mounted.current||current!==generation.current)return;
+   setConfig(verified);setStatus('Configuración guardada y verificada en Firestore.');return verified;
+  }catch(e){if(mounted.current&&current===generation.current){setError(e instanceof Error?e.message:'No se pudo guardar la configuración.');setStatus('Configuración sin confirmar.');}}
+  finally{if(mounted.current&&current===generation.current){preparing.current=false;setBusy(false);}}
+ }
+ async function start(input:Config){
+  const config=await save(input);if(!config)return;
+  const normalized={phone:config.phone,leaderId:config.leaderId,eventId:config.eventId,municipality:config.municipality,tenantId:tenant.tenantId};
   const scope=JSON.stringify(normalized);
   if(!identity.current||identity.current.scope!==scope)identity.current={id:randomHex(16),key:randomHex(32),scope};
   const session={id:identity.current.id,key:identity.current.key,resumeId:randomHex(16)};
@@ -45,7 +65,7 @@ export function WhatsappConnectionProvider({children}:{children:React.ReactNode}
   catch{if(mounted.current&&!active.signal.aborted)setError('No se pudo mantener la conexión. Intente reanudar.');}
   finally{if(controller.current===active)controller.current=null;if(mounted.current){setRunning(false);setConnected(false);setCode('');if(active.signal.aborted)setStatus('Recepción detenida. Las solicitudes guardadas permanecen en Firestore.');}}
  }
- return <Context.Provider value={{running,connected,status,code,error,saved,start,stop,reset,wake,config,setConfig}}>{children}</Context.Provider>;
+ return <Context.Provider value={{running,busy,connected,status,code,error,saved,save,start,stop,reset,wake,config,setConfig}}>{children}</Context.Provider>;
 }
 export function useWhatsappConnection(){const value=useContext(Context);if(!value)throw new Error('Falta el contexto de WhatsApp.');return value;}
 export function WhatsappConnectionStatus(){

@@ -31,6 +31,7 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
   try{
    while(store.state.inbox.length&&!stopped&&connected){
     const item=store.state.inbox[0];await options.checkActive();
+    if(await store.wasHandled(item.messageId)){store.state.inbox.shift();await store.save();continue;}
     if(!item.result){
      try{item.result=await intake(item.phone,item.messageId,item.text);}
      catch(e){if(e instanceof AgentError&&e.status===400)item.result={reply:e.message};else throw e;}
@@ -40,9 +41,8 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
     if(stopped||!connected)break;
     try{await socket.sendMessage(item.jid,{text:item.result.reply});}
     catch{emit({type:'notice',message:'Una respuesta sigue pendiente de entrega. Se reintentará al recuperar la conexión.'});break;}
-    store.state.handled.push(item.messageId);
+    await store.markHandled(item.messageId);
     store.state.inbox.shift();await store.save();
-    if(store.state.handled.length>=1000){stop('fatal','Se completaron 1000 mensajes en esta vinculación. Inicie una nueva para continuar.');break;}
    }
   }finally{processing=false;}
  }
@@ -74,9 +74,9 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
    if(!['notify','append'].includes(event.type)||stopped)return;
    for(const message of event.messages){
     const incoming=incomingPilotText(message,store.state.startedAt,true);if(!incoming)continue;
-    if(++accepted>150){stop('fatal','Se alcanzó el límite de mensajes de este intervalo. Detenga el envío y reanude la recepción.');break;}
+    if(++accepted>150){stop('renew','Renovando la conexión para continuar procesando mensajes…');break;}
     queue(async()=>{
-     if(store.state.handled.includes(incoming.messageId)||store.state.inbox.some(i=>i.messageId===incoming.messageId))return;
+     if(store.state.inbox.some(i=>i.messageId===incoming.messageId)||await store.wasHandled(incoming.messageId))return;
      if(store.state.inbox.length>=100)throw new AgentError('Hay demasiados mensajes pendientes. Revise las solicitudes antes de reanudar.',429);
      store.state.inbox.push(incoming);await store.save();await drain();
     });
