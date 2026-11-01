@@ -403,8 +403,13 @@ service cloud.firestore {
     }
     // Private assistant drafts and idempotency receipts. Requests still use the
     // existing operational rules; a conversation never grants extra privileges.
+    function canReadAgentDraft(uid) {
+      return signedIn() && request.auth.uid == uid && (platformAdmin()
+        || (profileExists() && sameTenant(me().get('tenantId', ''))
+          && (resource == null || resource.data.tenantId == me().tenantId)));
+    }
     match /usuarios/{uid}/agent_conversations/{conversationId} {
-      allow read: if signedIn() && request.auth.uid == uid;
+      allow read: if canReadAgentDraft(uid);
       allow create, update: if signedIn() && request.auth.uid == uid
         && canOperateTenant(request.resource.data.tenantId)
         && request.resource.data.ownerUid == uid && request.resource.data.id == conversationId
@@ -418,7 +423,7 @@ service cloud.firestore {
           && request.resource.data.revision == resource.data.revision + 1));
       allow delete: if false;
       match /receipts/{messageId} {
-        allow read: if signedIn() && request.auth.uid == uid;
+        allow read: if canReadAgentDraft(uid);
         allow create: if signedIn() && request.auth.uid == uid
           && request.resource.data.ownerUid == uid && request.resource.data.messageId == messageId
           && canOperateTenant(request.resource.data.tenantId)

@@ -1,8 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {initializeTestEnvironment,assertFails} from '@firebase/rules-unit-testing';
-import {doc,setDoc,getDoc} from 'firebase/firestore';
+import {initializeTestEnvironment,assertFails,assertSucceeds} from '@firebase/rules-unit-testing';
+import {doc,setDoc,getDoc,updateDoc,collection,getDocs,query,where} from 'firebase/firestore';
 import {createAgentBackend} from '../src/server/requestAgent';
 import type {AgentTurn} from '../src/lib/requestAgent';
 const enabled=process.env.ASTREA_AGENT_EMULATOR==='true';
@@ -66,6 +66,25 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
    await env.withSecurityRulesDisabled(async ctx=>setDoc(doc(ctx.firestore(),'jornadas_operativas','agent-event'),{id:'agent-event',tenantId,name:'Jornada de prueba',status:'Cancelado'}));
    await assert.rejects(backend().turn({...confirmation,conversationId:another.conversationId}),/jornada/);
    const reload=await backend().turn({...another,action:'resume',patch:undefined});assert.equal(reload.conversation.status,'review');assert.equal(reload.conversation.requestId,'');
+  });
+  await t.test('draft and receipt reads respect profile revocation, tenant changes and admin claims',async()=>{
+   const db=env.authenticatedContext(a.uid,{email:'agent@test.invalid'}).firestore();
+   const conversation=doc(db,'usuarios',a.uid,'agent_conversations',input.conversationId);
+   const receipt=doc(conversation,'receipts',input.messageId);
+   const drafts=query(collection(db,'usuarios',a.uid,'agent_conversations'),where('tenantId','==',tenantId));
+   const change=async(patch:Record<string,unknown>)=>env.withSecurityRulesDisabled(async ctx=>updateDoc(doc(ctx.firestore(),'usuarios',a.uid),patch));
+   await assertSucceeds(getDoc(conversation));await assertSucceeds(getDoc(receipt));await assertSucceeds(getDocs(drafts));
+   for(const patch of [{active:false},{active:true,accessVersion:1},{accessVersion:2,tenantId:foreign}]){
+    await change(patch);await assertFails(getDoc(conversation));await assertFails(getDoc(receipt));await assertFails(getDocs(drafts));
+   }
+   await change({active:false,tenantId,accessVersion:1});
+   const admin=env.authenticatedContext(a.uid,{email:'admin@test.invalid',admin:true}).firestore();
+   await assertSucceeds(getDoc(doc(admin,'usuarios',a.uid,'agent_conversations',input.conversationId)));
+   const otherAdmin=env.authenticatedContext('another-admin',{email:'admin@test.invalid',admin:true}).firestore();
+   // The existing global-admin migration rule retains access to all documents.
+   await assertSucceeds(getDoc(doc(otherAdmin,'usuarios',a.uid,'agent_conversations',input.conversationId)));
+   await change({active:true,accessVersion:2});
+   await assertSucceeds(getDoc(doc(db,'usuarios',a.uid,'agent_conversations','new-draft')));
   });
  }finally{await env.cleanup();}
 });

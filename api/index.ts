@@ -223,7 +223,7 @@ export default async function handler(req: ApiRequest, res: ServerResponse) {
       const profile=await readAuthorizedDocument(`usuarios/${encodeURIComponent(user.sub)}`,token);
       const admin=isPlatformAdminClaims(user as unknown as Record<string,unknown>);
       const tenantId=typeof body.tenantId==='string'?body.tenantId:'';
-      if(!/^[a-zA-Z0-9_-]{1,120}$/.test(tenantId)||!profile||profile.active!==true||(!admin&&(profile.accessVersion!==2||profile.tenantId!==tenantId||!['AdminTenant','Gobernador','Diputado','Alcalde','Concejal','JefePolitico','Supervisor','Operador','LiderVeredal'].includes(String(profile.role)))))return json(res,403,{success:false,error:'Su perfil no puede registrar solicitudes en esta organización.'});
+      if(!/^[a-zA-Z0-9_-]{1,120}$/.test(tenantId)||(!admin&&(!profile||profile.active!==true||profile.accessVersion!==2||profile.tenantId!==tenantId||!['AdminTenant','Gobernador','Diputado','Alcalde','Concejal','JefePolitico','Supervisor','Operador','LiderVeredal'].includes(String(profile.role)))))return json(res,403,{success:false,error:'Su perfil no puede registrar solicitudes en esta organización.'});
       const organization=await readAuthorizedDocument(`organizaciones/${tenantId}`,token);
       if(organization?.active!==true)return json(res,403,{success:false,error:'La organización no está activa.'});
       const backend=createAgentBackend({projectId:FIREBASE_PROJECT_ID,databaseId:FIRESTORE_DATABASE_ID,token,uid:user.sub,tenantId});
