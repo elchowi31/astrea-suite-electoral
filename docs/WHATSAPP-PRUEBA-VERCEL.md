@@ -1,35 +1,34 @@
-# WhatsApp: prueba temporal en Vercel
-
-## Alcance
-
-En Solicitudes y jornadas, un administrador global puede abrir «WhatsApp · prueba en Vercel». Es una prueba atendida de cuatro minutos, dentro de una función con límite de 300 segundos. No ofrece recepción permanente ni invocaciones automáticas para mantenerla viva. Mantenga el panel abierto y el teléfono con conexión mientras prueba.
-
-El receptor es el número corporativo que el operador escribe al iniciar. Desde OTRO número de WhatsApp se envían las solicitudes. Los mensajes propios, grupos, historias, mensajes antiguos, medios y remitentes LID sin teléfono verificable se ignoran. Solo se reciben textos nuevos mientras el panel indica «Conectado». Cualquier contacto puede enviar una solicitud durante esta ventana; no obtiene acceso a la base ni a otros registros. Hay un límite de 30 mensajes por contacto y 100 por sesión.
+# WhatsApp operativo mientras Astrea permanece abierta
 
 ## Uso
 
-1. Inicie sesión como administrador global y seleccione la organización correcta y «Usar datos reales».
-2. Cree o seleccione un responsable y una jornada claramente identificados como pruebas. Abra el panel, escriba el número receptor con indicativo, el responsable, la jornada y el municipio. Estos tres últimos datos se aplican a todas las solicitudes de la ventana.
-3. Pulse «Iniciar prueba de 4 minutos». En WhatsApp del receptor, abra Dispositivos vinculados → Vincular un dispositivo → Vincular con número de teléfono. Introduzca allí el código que muestra el panel. No lo comparta ni lo envíe en chats.
-4. Espere «Conectado». Desde un segundo teléfono, escriba «Necesito 3 almuerzos» o «Transporte para 8 personas». Conteste la descripción solicitada y revise el resumen. El costo inicial es cero, por cotizar; el operador puede corregirlo posteriormente desde la plataforma. Escriba «confirmar» solo si los datos están bien.
-5. WhatsApp devuelve un radicado únicamente después de verificar la escritura. En el panel aparece «Solicitud guardada» y, cuando el listener de Firestore recibe la fila, «Visible en la plataforma». La solicitud aparece en la tabla habitual, pendiente, con la marca PRUEBA WHATSAPP y el teléfono de origen en las notas. No implica aprobación, reserva de transporte, entrega ni desembolso.
-6. Recargue la plataforma y busque el radicado: los registros y borradores persisten en Firestore. «Nueva solicitud» inicia otro borrador; «cancelar» cierra el actual. Las solicitudes se registran bajo el operador que autorizó la sesión; no se suplanta una cuenta Astrea del remitente.
-7. Pulse «Detener y desconectar» al terminar. También finaliza al cerrar la página, perder la conexión o alcanzar el límite. Se intenta cerrar la sesión vinculada; si Vercel termina abruptamente el proceso, retire manualmente el dispositivo desde WhatsApp. La siguiente prueba requiere vincular de nuevo. Los datos confirmados no se borran.
+1. Entre como administrador global, elija la organización y «Usar datos reales».
+2. En Solicitudes y jornadas abra «WhatsApp · recepción desde esta pestaña». Indique el número receptor con indicativo, responsable, jornada vigente y municipio. Use una jornada de prueba.
+3. Pulse «Iniciar / reanudar recepción». En WhatsApp del receptor: Dispositivos vinculados → Vincular un dispositivo → Vincular con número de teléfono. Introduzca el código privado del panel.
+4. Espere el estado verde «recepción activa». Desde otro número envíe «Necesito 3 almuerzos» o «Transporte para 8 personas», conteste la descripción y confirme el resumen. Los mensajes propios del receptor, grupos y contenido no textual no entran al asistente.
+5. La confirmación guarda una solicitud real en Firestore, pendiente, con marca PRUEBA WHATSAPP, teléfono de origen y operador. El costo inicia en cero, por cotizar. No aprueba gastos ni reserva cupos. El radicado se devuelve después de verificar la escritura; el panel indica «Visible en la plataforma» cuando el listener recibe la fila.
+6. Puede cambiar a otros módulos de Astrea sin detener la recepción. La barra superior informa el estado y permite detenerla. La conexión se renueva automáticamente antes del límite de cada función de Vercel, conservando la vinculación y los formularios en curso. Puede haber una breve pausa de reconexión; no se promete recepción instantánea durante ese intervalo.
+7. «Detener recepción» interrumpe el servicio. «Iniciar / reanudar» recupera la misma vinculación si conserva esta pestaña y los mismos datos. «Nueva vinculación» descarta la clave local; retire el dispositivo anterior en WhatsApp antes de volver a vincular. Cerrar o recargar la pestaña pierde la clave local y requiere iniciar una nueva vinculación. Las solicitudes ya confirmadas no se borran.
 
-## Implementación
+## Celular y PC
 
-- Se conserva Baileys como transporte y el normalizador de remitentes del adaptador del kit Claude. No se ejecutan su dashboard, SQLite, herramientas comerciales ni llamadas a modelos de IA.
-- API autenticada: POST `/api/whatsapp/pilot`. Solo claims de administrador global. Se verifican organización, responsable y jornada antes de conectar y antes de procesar cada mensaje.
-- Las credenciales de WhatsApp y claves Signal solo viven en la memoria de la función. No se guardan QR/códigos, credenciales ni tokens en Firestore, logs o almacenamiento del navegador.
-- Firestore `whatsapp_pilot_locks/{hashDelTelefono}` guarda un bloqueo temporal adquirido con compare-and-set. No contiene credenciales. La regla administrativa existente limita su acceso. Un bloqueo abandonado vence en cinco minutos; una ejecución antigua no puede liberar el bloqueo de una nueva.
-- Los borradores y recibos usan `usuarios/{uid}/agent_conversations`, y las solicitudes `solicitudes_recursos`, con auditoría en la misma transacción. La lista existente usa `onSnapshot` y no necesita actualización manual.
-- La prueba es compatible con navegador móvil; Samsung S24 FE / Android 16 sirve como teléfono de vinculación, sin instalar Termux. No es una garantía de estabilidad de WhatsApp ni de ejecución en segundo plano del navegador.
-- La vinculación de WhatsApp y una solicitud real de extremo a extremo requieren que el propietario introduzca el código en su teléfono. Las pruebas automatizadas validan almacenamiento, deduplicación, permisos y bloqueos; no sustituyen esa comprobación real.
+No requiere instalar Termux ni mantener un VPS. Se ejecuta con el navegador abierto y conectado a Internet. En Android mantenga Astrea en primer plano; el navegador puede suspender una pestaña con la pantalla bloqueada o al cambiar de aplicación. Se solicita Screen Wake Lock si el navegador lo admite. Esta API solo evita el apagado de pantalla mientras el navegador lo permite: no garantiza ejecución en segundo plano. Al regresar se comprueba la conexión y se reintenta automáticamente si la sesión sigue viva.
 
-## Validación
+## Persistencia y control
 
-`npm run check` comprueba TypeScript, pruebas, carga de las dos funciones en Node y compilación. La integración usa Auth/Firestore emulados y verifica petición, confirmación repetida, notas de origen y lectura posterior. No abre una sesión real de WhatsApp ni envía mensajes a terceros.
+- Una petición autenticada sostiene cada tramo de hasta 240 segundos; la función tiene máximo 300 segundos. Solo el controlador de la pestaña inicia el siguiente tramo, obteniendo un token Firebase actualizado. No hay cron, auto-invocación del servidor ni servicio autónomo 24/7.
+- La recepción se monta fuera de las vistas de cada módulo y se detiene al salir de la cuenta, cambiar de organización, pasar a demo o perder el rol requerido. El backend exige claims de administrador global y verifica organización/responsable/jornada antes de conectar y antes de procesar cada solicitud.
+- Baileys conserva su autenticación entre tramos. No se hace logout durante las renovaciones. Las claves Signal se escriben antes de confirmar su actualización; las credenciales, la bandeja pendiente y los cursores de conversación se guardan cifrados con AES-256-GCM en `usuarios/{uid}/whatsapp_sessions/{id}`. Cada escritura usa compare-and-set.
+- La clave aleatoria de 256 bits vive solo en memoria de la pestaña y se transmite por HTTPS en el cuerpo autenticado. Nunca se escribe en Firestore, URLs, logs, localStorage ni sessionStorage. El cifrado se liga al operador, identificador y ámbito. La regla administrativa existente protege esos documentos. El campo expiresAt es metadato de retención; no presupone una política TTL ya instalada. Al perder la clave no se puede recuperar el documento cifrado desde otra pestaña.
+- El bloqueo exclusivo por número evita conexiones simultáneas desde dos pestañas. Se libera después de guardar y cerrar el transporte; un bloqueo abandonado vence en cinco minutos. La pestaña reintenta con espera progresiva. Los errores de permiso y de vinculación requieren intervención visible.
+- Los mensajes de la breve desconexión se admiten al volver si WhatsApp los entrega y corresponden al período iniciado por esta pestaña. Se conserva la bandeja antes de procesarla y la respuesta antes de enviarla. Un fallo después de enviar y antes de guardar el recibo puede repetir una respuesta de WhatsApp, pero el backend conserva la idempotencia de la solicitud.
+- Los borradores permanecen en `usuarios/{uid}/agent_conversations`; solicitudes y auditoría usan las colecciones existentes y una transacción. El cursor de cada remitente sobrevive a la renovación, incluso después de «nueva solicitud».
+- Prueba de bajo volumen: 30 mensajes por contacto y 100 procesados por tramo, 100 pendientes, 1000 recibos por vinculación y estado cifrado con tamaño limitado. Los límites detienen o rechazan de forma visible; no habilitan campañas de mensajes masivos.
 
-Referencia de duración: https://vercel.com/docs/functions/configuring-functions/duration
+## Verificación
 
-Referencia de conexión: https://github.com/WhiskeySockets/baileys.wiki-site/blob/main/docs/socket/connecting.md
+Las pruebas cubren cifrado y manipulación, restauración de claves binarias, escritura concurrente, renovación de la pestaña, revocación de permisos, cierre sin logout, bandeja pendiente y liberación del bloqueo antes de renovar. La integración con Auth/Firestore emulados crea solicitudes, renueva el backend entre pasos, inicia una segunda solicitud, confirma sin duplicar y vuelve a leer los datos persistentes.
+
+La vinculación y recepción real con el teléfono requieren intervención del titular. Las pruebas automatizadas no prueban el protocolo real de WhatsApp, la estabilidad de la cuenta ni el comportamiento de Android durante una suspensión. El despliegue no equivale a tener el número conectado.
+
+Referencias: https://vercel.com/docs/functions/configuring-functions/duration y https://github.com/WhiskeySockets/Baileys

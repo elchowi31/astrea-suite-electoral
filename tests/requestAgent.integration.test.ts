@@ -5,7 +5,8 @@ import {initializeTestEnvironment,assertFails,assertSucceeds} from '@firebase/ru
 import {doc,setDoc,getDoc,updateDoc,collection,getDocs,query,where} from 'firebase/firestore';
 import {createAgentBackend} from '../src/server/requestAgent';
 import type {AgentTurn} from '../src/lib/requestAgent';
-import {pilotIntake} from '../src/server/whatsappPilotCore';
+import {pilotIntake,pilotLease} from '../src/server/whatsappPilotCore';
+import {loadWhatsappSession} from '../src/server/whatsappSessionStore';
 const enabled=process.env.ASTREA_AGENT_EMULATOR==='true';
 test('Agent REST API: Firestore transactions, rules, reload, deduplication and tenant isolation',{skip:!enabled,timeout:120000},async t=>{
  assert.equal(process.env.GCLOUD_PROJECT,'demo-astrea');
@@ -80,6 +81,37 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
    const record=(await getDoc(doc(db,'solicitudes_recursos',confirmed.requestId))).data()!;
    assert.equal(record.quantity,3);assert.equal(record.amount,0);assert.equal(record.status,'Pendiente');assert.equal(record.leaderId,'agent-leader');assert.match(record.notes,/573001234567/);assert.match(record.notes,/PRUEBA WHATSAPP/);
    active=false;await assert.rejects(intake('573009999999','inbound-4','Necesito 2 almuerzos'),/Disabled/);
+  });
+  await t.test('WhatsApp rotation restores encrypted authentication and a second conversation from actual emulator documents',async()=>{
+   const config={phone:'573000000000',tenantId,leaderId:'agent-leader',eventId:'agent-event',municipality:'Astrea'};
+   const session={id:'e'.repeat(32),key:'f'.repeat(64)};
+   const options={base:'http://127.0.0.1:8088/v1/projects/demo-astrea/databases/(default)/documents',token:'owner',uid:a.uid,config,session};
+   const lock1=pilotLease({...options,phone:config.phone}),lock2=pilotLease({...options,phone:config.phone});
+   await lock1.acquire();await assert.rejects(lock2.acquire(),/activa/);await lock1.release();await lock2.acquire();await lock2.release();
+   let checkpoint=await loadWhatsappSession(options);
+   await checkpoint.auth.keys.set({'pre-key':{'42':{private:Buffer.from('test-private-key'),public:Buffer.from('test-public-key')}}});
+   const intake=()=>pilotIntake({projectId:'demo-astrea',databaseId:'(default)',token:a.token,uid:a.uid,config,runId:session.id,origin:'http://127.0.0.1:8088',conversations:checkpoint.state.conversations,saveCursor:checkpoint.save,checkActive:async()=>{}});
+   await intake()('573001111111','rotate-1','Necesito 2 almuerzos');
+   checkpoint=await loadWhatsappSession(options);
+   await intake()('573001111111','rotate-2','Prueba de alimentación');
+   checkpoint=await loadWhatsappSession(options);
+   const first=await intake()('573001111111','rotate-3','confirmar');assert.ok(first.requestId);
+   await intake()('573001111111','rotate-4','nueva solicitud');
+   checkpoint=await loadWhatsappSession(options);
+   await intake()('573001111111','rotate-5','Necesito 4 almuerzos');
+   checkpoint=await loadWhatsappSession(options);
+   await intake()('573001111111','rotate-6','Segunda prueba de alimentación');
+   const second=await intake()('573001111111','rotate-7','confirmar');assert.ok(second.requestId);assert.notEqual(first.requestId,second.requestId);
+   checkpoint=await loadWhatsappSession(options);
+   const duplicate=await intake()('573001111111','rotate-7','confirmar');assert.match(duplicate.reply,new RegExp(second.requestId));
+   assert.deepEqual((await checkpoint.auth.keys.get('pre-key',['42']))['42'].private,Buffer.from('test-private-key'));
+   const db=env.authenticatedContext(a.uid,{email:'agent@test.invalid'}).firestore();
+   assert.equal((await getDoc(doc(db,'solicitudes_recursos',second.requestId))).data()!.quantity,4);
+   await assertFails(getDoc(doc(db,'usuarios',a.uid,'whatsapp_sessions',session.id)));
+   await env.withSecurityRulesDisabled(async ctx=>{
+    const raw=(await getDoc(doc(ctx.firestore(),'usuarios',a.uid,'whatsapp_sessions',session.id))).data()!;
+    assert.ok(raw.ciphertext);assert.ok(!JSON.stringify(raw).includes('test-private-key'));assert.ok(!JSON.stringify(raw).includes(session.key));
+   });
   });
   await t.test('draft and receipt reads respect profile revocation, tenant changes and admin claims',async()=>{
    const db=env.authenticatedContext(a.uid,{email:'agent@test.invalid'}).firestore();
