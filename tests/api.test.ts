@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import handler from '../api/index.ts';
+import pilotHandler from '../api/whatsapp-pilot.ts';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -47,7 +48,7 @@ before(async () => {
     }
     return nativeFetch(input, init);
   };
-  server = createServer((req, res) => { void handler(req, res); });
+  server = createServer((req, res) => { void (req.url==='/api/whatsapp/pilot'?pilotHandler:handler)(req, res); });
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   assert(address && typeof address !== 'string');
@@ -142,4 +143,11 @@ test('request agent preserves platform-admin claims while still requiring an act
   profileExists=false;assert.equal((await call({admin:true})).status,400);
   tenantActive=false;assert.equal((await call({admin:true})).status,403);
  }finally{active=true;profileExists=true;tenantActive=true;}
+});
+test('WhatsApp pilot cannot start anonymously, as an ordinary user, or with invalid scope',async()=>{
+ const call=(authorization:string,body:unknown)=>nativeFetch(`${base}/api/whatsapp/pilot`,{method:'POST',headers:{Authorization:`Bearer ${authorization}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ assert.equal((await call('',{})).status,401);
+ assert.equal((await call(token({sub:'pilot-member'}),{})).status,403);
+ assert.equal((await call(token({sub:'pilot-admin',admin:true}),{})).status,400);
+ assert.equal((await call(token({sub:'pilot-admin',admin:true}),{phone:'573001234567',tenantId:'tenant-a',leaderId:'unknown-leader',eventId:'unknown-event',municipality:'Astrea'})).status,403);
 });

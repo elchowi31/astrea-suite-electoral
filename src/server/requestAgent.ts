@@ -17,7 +17,7 @@ function decode(v:Value):any{
   if('integerValue'in v)return Number(v.integerValue);if('doubleValue'in v)return v.doubleValue;
   if(v.mapValue)return decodeFields(v.mapValue.fields);if(v.arrayValue)return (v.arrayValue.values||[]).map(decode);return null;
 }
-export function createAgentBackend(options:{projectId:string;databaseId:string;token:string;uid:string;tenantId:string;origin?:string;fetcher?:typeof fetch}){
+export function createAgentBackend(options:{projectId:string;databaseId:string;token:string;uid:string;tenantId:string;origin?:string;fetcher?:typeof fetch;requestNotes?:string;leaderIds?:string[];eventIds?:string[]}){
   const {uid,tenantId,token}=options;const request=options.fetcher||fetch;
   const root=`projects/${options.projectId}/databases/${options.databaseId}/documents`;
   const base=`${options.origin||'https://firestore.googleapis.com'}/v1/${root}`;
@@ -39,7 +39,8 @@ export function createAgentBackend(options:{projectId:string;databaseId:string;t
   async function turn(input:AgentTurn){
     validateAgentTurn(input);
     const [leaders,events]=await Promise.all([catalog('lideres','fullName'),catalog('jornadas_operativas','name')]);
-    const context:AgentContext={uid,tenantId,leaders,events};
+    const context:AgentContext={uid,tenantId,leaders:options.leaderIds?leaders.filter(l=>options.leaderIds!.includes(l.id)):leaders,events:options.eventIds?events.filter(e=>options.eventIds!.includes(e.id)):events};
+    const makeRequest=(c:AgentConversation)=>({...agentRequest(c),...(options.requestNotes?{notes:options.requestNotes}:{})});
     const path=`usuarios/${uid}/agent_conversations/${input.conversationId}`;
     async function verifySubmitted(conversation:AgentConversation){
       if(conversation.status!=='submitted')return;
@@ -67,7 +68,7 @@ export function createAgentBackend(options:{projectId:string;databaseId:string;t
       const writes:any[]=[];
       const write=(p:string,data:Record<string,any>)=>writes.push({update:{name:`${root}/${p}`,fields:encodeFields(data)}});
       if(conversation.status==='submitted'){
-        const record=agentRequest(conversation);
+        const record=makeRequest(conversation);
         const leader=await read(`lideres/${record.leaderId}`,transaction);
         if(leader?.tenantId!==tenantId)throw new AgentError('El responsable ya no está disponible.');
         if(record.eventId){const event=await read(`jornadas_operativas/${record.eventId}`,transaction);if(event?.tenantId!==tenantId||['Cancelado','Finalizado'].includes(event.status))throw new AgentError('La jornada ya no está activa.');}
@@ -80,7 +81,7 @@ export function createAgentBackend(options:{projectId:string;databaseId:string;t
       const saved=await read(path) as AgentConversation|undefined;
       if(!saved||saved.revision<conversation.revision)throw new AgentError('No se pudo verificar el guardado. Reintente el mismo mensaje.',503);
       if(conversation.status==='submitted'){
-        const savedRequest=await read(`solicitudes_recursos/${conversation.requestId}`),expected=agentRequest(conversation);
+        const savedRequest=await read(`solicitudes_recursos/${conversation.requestId}`),expected=makeRequest(conversation);
         if(!savedRequest||Object.entries(expected).some(([k,v])=>JSON.stringify(savedRequest[k])!==JSON.stringify(v)))throw new AgentError('El guardado requiere revisión. No se confirma la solicitud.',503);
       }
       return {conversation:saved,context,reply:saved.messages.at(-1)?.text||'',verified:true};

@@ -3,7 +3,9 @@
   "buildCommand": "npm run build:frontend",
   "installCommand": "npm ci --no-audit --no-fund --fetch-timeout=60000 --fetch-retries=1",
   "outputDirectory": "dist",
+  "functions": {"api/whatsapp-pilot.ts": {"maxDuration": 300}},
   "rewrites": [
+    {"source":"/api/whatsapp/pilot","destination":"/api/whatsapp-pilot"},
     {
       "source": "/api/:path*",
       "destination": "/api/index"
