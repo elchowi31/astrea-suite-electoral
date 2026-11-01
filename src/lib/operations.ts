@@ -1,4 +1,4 @@
-import type { CampaignExpense, Candidate, GrassrootsVoter, Leader, TransportVehicle, UserProfile, FinancialRubro, ExpenseComponent } from '../types';
+import type { CampaignExpense, Candidate, GrassrootsVoter, Leader, TransportVehicle, UserProfile, FinancialRubro, ExpenseComponent } from '../types.js';
 
 export const RESOURCE_CATALOG: { name: string; unit: string; rubro: FinancialRubro; component: ExpenseComponent }[] = [
   { name: 'Transporte de pasajeros', unit: 'personas', rubro: 'Transporte y Movilización', component: 'Transporte y Movilización' },

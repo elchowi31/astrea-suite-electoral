@@ -4,6 +4,8 @@ import { createVerify } from 'node:crypto';
 import firebaseConfig from '../firebase-applet-config.json' with { type: 'json' };
 import { isPlatformAdminClaims } from '../src/lib/accessPolicy.js';
 import { withAvailableModel } from '../src/lib/aiAvailability.js';
+import { createAgentBackend } from '../src/server/requestAgent.js';
+import { AgentError, type AgentTurn } from '../src/lib/requestAgent.js';
 
 type ApiRequest = IncomingMessage & { body?: Record<string, unknown> };
 type TokenPayload = {
@@ -201,7 +203,7 @@ export default async function handler(req: ApiRequest, res: ServerResponse) {
     return json(res, 200, { status: 'ok', service: 'Astrea Suite Electoral API', timestamp: new Date().toISOString() });
   }
   if (!pathname.startsWith('/api/')) return json(res, 404, { success: false, error: 'Ruta no encontrada.' });
-  const routes = ['/api/ai/analyze-document', '/api/ai/generate-speech', '/api/ai/electoral-strategy'];
+  const routes = ['/api/ai/analyze-document', '/api/ai/generate-speech', '/api/ai/electoral-strategy', '/api/agent/turn'];
   if (!routes.includes(pathname)) return json(res, 404, { success: false, error: 'Ruta no encontrada.' });
   const user = await authorize(req, res);
   if (!user) return;
@@ -217,6 +219,16 @@ export default async function handler(req: ApiRequest, res: ServerResponse) {
   try {
     const body = await parseBody(req);
     const token = req.headers.authorization!.slice(7);
+    if(pathname==='/api/agent/turn'){
+      const profile=await readAuthorizedDocument(`usuarios/${encodeURIComponent(user.sub)}`,token);
+      const admin=isPlatformAdminClaims(user as unknown as Record<string,unknown>);
+      const tenantId=typeof body.tenantId==='string'?body.tenantId:'';
+      if(!/^[a-zA-Z0-9_-]{1,120}$/.test(tenantId)||!profile||profile.active!==true||(!admin&&(profile.accessVersion!==2||profile.tenantId!==tenantId||!['AdminTenant','Gobernador','Diputado','Alcalde','Concejal','JefePolitico','Supervisor','Operador','LiderVeredal'].includes(String(profile.role)))))return json(res,403,{success:false,error:'Su perfil no puede registrar solicitudes en esta organización.'});
+      const organization=await readAuthorizedDocument(`organizaciones/${tenantId}`,token);
+      if(organization?.active!==true)return json(res,403,{success:false,error:'La organización no está activa.'});
+      const backend=createAgentBackend({projectId:FIREBASE_PROJECT_ID,databaseId:FIRESTORE_DATABASE_ID,token,uid:user.sub,tenantId});
+      return json(res,200,{success:true,...await backend.turn(body as unknown as AgentTurn)});
+    }
     const tenant = await authorizeOrganization(user, token, body);
     if (!tenant) return json(res, 403, { success: false, error: 'Su perfil no tiene autorización para esta organización o el servicio de IA.' });
     const tenantName = cleanText(tenant.name, 'la organización');
@@ -248,6 +260,7 @@ export default async function handler(req: ApiRequest, res: ServerResponse) {
     }
     return json(res, 404, { success: false, error: 'Ruta no encontrada.' });
   } catch (error) {
+    if(error instanceof AgentError)return json(res,error.status,{success:false,error:error.message});
     if (error instanceof Error && error.message === 'PAYLOAD_TOO_LARGE') return json(res, 413, { success: false, error: 'Solicitud demasiado grande.' });
     if (error instanceof Error && error.message === 'INVALID_JSON') return json(res, 400, { success: false, error: 'JSON inválido.' });
     if (error instanceof Error && error.message === 'IDENTITY_SERVICE_UNAVAILABLE') return json(res, 503, { success: false, error: 'No fue posible verificar los permisos. Intente más tarde.' });

@@ -401,6 +401,32 @@ service cloud.firestore {
         && (data.leaderId != '' || data.candidateId != '')
         && eventReference(data.tenantId,data.eventId) && leaderReference(data.tenantId,data.leaderId) && candidateReference(data.tenantId,data.candidateId);
     }
+    // Private assistant drafts and idempotency receipts. Requests still use the
+    // existing operational rules; a conversation never grants extra privileges.
+    match /usuarios/{uid}/agent_conversations/{conversationId} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && canOperateTenant(request.resource.data.tenantId)
+        && request.resource.data.ownerUid == uid && request.resource.data.id == conversationId
+        && request.resource.data.keys().hasOnly(['id','tenantId','ownerUid','revision','status','draft','messages','updatedAt','requestId'])
+        && request.resource.data.revision is int && request.resource.data.revision > 0
+        && request.resource.data.status in ['draft','review','submitted','human','cancelled']
+        && request.resource.data.draft is map && request.resource.data.messages is list
+        && request.resource.data.messages.size() <= 30 && request.resource.data.updatedAt is string
+        && request.resource.data.requestId is string
+        && (resource == null || (request.resource.data.tenantId == resource.data.tenantId
+          && request.resource.data.revision == resource.data.revision + 1));
+      allow delete: if false;
+      match /receipts/{messageId} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow create: if signedIn() && request.auth.uid == uid
+          && request.resource.data.ownerUid == uid && request.resource.data.messageId == messageId
+          && canOperateTenant(request.resource.data.tenantId)
+          && request.resource.data.keys().hasOnly(['messageId','revision','createdAt','tenantId','ownerUid'])
+          && request.resource.data.revision is int && request.resource.data.createdAt is string;
+        allow update, delete: if false;
+      }
+    }
     match /jornadas_operativas/{id} {
       allow read: if canReadTenant(resource.data.tenantId);
       allow create: if canOperateTenant(request.resource.data.tenantId) && request.resource.data.createdBy == request.auth.uid

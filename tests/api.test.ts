@@ -122,3 +122,12 @@ test('The installed app (https://localhost) may call the API with its token; oth
   const unauthenticated = await nativeFetch(`${base}/api/ai/analyze-document`, { method: 'POST', headers: { Origin: 'https://localhost', 'Content-Type': 'application/json' }, body: '{}' });
   assert.equal(unauthenticated.status, 401);
 });
+
+test('request agent requires identity, active operational role and exact tenant',async()=>{
+ const call=(body:unknown,authorization=token({sub:'agent-api-user'}))=>nativeFetch(`${base}/api/agent/turn`,{method:'POST',headers:{Authorization:`Bearer ${authorization}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ assert.equal((await call({},'')).status,401);
+ assert.equal((await call({tenantId:'tenant-b'})).status,403);
+ role='Consulta';assert.equal((await call({tenantId:'tenant-a'})).status,403);role='AdminTenant';
+ active=false;assert.equal((await call({tenantId:'tenant-a'})).status,403);active=true;
+ assert.equal((await call({tenantId:'tenant-a',action:'confirm'})).status,400);
+});

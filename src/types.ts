@@ -306,7 +306,7 @@ export interface TransportVehicle {
   longitude?: number;
   locationCapturedAt?: string;
   locationSource?: 'GPS' | 'Mapa' | 'Manual';
-  plannedRoute?: import('./lib/territorialMaps').TerritorialRoute;
+  plannedRoute?: import('./lib/territorialMaps.js').TerritorialRoute;
 }
 
 // ----------------------------------------------------
