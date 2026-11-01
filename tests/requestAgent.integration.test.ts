@@ -84,7 +84,7 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
   });
   await t.test('WhatsApp rotation restores encrypted authentication and a second conversation from actual emulator documents',async()=>{
    const config={phone:'573000000000',tenantId,leaderId:'agent-leader',eventId:'agent-event',municipality:'Astrea'};
-   const session={id:'e'.repeat(32),key:'f'.repeat(64)};
+   const session={id:'e'.repeat(32),key:'f'.repeat(64),resumeId:'a'.repeat(32)};
    const options={base:'http://127.0.0.1:8088/v1/projects/demo-astrea/databases/(default)/documents',token:'owner',uid:a.uid,config,session};
    const lock1=pilotLease({...options,phone:config.phone}),lock2=pilotLease({...options,phone:config.phone});
    await lock1.acquire();await assert.rejects(lock2.acquire(),/activa/);await lock1.release();await lock2.acquire();await lock2.release();

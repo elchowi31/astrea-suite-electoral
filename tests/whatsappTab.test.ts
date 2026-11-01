@@ -7,7 +7,7 @@ import {runWhatsappTab} from '../src/lib/whatsappTabConnection';
 import {runWhatsappPilot} from '../src/server/whatsappPilot';
 
 const config={phone:'573001234567',tenantId:'tenant',leaderId:'leader',eventId:'event',municipality:'Astrea'};
-const session={id:'a'.repeat(32),key:'b'.repeat(64)};
+const session={id:'a'.repeat(32),key:'b'.repeat(64),resumeId:'c'.repeat(32)};
 function state():SessionState{return {version:1,startedAt:Date.now(),creds:initAuthCreds(),keys:{test:Buffer.from('private-key')},conversations:{phone:'conversation-2'},inbox:[],handled:[]};}
 test('encrypted session restores binary keys and rejects tampering, wrong owner and wrong key',()=>{
  const initial=state();const sealed=sealSession(initial,session.key,'operator:scope');
@@ -32,12 +32,17 @@ test('Firestore checkpoint survives a new invocation, serializes writes and refu
  const first=await loadWhatsappSession(options);
  await first.auth.keys.set({'pre-key':{'1':{private:Buffer.from('secret'),public:Buffer.from('pub')}}});
  first.state.conversations.contact='new-draft';first.state.inbox.push({phone:'573009999999',jid:'573009999999@s.whatsapp.net',messageId:'in-1',text:'confirmar'});await first.save();
+ first.state.startedAt=1000;await first.save();
  const second=await loadWhatsappSession(options);assert.equal(second.state.inbox[0].messageId,'in-1');assert.equal(second.state.conversations.contact,'new-draft');assert.deepEqual((await second.auth.keys.get('pre-key',['1']))['1'].private,Buffer.from('secret'));
+ assert.equal(second.state.startedAt,1000,'automatic renewals retain the admitted time range');
  assert.ok(writes.every(w=>!w.includes('secret')&&!w.includes('new-draft')&&!w.includes(session.key)));
  await second.auth.keys.set({'pre-key':{'1':null}});assert.equal((await second.auth.keys.get('pre-key',['1']))['1'],undefined);
  await assert.rejects(first.save(),/conservar/);
  await assert.rejects(loadWhatsappSession({...options,config:{...config,tenantId:'other'}}),/ámbito/);
- fail=true;await assert.rejects(second.save(),/conservar/);
+ const resumed=await loadWhatsappSession({...options,session:{...session,resumeId:'d'.repeat(32)}});
+ assert.ok(resumed.state.startedAt>1000,'explicit resume excludes messages from the paused interval');
+ assert.equal(resumed.state.inbox[0].messageId,'in-1','already accepted work remains pending');
+ fail=true;await assert.rejects(resumed.save(),/conservar/);
 });
 const response=(events:unknown[])=>new Response(events.map(e=>JSON.stringify(e)+'\n').join(''),{headers:{'Content-Type':'application/x-ndjson'}});
 test('tab renews with fresh authorized requests and unchanged session; stop prevents another request',async()=>{

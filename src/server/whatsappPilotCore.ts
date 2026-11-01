@@ -15,12 +15,13 @@ export function validatePilotConfig(body:Record<string,unknown>):PilotConfig{
  return result;
 }
 export type PilotMessage={key:{id?:string|null;fromMe?:boolean|null;remoteJid?:string|null;remoteJidAlt?:string|null;senderPn?:string|null};messageTimestamp?:unknown;message?:{conversation?:string|null;extendedTextMessage?:{text?:string|null}|null}|null};
-export function incomingPilotText(message:PilotMessage,startedAt:number){
+export function incomingPilotText(message:PilotMessage,startedAt:number,strictCutoff=false){
  if(message.key.fromMe||!message.key.id)return null;
  const jid=message.key.remoteJid||'';
  const phone=canonicalSender(jid,message.key.senderPn||message.key.remoteJidAlt);
  const timestamp=Number(message.messageTimestamp);
- if(!phone||!Number.isFinite(timestamp)||timestamp*1000<startedAt-2000||timestamp*1000>Date.now()+60000)return null;
+ const cutoff=strictCutoff?Math.ceil(startedAt/1000)*1000:startedAt-2000;
+ if(!phone||!Number.isFinite(timestamp)||timestamp*1000<cutoff||timestamp*1000>Date.now()+60000)return null;
  const text=(message.message?.conversation||message.message?.extendedTextMessage?.text||'').trim();
  if(!text||text.length>500)return null;
  return {phone,jid,text,messageId:createHash('sha256').update(`${jid}:${message.key.id}`).digest('hex')};

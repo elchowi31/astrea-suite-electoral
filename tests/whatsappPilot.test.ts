@@ -11,6 +11,8 @@ test('pilot requires explicit scope and international phone',()=>{
 test('only new inbound private text with verified sender identity enters the pilot',()=>{
  const now=Date.now();const msg={key:{id:'msg',remoteJid:'573001234567@s.whatsapp.net'},messageTimestamp:Math.floor(now/1000),message:{conversation:'Necesito 8 almuerzos'}};
  assert.equal(incomingPilotText(msg,now)?.phone,'573001234567');
+ assert.equal(incomingPilotText(msg,now+1000,true),null,'a message from the explicit stopped period must not enter on resume');
+ assert.equal(incomingPilotText(msg,now-1000,true)?.phone,'573001234567','automatic renewal keeps the original cutoff');
  for(const patch of [{key:{...msg.key,fromMe:true}},{key:{...msg.key,remoteJid:'abc@g.us'}},{key:{...msg.key,remoteJid:'opaque@lid'}},{messageTimestamp:0},{messageTimestamp:undefined},{message:{conversation:'x'.repeat(501)}}])assert.equal(incomingPilotText({...msg,...patch},now),null);
  assert.equal(incomingPilotText({...msg,key:{...msg.key,remoteJid:'opaque@lid',remoteJidAlt:'573001234567@s.whatsapp.net'}},now)?.phone,'573001234567');
 });

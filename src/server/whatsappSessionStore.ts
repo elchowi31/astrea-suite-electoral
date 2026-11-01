@@ -5,13 +5,13 @@ import {decodeFields,encodeFields} from './requestAgent.js';
 import type {PilotConfig} from './whatsappPilotCore.js';
 import {writeCheckpoint} from './firestoreCheckpoint.js';
 
-export type TabSession={id:string;key:string};
+export type TabSession={id:string;key:string;resumeId:string};
 export type InboxItem={phone:string;jid:string;text:string;messageId:string;result?:{reply:string;requestId?:string}};
-export type SessionState={version:1;startedAt:number;creds:AuthenticationState['creds'];keys:Record<string,unknown>;conversations:Record<string,string>;inbox:InboxItem[];handled:string[]};
+export type SessionState={version:1;startedAt:number;resumeId?:string;creds:AuthenticationState['creds'];keys:Record<string,unknown>;conversations:Record<string,string>;inbox:InboxItem[];handled:string[]};
 export function validateTabSession(value:unknown):TabSession{
  const v=value as TabSession;
- if(!v||!/^\w{32}$/.test(v.id)||! /^[a-f0-9]{64}$/.test(v.key))throw new AgentError('Actualice la plataforma para iniciar la conexión de WhatsApp.');
- return {id:v.id,key:v.key};
+ if(!v||!/^\w{32}$/.test(v.id)||! /^[a-f0-9]{64}$/.test(v.key)||! /^[a-f0-9]{32}$/.test(v.resumeId))throw new AgentError('Actualice la plataforma para iniciar la conexión de WhatsApp.');
+ return {id:v.id,key:v.key,resumeId:v.resumeId};
 }
 export function sealSession(state:SessionState,key:string,aad:string){
  const plain=Buffer.from(JSON.stringify(state,BufferJSON.replacer));
@@ -63,6 +63,9 @@ export async function loadWhatsappSession(options:{base:string;token:string;uid:
   })) as any,
   set:async(data)=>{for(const [type,values] of Object.entries(data))for(const [id,value] of Object.entries(values||{})){if(value==null)delete state.keys[`${type}:${id}`];else state.keys[`${type}:${id}`]=value;}await save();}
  }};
- if(!record)await save();
+ // Automatic rotation keeps resumeId; an explicit Start/Resume changes it.
+ // Move the cutoff forward before connecting so offline messages from a manual
+ // pause are excluded, without discarding previously accepted pending work.
+ if(!record||state.resumeId!==options.session.resumeId){state.resumeId=options.session.resumeId;state.startedAt=Date.now();await save();}
  return {state,auth,save,flush:()=>writes};
 }

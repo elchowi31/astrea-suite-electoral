@@ -73,7 +73,7 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
    // Append includes offline messages from the renewal gap. Only this tab's time range is accepted.
    if(!['notify','append'].includes(event.type)||stopped)return;
    for(const message of event.messages){
-    const incoming=incomingPilotText(message,store.state.startedAt);if(!incoming)continue;
+    const incoming=incomingPilotText(message,store.state.startedAt,true);if(!incoming)continue;
     if(++accepted>150){stop('fatal','Se alcanzó el límite de mensajes de este intervalo. Detenga el envío y reanude la recepción.');break;}
     queue(async()=>{
      if(store.state.handled.includes(incoming.messageId)||store.state.inbox.some(i=>i.messageId===incoming.messageId))return;

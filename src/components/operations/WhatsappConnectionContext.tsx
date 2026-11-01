@@ -29,7 +29,7 @@ export function WhatsappConnectionProvider({children}:{children:React.ReactNode}
   const normalized={...config,phone:config.phone.replace(/[+\s()-]/g,''),municipality:config.municipality.trim(),tenantId:tenant.tenantId};
   const scope=JSON.stringify(normalized);
   if(!identity.current||identity.current.scope!==scope)identity.current={id:randomHex(16),key:randomHex(32),scope};
-  const session={id:identity.current.id,key:identity.current.key};
+  const session={id:identity.current.id,key:identity.current.key,resumeId:randomHex(16)};
   const active=new AbortController();controller.current=active;setRunning(true);setConnected(false);setError('');setCode('');setStatus('Iniciando WhatsApp…');
   const event=(e:WhatsappEvent)=>{
    if(!mounted.current||active.signal.aborted)return;
