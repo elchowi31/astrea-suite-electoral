@@ -5,6 +5,7 @@ import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { EditRecordButton } from './components/common/EditRecordButton';
 import { OperationsEditingReferences } from './components/operations/OperationsEditingReferences';
 import { OperationsProvider } from './components/operations/OperationsContext';
+import {WhatsappConnectionProvider,WhatsappConnectionStatus} from './components/operations/WhatsappConnectionContext';
 const OperationsOverview = lazy(()=>import('./components/operations/OperationsOverview').then(m=>({default:m.OperationsOverview})));
 const ResourcesView = lazy(()=>import('./components/operations/ResourcesView').then(m=>({default:m.ResourcesView})));
 import { DevicePersistencePanel } from './components/DevicePersistence';
@@ -633,6 +634,7 @@ export default function App() {
         {/* Content Area */}
         <main className="app-content min-w-0 flex-1 p-3 sm:p-5 lg:p-6 w-full space-y-5">
           <OperationsProvider key={`${currentTenant.tenantId}-${demoActive?'demo':'real'}`} tenant={currentTenant} user={demoViewUser} leaders={visibleLeaders} candidates={visibleCandidates} voters={visibleVoters} expenses={visibleExpenses} vehicles={visibleVehicles} contributions={visibleContributions} readOnly={demoActive} demo={demoBundle?.operations}>
+          <WhatsappConnectionProvider><WhatsappConnectionStatus/>
           <DemoEditing.Provider value={demoActive&&demoBundle?{bundle:demoBundle,realReferences:{candidatos:candidates.map(c=>({id:c.id,name:c.fullName})),lideres:leaders.map(l=>({id:l.id,name:l.fullName})),aportes:donorContributions.map(c=>({id:c.id,name:c.donorName})),vehiculos:vehicles.map(v=>({id:v.id,name:v.licensePlate}))},onPromoted:()=>{setDemoEnabled(false);notifyFirestoreSave('Ficha guardada en datos reales.');}}:null}>
           <OperationsEditingReferences>
           {activeTab === 'device' && isTrackingAdministrator(currentUser) && <><DevicePersistencePanel /><div className="flex flex-wrap gap-3"><EditRecordButton collection="usuarios" record={currentUser} label="Editar mi perfil" />{['AdminTenant','AdminGlobal'].includes(currentUser.role)&&<EditRecordButton collection="organizaciones" record={currentTenant} label="Editar organización" />}</div></>}
@@ -884,6 +886,7 @@ export default function App() {
 
           </OperationsEditingReferences>
           </DemoEditing.Provider>
+          </WhatsappConnectionProvider>
           </OperationsProvider>
         </main>
 

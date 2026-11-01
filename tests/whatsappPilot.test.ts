@@ -11,17 +11,18 @@ test('pilot requires explicit scope and international phone',()=>{
 test('only new inbound private text with verified sender identity enters the pilot',()=>{
  const now=Date.now();const msg={key:{id:'msg',remoteJid:'573001234567@s.whatsapp.net'},messageTimestamp:Math.floor(now/1000),message:{conversation:'Necesito 8 almuerzos'}};
  assert.equal(incomingPilotText(msg,now)?.phone,'573001234567');
+ assert.equal(incomingPilotText(msg,now+1000,true),null,'a message from the explicit stopped period must not enter on resume');
+ assert.equal(incomingPilotText(msg,now-1000,true)?.phone,'573001234567','automatic renewal keeps the original cutoff');
  for(const patch of [{key:{...msg.key,fromMe:true}},{key:{...msg.key,remoteJid:'abc@g.us'}},{key:{...msg.key,remoteJid:'opaque@lid'}},{messageTimestamp:0},{messageTimestamp:undefined},{message:{conversation:'x'.repeat(501)}}])assert.equal(incomingPilotText({...msg,...patch},now),null);
  assert.equal(incomingPilotText({...msg,key:{...msg.key,remoteJid:'opaque@lid',remoteJidAlt:'573001234567@s.whatsapp.net'}},now)?.phone,'573001234567');
 });
 test('serverless lease allows one instance, rejects races and fences stale releases',async()=>{
  let record:any=null,rev=0,now=1000;
  const fetcher:typeof fetch=async(input,init)=>{
-  const url=new URL(String(input));
-  if(init?.method!=='PATCH')return new Response(JSON.stringify(record||{}),{status:record?200:404});
-  const expected=url.searchParams.get('currentDocument.updateTime');
-  if((url.searchParams.has('currentDocument.exists')&&record)||(expected!==null&&expected!==record?.updateTime))return new Response('{}',{status:409});
-  record={...JSON.parse(init!.body as string),updateTime:String(++rev)};return new Response(JSON.stringify(record));
+  if(init?.method!=='POST')return new Response(JSON.stringify(record||{}),{status:record?200:404});
+  const write=JSON.parse(String(init.body)).writes[0],guard=write.currentDocument;
+  if((guard.exists===false&&record)||(guard.updateTime&&guard.updateTime!==record?.updateTime))return new Response('{}',{status:409});
+  record={fields:write.update.fields,updateTime:String(++rev)};return new Response(JSON.stringify({writeResults:[{updateTime:record.updateTime}]}));
  };
  const make=()=>pilotLease({base:'https://firestore.test/documents',token:'test-only',phone:'573001234567',fetcher,now:()=>now});
  const first=make(),second=make();await first.acquire();await assert.rejects(second.acquire(),/activa/);
