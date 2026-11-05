@@ -2,7 +2,7 @@ import {decodeFields,encodeFields} from './requestAgent.js';
 import {writeCheckpoint} from './firestoreCheckpoint.js';
 
 export type DiagnosticStage='starting'|'pairing'|'paired'|'connected'|'heartbeat'|'received'|'ignored'|'prepared'|'replied'|'saved'|'duplicate'|'pending_reply'|'stopped';
-export type DiagnosticDetails={detail?:string;senderHint?:string;text?:string;reply?:string;requestId?:string;queued?:number;recoveredHandled?:number};
+export type DiagnosticDetails={detail?:string;senderHint?:string;text?:string;reply?:string;requestId?:string;queued?:number;recoveredHandled?:number;conversationHint?:string;responseMs?:number;processingMs?:number};
 /** An operator-visible trace, scoped to the authenticated owner and organization.
  * It never stores credentials, encryption keys, full phone numbers or history sync. */
 export function createWhatsappDiagnostics(options:{base:string;token:string;uid:string;config:{tenantId:string;eventId:string;phone:string};session:{id:string};fetcher?:typeof fetch}){
@@ -23,12 +23,12 @@ export function createWhatsappDiagnostics(options:{base:string;token:string;uid:
    record.stage=stage;record.detail=clean(details.detail,300);
    if(['received','replied','saved','ignored'].includes(stage)&&(stage!=='saved'||details.requestId!==record.lastRequestId))record[stage]=(Number(record[stage])||0)+1;
    if(stage==='connected')record.lastHeartbeatAt=at;
-   if(stage==='received'){record.lastReceivedAt=at;record.lastText=clean(details.text,180);record.lastSenderHint=clean(details.senderHint,20);}
-   if(stage==='replied'){record.lastRepliedAt=at;record.lastReply=clean(details.reply,500);}
+   if(stage==='received'){record.lastReceivedAt=at;record.lastText=clean(details.text,180);record.lastSenderHint=clean(details.senderHint,20);record.lastConversationHint=clean(details.conversationHint,12);}
+   if(stage==='replied'){record.lastRepliedAt=at;record.lastReply=clean(details.reply,500);if(Number.isFinite(details.responseMs))record.lastResponseMs=Math.max(0,details.responseMs!);if(Number.isFinite(details.processingMs))record.lastProcessingMs=Math.max(0,details.processingMs!);}
    if(stage==='saved')record.lastRequestId=clean(details.requestId,160);
    if(details.queued!==undefined)record.queued=details.queued;
    if(details.recoveredHandled!==undefined)record.recoveredHandled=details.recoveredHandled;
-   record.history=[...(record.history||[]),{at,stage,detail:clean(details.detail,300),senderHint:clean(details.senderHint,20),...(details.text?{text:clean(details.text,180)}:{}),...(details.reply?{reply:clean(details.reply,500)}:{})}].slice(-30);
+   record.history=[...(record.history||[]),{at,stage,detail:clean(details.detail,300),senderHint:clean(details.senderHint,20),conversationHint:clean(details.conversationHint,12),...(Number.isFinite(details.responseMs)?{responseMs:Math.max(0,details.responseMs!)}:{}),...(details.text?{text:clean(details.text,180)}:{}),...(details.reply?{reply:clean(details.reply,500)}:{})}].slice(-30);
   }
   record.updatedAt=at;
   const saved=await writeCheckpoint({base:options.base,path,headers,request,revision,fields:encodeFields(record),timeout:10000});

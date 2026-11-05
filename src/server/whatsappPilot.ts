@@ -36,11 +36,17 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
  async function drain(){
   if(processing||stopped||!connected||!socket)return;processing=true;
   try{
-   while(store.state.inbox.length&&!stopped&&connected){
-    const item=store.state.inbox[0];await options.checkActive();
+   const blockedChats=new Set<string>();
+   for(let remaining=store.state.inbox.length;remaining>0&&!stopped&&connected;remaining--){
+    const item=store.state.inbox[0];
+    if(!item)break;
+    if(blockedChats.has(item.senderKey||item.phone)){store.state.inbox.push(store.state.inbox.shift()!);continue;}
+    const processingStartedAt=Date.now();
+    // Fresh intake checks access itself. Prepared replies still recheck revocation.
+    if(item.result||item.unsupportedReply)await options.checkActive();
     if(await store.wasHandled(item.messageId)){store.state.inbox.shift();await store.save();continue;}
     if(!item.result){
-     try{item.result=await intake(item.senderKey||item.phone,item.messageId,item.text,item.phone);}
+     try{item.result=item.unsupportedReply?{reply:item.unsupportedReply}:await intake(item.senderKey||item.phone,item.messageId,item.text,item.phone);}
      catch(e){if(e instanceof AgentError&&e.status===400)item.result={reply:e.message};else throw e;}
      await store.save();
      trace('prepared',{detail:'Respuesta preparada; pendiente de envío.',reply:item.result.reply,queued:store.state.inbox.length});
@@ -48,10 +54,11 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
     if(item.result.requestId){emit({type:'saved',requestId:item.result.requestId});trace('saved',{detail:'Solicitud confirmada y guardada en Firestore.',requestId:item.result.requestId});}
     if(stopped||!connected)break;
     try{await socket.sendMessage(item.jid,{text:item.result.reply});}
-    catch{trace('pending_reply',{detail:'WhatsApp no confirmó el envío; se reintentará.',queued:store.state.inbox.length});emit({type:'notice',message:'Una respuesta sigue pendiente de entrega. Se reintentará al recuperar la conexión.'});break;}
+    catch{trace('pending_reply',{detail:'WhatsApp no confirmó el envío; se reintentará.',queued:store.state.inbox.length});emit({type:'notice',message:'Una respuesta sigue pendiente de entrega. Se reintentará al recuperar la conexión.'});blockedChats.add(item.senderKey||item.phone);store.state.inbox.push(store.state.inbox.shift()!);await store.save();continue;}
+    const replySentAt=Date.now();
     await store.markHandled(item.messageId);
     store.state.inbox.shift();await store.save();
-    trace('replied',{detail:'Respuesta enviada a WhatsApp. La lectura en el teléfono aún no está confirmada.',reply:item.result.reply,senderHint:item.phone?item.phone.slice(-4):'',queued:store.state.inbox.length});
+    trace('replied',{detail:'Respuesta enviada a WhatsApp. La lectura en el teléfono aún no está confirmada.',reply:item.result.reply,senderHint:item.phone?item.phone.slice(-4):'',conversationHint:(item.senderKey||item.phone).slice(-12),queued:store.state.inbox.length,processingMs:replySentAt-processingStartedAt,...(item.receivedAt?{responseMs:Math.max(0,replySentAt-item.receivedAt)}:{})});
     emit({type:'activity',message:'Mensaje recibido y respuesta enviada. Complete el cuestionario y escriba «confirmar» para guardar la solicitud.'});
    }
   }finally{processing=false;}
@@ -96,11 +103,12 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
     if(message.key.fromMe||!message.key.id)continue;
     const jid=message.key.remoteJid||'';
     if(!jid.endsWith('@s.whatsapp.net')&&!jid.endsWith('@lid'))continue;
+    const receivedAt=Date.now();
     queue(async()=>{
      const result=await resolvePilotText(message,store.state.startedAt,current.signalRepository?.lidMapping?.getPNForLID?.bind(current.signalRepository.lidMapping));
      const incoming=result.incoming;
      if(!incoming){
-      const reasons={before_session:'El mensaje es anterior al inicio de esta recepción. Envíe uno nuevo.',invalid_timestamp:'La fecha del mensaje no es válida.',unsupported_content:'No se recibió texto compatible (máximo 500 caracteres). Envíe una frase de texto.',unresolved_sender:'WhatsApp no entregó un identificador válido de conversación privada.',own_or_missing_id:'Mensaje propio o sin identificador.',not_private:'Solo se atienden conversaciones privadas.'};
+      const reasons={before_session:'El mensaje es anterior al inicio de esta recepción. Envíe uno nuevo.',invalid_timestamp:'La fecha del mensaje no es válida.',unsupported_content:'No se recibió contenido de usuario compatible. Envíe una frase de texto.',unresolved_sender:'WhatsApp no entregó un identificador válido de conversación privada.',own_or_missing_id:'Mensaje propio o sin identificador.',not_private:'Solo se atienden conversaciones privadas.'};
       // System and history packets are not messages from the user; do not flood the trace.
       if(result.reason==='unresolved_sender'||(result.reason==='unsupported_content'&&message.message)||result.reason==='invalid_timestamp'||result.reason==='before_session')trace('ignored',{detail:reasons[result.reason]});
       return;
@@ -108,8 +116,8 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
      if(++accepted>150){stop('renew','Renovando la conexión para continuar procesando mensajes.');return;}
      if(store.state.inbox.some(i=>i.messageId===incoming.messageId)||await store.wasHandled(incoming.messageId)){trace('duplicate',{detail:'Mensaje ya recibido; no se vuelve a registrar.'});return;}
      if(store.state.inbox.length>=100)throw new AgentError('Hay demasiados mensajes pendientes. Revise las solicitudes antes de reanudar.',429);
-     store.state.inbox.push(incoming);await store.save();
-     trace('received',{detail:incoming.phone?'Mensaje privado recibido y conservado para procesar.':'Mensaje recibido mediante identificador privado; no requiere compartir el número.',text:incoming.text,senderHint:incoming.phone?incoming.phone.slice(-4):'',queued:store.state.inbox.length});
+     store.state.inbox.push({...incoming,receivedAt});await store.save();
+     trace('received',{detail:incoming.phone?'Mensaje privado recibido y conservado para procesar.':'Mensaje recibido mediante identificador privado; no requiere compartir el número.',text:incoming.text,senderHint:incoming.phone?incoming.phone.slice(-4):'',conversationHint:incoming.senderKey.slice(-12),queued:store.state.inbox.length});
      emit({type:'activity',message:'Mensaje de WhatsApp recibido. Preparando respuesta.'});await drain();
     });
    }

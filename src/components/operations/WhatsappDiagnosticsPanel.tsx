@@ -2,8 +2,8 @@ import React,{useEffect,useState} from 'react';
 import {doc,onSnapshot} from 'firebase/firestore';
 import {db} from '../../lib/firebase';
 import {useOperations} from './OperationsContext';
-type Entry={at:string;stage:string;detail:string;senderHint?:string;text?:string;reply?:string};
-type Diagnostic={receiverHint:string;stage:string;detail:string;updatedAt:string;lastHeartbeatAt?:string;received:number;replied:number;saved:number;ignored:number;queued?:number;recoveredHandled?:number;lastText?:string;lastReply?:string;lastRequestId?:string;history:Entry[]};
+type Entry={at:string;stage:string;detail:string;senderHint?:string;text?:string;reply?:string;conversationHint?:string;responseMs?:number};
+type Diagnostic={receiverHint:string;stage:string;detail:string;updatedAt:string;lastHeartbeatAt?:string;received:number;replied:number;saved:number;ignored:number;queued?:number;recoveredHandled?:number;lastText?:string;lastReply?:string;lastRequestId?:string;history:Entry[];lastResponseMs?:number;lastProcessingMs?:number;lastConversationHint?:string};
 const time=(s:string)=>new Date(s).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
 const labels:Record<string,string>={starting:'Iniciando',pairing:'Esperando teléfono',paired:'Vinculación confirmada',connected:'Conectado',received:'Recibido',ignored:'No procesado',prepared:'Respuesta preparada',replied:'Respuesta enviada',saved:'Solicitud guardada',duplicate:'Duplicado evitado',pending_reply:'Envío pendiente',stopped:'Recepción detenida'};
 export function WhatsappDiagnosticsPanel(){
@@ -21,10 +21,12 @@ export function WhatsappDiagnosticsPanel(){
    <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">{[['Recibidos',data.received],['Respuestas enviadas',data.replied],['Solicitudes guardadas',data.saved],['Pendientes',data.queued||0]].map(([label,value])=><div key={label} className="rounded-lg bg-slate-900 p-3"><p className="text-xl font-semibold text-emerald-200">{value}</p><p className="mt-1 text-xs text-slate-400">{label}</p></div>)}</div>
    <p className="text-sm text-slate-200">{labels[data.stage]||data.stage}: {data.detail}</p>
    {!!data.recoveredHandled&&<p className="text-xs text-slate-400">La sesión recuperó {data.recoveredHandled} recibos de mensajes ya atendidos antes de esta actualización.</p>}
+   {data.lastResponseMs!==undefined&&<p className="text-xs text-slate-300">Última respuesta: {(data.lastResponseMs/1000).toFixed(1)} s desde la recepción en la plataforma{data.lastProcessingMs!==undefined?` · procesamiento y envío: ${(data.lastProcessingMs/1000).toFixed(1)} s`:''}. No incluye el tiempo previo a que WhatsApp entregue el mensaje al receptor.</p>}
+   {data.lastConversationHint&&<p className="text-xs text-slate-400">Conversación: {data.lastConversationHint} · cada chat mantiene su propio formulario.</p>}
    {data.lastText&&<p className="rounded-lg bg-slate-900 p-3 text-sm text-slate-200"><strong>Último mensaje: </strong>{data.lastText}</p>}
    {data.lastReply&&<p className="whitespace-pre-wrap rounded-lg bg-emerald-950/20 p-3 text-sm text-emerald-100"><strong>Última respuesta enviada: </strong>{data.lastReply}</p>}
    {data.lastRequestId&&<p className="break-all text-xs text-emerald-200">Último radicado: {data.lastRequestId}</p>}
-   <details><summary className="cursor-pointer text-xs text-slate-300">Ver actividad reciente · {data.ignored||0} mensajes no procesados</summary><ol className="mt-3 max-h-64 space-y-2 overflow-y-auto">{(data.history||[]).slice().reverse().map((entry,i)=><li key={i} className="border-t border-slate-800 pt-2 text-xs text-slate-400"><strong className="text-slate-200">{time(entry.at)} · {labels[entry.stage]||entry.stage}</strong>{entry.senderHint&&` · remitente terminado en ${entry.senderHint}`}<p>{entry.detail}</p></li>)}</ol></details>
+   <details><summary className="cursor-pointer text-xs text-slate-300">Ver actividad reciente · {data.ignored||0} mensajes no procesados</summary><ol className="mt-3 max-h-64 space-y-2 overflow-y-auto">{(data.history||[]).slice().reverse().map((entry,i)=><li key={i} className="border-t border-slate-800 pt-2 text-xs text-slate-400"><strong className="text-slate-200">{time(entry.at)} · {labels[entry.stage]||entry.stage}</strong>{entry.senderHint?` · remitente terminado en ${entry.senderHint}`:entry.conversationHint?` · chat ${entry.conversationHint}`:''}{entry.responseMs!==undefined?` · ${(entry.responseMs/1000).toFixed(1)} s`:''}<p>{entry.detail}</p></li>)}</ol></details>
   </>}
  </section>;
 }

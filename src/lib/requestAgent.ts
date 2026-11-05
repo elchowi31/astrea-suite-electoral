@@ -46,7 +46,7 @@ export function question(d:AgentDraft,c:AgentContext):string {
     case 'resource':return '¿Qué necesita? Puede escribir «Necesito 20 almuerzos», «Transporte para 8 personas» o elegir un recurso en la ficha.';
     case 'quantity':return '¿Qué cantidad necesita? Escriba solo el número.';
     case 'municipality':return '¿En qué municipio se necesita el recurso?';
-    case 'description':return 'Describa la necesidad. Para transporte, indique origen, destino y hora de recogida.';
+    case 'description':return d.resource===TRANSPORT_RESOURCE?'Indique origen, destino, fecha y hora de recogida, y si necesita regreso. Incluya cualquier ayuda de movilidad que deba prever coordinación.':['Alimentación','Refrigerios e hidratación'].includes(d.resource||'')?'Indique lugar, fecha y hora de entrega, y cualquier requisito de alimentación.':d.resource==='Combustible'?'Indique el tipo de combustible, vehículo o equipo, lugar y fecha en que se necesita.':'Describa el recurso, el lugar y la fecha en que lo necesita para el evento.';
     case 'leaderId':return c.leaders.length?`Seleccione el responsable en la ficha o escriba su nombre exacto: ${c.leaders.slice(0,12).map(l=>l.name).join('; ')}.`:'No hay líderes disponibles. Registre primero al responsable en la plataforma.';
     case 'eventId':return c.events.length?`Seleccione la jornada en la ficha o escriba su nombre exacto: ${c.events.slice(0,12).map(e=>e.name).join('; ')}.`:'No hay jornadas activas. Cree una jornada antes de solicitar transporte.';
     case 'unitCost':return '¿Cuál es el costo unitario estimado en pesos? Escriba 0 si aún no tiene cotización.';
@@ -57,7 +57,7 @@ export function parseMessage(text:string,d:AgentDraft,c:AgentContext):AgentDraft
   const n=normalize(text),next={...d},field=missingField(d);
   if(field==='resource'){
     const exact=RESOURCE_CATALOG.find(r=>normalize(r.name)===n);
-    const resource=exact?.name||(/almuerzo|comida|alimentacion|raciones/.test(n)?'Alimentación':/refrigerio|hidratacion|agua/.test(n)?'Refrigerios e hidratación':/transporte|pasajero|cupos/.test(n)?TRANSPORT_RESOURCE:/combustible|gasolina|galones/.test(n)?'Combustible':undefined);
+    const resource=exact?.name||(/almuerzo|desayuno|cena|comida|alimentacion|raciones/.test(n)?'Alimentación':/refrigerio|merienda|hidratacion|agua/.test(n)?'Refrigerios e hidratación':/transporte|pasajero|cupos/.test(n)?TRANSPORT_RESOURCE:/combustible|gasolina|diesel|acpm|galones/.test(n)?'Combustible':/uniforme/.test(n)?'Uniformes del equipo':/camiseta/.test(n)?'Camisetas para asistentes':/sonido|tarima/.test(n)?'Sonido, tarima y evento':/sillas|mesas|mobiliario/.test(n)?'Sede y mobiliario':/montaje|avanzada/.test(n)?'Avanzada y montaje':/senalizacion|impresos/.test(n)?'Impresos y señalización':undefined);
     if(resource){next.resource=resource;const q=n.match(/\b(\d+(?:[.,]\d+)?)\b/);if(q)next.quantity=Number(q[1].replace(',','.'));}
   }else if(field==='quantity'||field==='unitCost'){
     if(!/^\d+(?:[.,]\d+)?$/.test(n))throw new AgentError('Escriba un número sin separadores de miles, por ejemplo 15000.');

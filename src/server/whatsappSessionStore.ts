@@ -6,7 +6,7 @@ import type {PilotConfig} from './whatsappPilotCore.js';
 import {writeCheckpoint} from './firestoreCheckpoint.js';
 
 export type TabSession={id:string;key:string;resumeId:string};
-export type InboxItem={phone:string;senderKey?:string;jid:string;text:string;messageId:string;result?:{reply:string;requestId?:string}};
+export type InboxItem={phone:string;senderKey?:string;jid:string;text:string;messageId:string;receivedAt?:number;sourceSentAt?:number;unsupportedReply?:string;result?:{reply:string;requestId?:string}};
 export type SessionState={version:1;receiptsVersion?:1;startedAt:number;resumeId?:string;creds:AuthenticationState['creds'];keys:Record<string,unknown>;conversations:Record<string,string>;inbox:InboxItem[];handled:string[]};
 export function validateTabSession(value:unknown):TabSession{
  const v=value as TabSession;

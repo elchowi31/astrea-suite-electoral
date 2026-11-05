@@ -13,7 +13,7 @@ test('only new inbound private text with verified sender identity enters the pil
  assert.equal(incomingPilotText(msg,now)?.phone,'573001234567');
  assert.equal(incomingPilotText(msg,now+1000,true),null,'a message from the explicit stopped period must not enter on resume');
  assert.equal(incomingPilotText(msg,now-1000,true)?.phone,'573001234567','automatic renewal keeps the original cutoff');
- for(const patch of [{key:{...msg.key,fromMe:true}},{key:{...msg.key,remoteJid:'abc@g.us'}},{key:{...msg.key,remoteJid:'opaque@lid'}},{messageTimestamp:0},{messageTimestamp:undefined},{message:{conversation:'x'.repeat(501)}}])assert.equal(incomingPilotText({...msg,...patch},now),null);
+ for(const patch of [{key:{...msg.key,fromMe:true}},{key:{...msg.key,remoteJid:'abc@g.us'}},{key:{...msg.key,remoteJid:'opaque@lid'}},{messageTimestamp:0},{messageTimestamp:undefined}])assert.equal(incomingPilotText({...msg,...patch},now),null);
  assert.equal(incomingPilotText({...msg,key:{...msg.key,remoteJid:'opaque@lid',remoteJidAlt:'573001234567@s.whatsapp.net'}},now)?.phone,'573001234567');
 });
 test('serverless lease allows one instance, rejects races and fences stale releases',async()=>{
@@ -70,7 +70,17 @@ test('private LIDs work without phone lookup and keep their channel identity whe
  assert.equal(device.incoming?.senderKey,missing.incoming?.senderKey);
  const other=await resolvePilotText({...msg,key:{...msg.key,remoteJid:'123456789012346@lid'}},start);
  assert.notEqual(other.incoming?.senderKey,missing.incoming?.senderKey);
- for(const patch of [{key:{...msg.key,fromMe:true}},{key:{...msg.key,remoteJid:'123456789012345@g.us'}},{key:{...msg.key,remoteJid:'bad@lid'}},{messageTimestamp:0},{message:{conversation:'x'.repeat(501)}}]){
+ for(const patch of [{key:{...msg.key,fromMe:true}},{key:{...msg.key,remoteJid:'123456789012345@g.us'}},{key:{...msg.key,remoteJid:'bad@lid'}},{messageTimestamp:0}]){
   assert.equal((await resolvePilotText({...msg,...patch},start)).incoming,null);
  }
+});
+
+test('supported private content receives useful guidance instead of being silently dropped',async()=>{
+ const start=Date.now()-3000,msg={key:{id:'content-help',remoteJid:'573001234567@s.whatsapp.net'},messageTimestamp:Math.floor(Date.now()/1000)};
+ for(const message of [{audioMessage:{}},{imageMessage:{}},{locationMessage:{}},{conversation:'x'.repeat(1501)}]){
+  const result=await resolvePilotText({...msg,message},start);
+  assert.ok(result.incoming);assert.match(result.incoming.unsupportedReply!,/texto|1500/);
+ }
+ assert.equal((await resolvePilotText({...msg,message:{conversation:'x'.repeat(1500)}},start)).incoming?.text.length,1500);
+ assert.equal((await resolvePilotText({...msg,message:{}},start)).incoming,null,'system packets must not receive automatic replies');
 });
