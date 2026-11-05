@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Buffer } from 'node:buffer';
-import { createVerify } from 'node:crypto';
+import { verifyFirebaseToken, type TokenPayload } from '../src/server/firebaseToken.js';
 import firebaseConfig from '../firebase-applet-config.json' with { type: 'json' };
 import { isPlatformAdminClaims } from '../src/lib/accessPolicy.js';
 import { withAvailableModel } from '../src/lib/aiAvailability.js';
@@ -8,21 +8,9 @@ import { createAgentBackend } from '../src/server/requestAgent.js';
 import { AgentError, type AgentTurn } from '../src/lib/requestAgent.js';
 
 type ApiRequest = IncomingMessage & { body?: Record<string, unknown> };
-type TokenPayload = {
-  aud: string;
-  iss: string;
-  exp: number;
-  iat: number;
-  sub: string;
-  admin?: boolean;
-  email?: string;
-  email_verified?: boolean;
-};
-
 export const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId;
 export const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId || '(default)';
 const MAX_BODY_BYTES = 32 * 1024;
-let certCache: { expiresAt: number; certificates: Record<string, string> } = { expiresAt: 0, certificates: {} };
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 
 function json(res: ServerResponse, status: number, payload: unknown) {
@@ -37,52 +25,6 @@ function json(res: ServerResponse, status: number, payload: unknown) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function decodeBase64Url(value: string) {
-  return Buffer.from(value.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
-}
-
-async function firebaseCertificates(): Promise<Record<string, string>> {
-  if (certCache.expiresAt > Date.now()) return certCache.certificates;
-  const response = await fetch('https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com', { signal: AbortSignal.timeout(10_000) });
-  if (!response.ok) throw new Error('No fue posible validar la identidad.');
-  const certificates = await response.json() as Record<string, string>;
-  const maxAge = Number((response.headers.get('cache-control') || '').match(/max-age=(\d+)/)?.[1] || 1800);
-  certCache = { certificates, expiresAt: Date.now() + maxAge * 1000 };
-  return certificates;
-}
-
-async function verifyFirebaseToken(token: string): Promise<TokenPayload> {
-  const parts = token.split('.');
-  if (parts.length !== 3 || token.length > 8192) throw new Error('Token inválido.');
-  const header: unknown = JSON.parse(decodeBase64Url(parts[0]).toString('utf8'));
-  const payload: unknown = JSON.parse(decodeBase64Url(parts[1]).toString('utf8'));
-  if (!isRecord(header) || !isRecord(payload)) throw new Error('Token inválido.');
-  if (header.alg !== 'RS256' || typeof header.kid !== 'string' || !header.kid) throw new Error('Token no admitido.');
-  const certificate = (await firebaseCertificates())[header.kid];
-  if (!certificate) throw new Error('Firma desconocida.');
-  const verifier = createVerify('RSA-SHA256');
-  verifier.update(`${parts[0]}.${parts[1]}`);
-  verifier.end();
-  if (!verifier.verify(certificate, decodeBase64Url(parts[2]))) throw new Error('Firma inválida.');
-  const now = Math.floor(Date.now() / 1000);
-  if (
-    payload.aud !== FIREBASE_PROJECT_ID
-    || payload.iss !== `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`
-    || typeof payload.exp !== 'number'
-    || typeof payload.iat !== 'number'
-    || typeof payload.sub !== 'string'
-    || !Number.isFinite(payload.exp)
-    || !Number.isFinite(payload.iat)
-    || payload.exp <= now
-    || payload.iat > now + 60
-    || !payload.sub
-    || payload.sub.length > 128
-  ) {
-    throw new Error('Token vencido o emitido para otro proyecto.');
-  }
-  return payload as TokenPayload;
 }
 
 export async function parseBody(req: ApiRequest): Promise<Record<string, unknown>> {
@@ -171,7 +113,7 @@ export async function authorize(req: ApiRequest, res: ServerResponse) {
     return null;
   }
   try {
-    const user = await verifyFirebaseToken(token);
+    const user = await verifyFirebaseToken(token, FIREBASE_PROJECT_ID);
     const key = String(user.sub);
     if (!enforceRateLimit(key)) {
       json(res, 429, { success: false, error: 'Límite temporal de solicitudes alcanzado.' });
@@ -271,3 +213,4 @@ export default async function handler(req: ApiRequest, res: ServerResponse) {
     return json(res, 502, { success: false, error: 'No fue posible completar la solicitud de IA. Intente más tarde.' });
   }
 }
+

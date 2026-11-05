@@ -22,7 +22,7 @@ function token(extra: Record<string, unknown> = {}) {
   const payload = Buffer.from(JSON.stringify({
     sub: 'authorized-user', aud: 'gen-lang-client-0498782352',
     iss: 'https://securetoken.google.com/gen-lang-client-0498782352',
-    exp: now + 3600, iat: now, ...extra
+    exp: now + 3600, iat: now, auth_time: now, ...extra
   })).toString('base64url');
   const content = `${header}.${payload}`;
   return `${content}.${sign('RSA-SHA256', Buffer.from(content), privateKey).toString('base64url')}`;
@@ -159,3 +159,4 @@ test('WhatsApp pilot accepts only supported native preflights and still requires
  }
  const foreign=await nativeFetch(`${base}/api/whatsapp/pilot`,{method:'OPTIONS',headers:{Origin:'https://other.example'}});assert.equal(foreign.status,403);assert.equal(foreign.headers.get('Access-Control-Allow-Origin'),null);
 });
+
