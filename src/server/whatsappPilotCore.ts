@@ -1,5 +1,5 @@
 import {createHash,randomUUID} from 'node:crypto';
-import {AgentError,type AgentDraft} from '../lib/requestAgent.js';
+import {AgentError,requestCreatedReply,requestClosedReply,type AgentDraft} from '../lib/requestAgent.js';
 import {canonicalSender} from '../../integrations/claude-kit/astrea-adapter.js';
 import {createAgentBackend,decodeFields,encodeFields} from './requestAgent.js';
 import {writeCheckpoint} from './firestoreCheckpoint.js';
@@ -100,11 +100,12 @@ export function pilotIntake(options:{projectId:string;databaseId:string;token:st
   const backend=createAgentBackend({...options,tenantId:config.tenantId,leaderIds:[config.leaderId],eventIds:[config.eventId],requestNotes:`WHATSAPP · ${senderNote}. Registro recibido durante una sesión autorizada por ${options.uid}. Pendiente de revisión por coordinación.`});
   const turn={conversationId,messageId,revision:0,action:'resume' as const};
   let current=await backend.turn(turn);
-  if(help)return {reply:WHATSAPP_HELP+(current.conversation.requestId?`\nÚltima solicitud guardada. Radicado: ${current.conversation.requestId}`:''),requestId:''};
+  if(current.conversation.status==='submitted'&&command!=='nueva solicitud')return {reply:requestClosedReply(current.conversation.requestId),requestId:''};
+  if(help)return {reply:WHATSAPP_HELP,requestId:''};
   if(current.conversation.status==='human'&&command!=='cancelar')return {reply:'Esta conversación está pausada para atención manual. Para reiniciar el formulario escriba «cancelar» y después «nueva solicitud». Aún no se ha enviado aviso a un coordinador.',requestId:''};
   if(['estado','continuar'].includes(command))return {reply:(current.reply||WHATSAPP_HELP)+(current.conversation.requestId?`\nRadicado: ${current.conversation.requestId}`:''),requestId:current.conversation.requestId};
   if(['submitted','cancelled'].includes(current.conversation.status)){
-   if(command!=='nueva solicitud')return {reply:current.conversation.requestId?`Solicitud ya guardada. Radicado: ${current.conversation.requestId}. Escriba «nueva solicitud» para registrar otra.`:'Borrador cancelado. Escriba «nueva solicitud».',requestId:''};
+   if(command!=='nueva solicitud')return {reply:'Borrador cancelado. Escriba «nueva solicitud».',requestId:''};
    conversationId=createHash('sha256').update(`${initial}:${messageId}`).digest('hex');
    await saveConversation();
    current=await backend.turn({...turn,conversationId});
@@ -115,7 +116,7 @@ export function pilotIntake(options:{projectId:string;databaseId:string;token:st
    current=await backend.turn({...turn,conversationId,messageId:`init-${messageId}`,action:'edit',patch});
   }
   const result=await backend.turn({...turn,conversationId,revision:current.conversation.revision,action:command==='cancelar'?'cancel':'message',text});
-  return {reply:result.reply+(result.conversation.requestId?`\nRadicado: ${result.conversation.requestId}\nEscriba «nueva solicitud» para iniciar otra.`:'\nAstrea · Las entregas y asignaciones requieren aprobación de coordinación.'),requestId:result.conversation.requestId};
+  return {reply:result.conversation.requestId?requestCreatedReply(result.conversation.requestId):result.reply,requestId:result.conversation.requestId};
  };
 }
 

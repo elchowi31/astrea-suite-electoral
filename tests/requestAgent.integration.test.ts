@@ -1,3 +1,4 @@
+import {requestReference} from '../src/lib/requestReference';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -141,11 +142,39 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
    await intake('573001234567','inbound-1','Necesito 3 almuerzos');
    const review=await intake('573001234567','inbound-2','PRUEBA logística, no entregar');assert.match(review.reply,/Revise antes/);
    const confirmed=await intake('573001234567','inbound-3','confirmar');assert.ok(confirmed.requestId);
-   const replay=await intake('573001234567','inbound-3','confirmar');assert.match(replay.reply,new RegExp(confirmed.requestId));
+   const replay=await intake('573001234567','inbound-3','confirmar');assert.match(replay.reply,new RegExp(requestReference(confirmed.requestId)));
    const db=env.authenticatedContext(a.uid,{email:'agent@test.invalid'}).firestore();
    const record=(await getDoc(doc(db,'solicitudes_recursos',confirmed.requestId))).data()!;
    assert.equal(record.quantity,3);assert.equal(record.amount,0);assert.equal(record.status,'Pendiente');assert.equal(record.leaderId,'agent-leader');assert.match(record.notes,/573001234567/);assert.match(record.notes,/WHATSAPP/);assert.doesNotMatch(record.notes,/PRUEBA|no ejecutar como operación real/);
    active=false;await assert.rejects(intake('573009999999','inbound-4','Necesito 2 almuerzos'),/Disabled/);
+  });
+  await t.test('natural confirmation closes WhatsApp with one requisition; thanks, repeats and renewal do not reopen it',async()=>{
+   const config={phone:'573000000000',tenantId,leaderId:'agent-leader',eventId:'agent-event',municipality:'Astrea'};
+   const conversations:Record<string,string>={};
+   const makeIntake=()=>pilotIntake({projectId:'demo-astrea',databaseId:'(default)',token:a.token,uid:a.uid,config,runId:'natural-confirmation',origin:'http://127.0.0.1:8088',conversations,checkActive:async()=>{}});
+   const sender='573008880001',intake=makeIntake();
+   await intake(sender,'natural-start','Necesito 3 almuerzos');
+   await intake(sender,'natural-detail','Entrega en el salón del evento mañana a las 12.');
+   const db=env.authenticatedContext(a.uid,{email:'agent@test.invalid'}).firestore();
+   const before=(await getDocs(query(collection(db,'solicitudes_recursos'),where('tenantId','==',tenantId)))).size;
+   const result=await intake(sender,'natural-confirm','Si confirmo la solicitud');
+   assert.ok(result.requestId);const reference=requestReference(result.requestId);
+   assert.match(reference,/^REQ-/);assert.ok(result.reply.includes(reference));
+   assert.match(result.reply,/creada y guardada/);assert.match(result.reply,/según disponibilidad/);
+   const draftRef=doc(db,'usuarios',a.uid,'agent_conversations',conversations[sender]);
+   const closed=(await getDoc(draftRef)).data()!;assert.equal(closed.status,'submitted');
+   for(const [i,text] of ['Si confirmo la solicitud','Gracias','Ok gracias','hola','estado','continuar'].entries()){
+    const response=await makeIntake()(sender,i===0?'natural-confirm':'closing-'+i,text);
+    assert.ok(response.reply.includes(reference));assert.equal(response.requestId,'');
+    assert.doesNotMatch(response.reply,/Revise antes|¿Qué necesita|responde «sí, confirmo»/);
+    assert.equal((await getDoc(draftRef)).data()!.revision,closed.revision);
+   }
+   assert.equal((await getDocs(query(collection(db,'solicitudes_recursos'),where('tenantId','==',tenantId)))).size,before+1);
+   const record=(await getDoc(doc(db,'solicitudes_recursos',result.requestId))).data()!;
+   assert.equal(record.status,'Pendiente');assert.equal(requestReference(record.id),reference);
+   await makeIntake()(sender,'natural-new','nueva solicitud');
+   assert.notEqual(conversations[sender],closed.id);
+   assert.equal((await getDoc(doc(db,'usuarios',a.uid,'agent_conversations',conversations[sender]))).data()!.status,'draft');
   });
   await t.test('different WhatsApp senders complete independent resource forms and help does not consume answers',async()=>{
    const conversations:Record<string,string>={};
@@ -167,7 +196,7 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
    for(let i=0;i<saved.length;i++){
     const record=(await getDoc(doc(db,'solicitudes_recursos',saved[i].requestId))).data()!;
     assert.equal(record.quantity,[3,2,5][i]);assert.equal(record.resource,['Alimentación','Transporte de pasajeros','Combustible'][i]);assert.equal(record.status,'Pendiente');
-    const replay=await intake(senders[i],'multi-confirm-'+i,'confirmar');assert.match(replay.reply,new RegExp(saved[i].requestId));
+    const replay=await intake(senders[i],'multi-confirm-'+i,'confirmar');assert.match(replay.reply,new RegExp(requestReference(saved[i].requestId)));
    }
    const paused='573007770099';
    await intake(paused,'pause-start','humano');
@@ -197,7 +226,7 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
    await intake()('573001111111','rotate-6','Segunda prueba de alimentación');
    const second=await intake()('573001111111','rotate-7','confirmar');assert.ok(second.requestId);assert.notEqual(first.requestId,second.requestId);
    checkpoint=await loadWhatsappSession(options);
-   const duplicate=await intake()('573001111111','rotate-7','confirmar');assert.match(duplicate.reply,new RegExp(second.requestId));
+   const duplicate=await intake()('573001111111','rotate-7','confirmar');assert.match(duplicate.reply,new RegExp(requestReference(second.requestId)));
    assert.deepEqual((await checkpoint.auth.keys.get('pre-key',['42']))['42'].private,Buffer.from('test-private-key'));
    const db=env.authenticatedContext(a.uid,{email:'agent@test.invalid'}).firestore();
    assert.equal((await getDoc(doc(db,'solicitudes_recursos',second.requestId))).data()!.quantity,4);
@@ -241,9 +270,9 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
     const record=await changed;assert.equal(record.quantity,3);assert.equal(record.amount,0);assert.equal(record.status,'Pendiente');assert.equal(record.tenantId,tenantId);
     assert.match(record.notes,/teléfono no compartido/);assert.doesNotMatch(record.notes,/123456789012345|Remitente \+/);
     checkpoint=await loadWhatsappSession(options);
-    const replay=await intake()(incoming.senderKey,'private-confirm','confirmar');assert.match(replay.reply,new RegExp(requestId));
+    const replay=await intake()(incoming.senderKey,'private-confirm','confirmar');assert.match(replay.reply,new RegExp(requestReference(requestId)));
     // Authenticated mapping appearing later must not restart or merge another person's draft.
-    const mapped=await intake()(incoming.senderKey,'private-mapped','hola','573008888888');assert.match(mapped.reply,new RegExp(requestId));
+    const mapped=await intake()(incoming.senderKey,'private-mapped','hola','573008888888');assert.match(mapped.reply,new RegExp(requestReference(requestId)));
     assert.equal(checkpoint.state.conversations['573008888888'],conversationId);
     const another=(await resolvePilotText({key:{id:'other-private',remoteJid:'123456789012346@lid'},messageTimestamp:Math.floor(Date.now()/1000),message:{conversation:'Necesito 1 almuerzo'}},Date.now()-3000)).incoming!;
     await intake()(another.senderKey,another.messageId,another.text);
