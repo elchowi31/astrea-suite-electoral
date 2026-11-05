@@ -59,7 +59,7 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
    const results=await Promise.all([backend().turn(message),backend().turn(message)]);
    assert.ok(results.some(r=>r.duplicate));assert.ok(results.every(r=>r.conversation.revision===1));
    const db=env.authenticatedContext(a.uid,{email:'agent@test.invalid'}).firestore();
-   assert.equal((await getDocs(collection(db,'usuarios',a.uid,'agent_conversations',message.conversationId,'receipts'))).size,1);
+   assert.equal((await getDocs(query(collection(db,'usuarios',a.uid,'agent_conversations',message.conversationId,'receipts'),where('tenantId','==',tenantId)))).size,1);
   });
   await t.test('concurrent different messages cannot overwrite the same draft revision',async()=>{
    const conversationId='concurrent-different-messages';
