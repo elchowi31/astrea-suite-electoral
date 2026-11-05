@@ -171,7 +171,7 @@ function checkpointFixture(){
 for(const fault of ['lost-response','missing-version','transient'] as const)test('session checkpoint recovers '+fault+' and restores keys on renewal',async()=>{
  const fixture=checkpointFixture(),store=await loadWhatsappSession(fixture.options);
  fixture.setFault(fault);
- await store.auth.keys.set({'pre-key':{'recover':{private:Buffer.from('recoverable-key')}}});
+ await store.auth.keys.set({'pre-key':{'recover':{private:Buffer.from('recoverable-key'),public:Buffer.from('public-recovery-key')}}});
  await store.flush();
  store.state.conversations.contact='retained-draft';await store.save();await store.flush();
  const restored=await loadWhatsappSession(fixture.options);
@@ -195,7 +195,7 @@ test('permission failures stay visible, queued callers do not flood writes, and 
 });
 test('rapid key changes coalesce into a checkpoint with all values and no plaintext secrets',async()=>{
  const fixture=checkpointFixture(),store=await loadWhatsappSession(fixture.options),before=fixture.posts;
- await Promise.all(Array.from({length:40},(_,i)=>store.auth.keys.set({'pre-key':{[String(i)]:{private:Buffer.from('secret-'+i)}}})));
+ await Promise.all(Array.from({length:40},(_,i)=>store.auth.keys.set({'pre-key':{[String(i)]:{private:Buffer.from('secret-'+i),public:Buffer.from('public-'+i)}}})));
  await store.flush();
  assert.equal(fixture.posts,before+1);
  const restored=await loadWhatsappSession(fixture.options);

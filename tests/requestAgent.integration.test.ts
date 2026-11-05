@@ -247,7 +247,7 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
     return response;
    }});
    loseResponse=true;
-   await checkpoint.auth.keys.set({'pre-key':{'recover':{private:Buffer.from('private-recovery-key')}}});
+   await checkpoint.auth.keys.set({'pre-key':{'recover':{private:Buffer.from('private-recovery-key'),public:Buffer.from('public-recovery-key')}}});
    checkpoint.state.conversations.contact='recovered-conversation';await checkpoint.save();await checkpoint.flush();
    const restored=await loadWhatsappSession(options);
    assert.equal(restored.state.conversations.contact,'recovered-conversation');
