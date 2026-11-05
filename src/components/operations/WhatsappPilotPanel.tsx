@@ -1,4 +1,4 @@
-import React,{useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import {WhatsappDiagnosticsPanel} from './WhatsappDiagnosticsPanel';
 import {MessageCircle} from 'lucide-react';
 import {useOperations} from './OperationsContext';
@@ -9,6 +9,16 @@ export function WhatsappPilotPanel({onSwitchAccount}:{onSwitchAccount?:()=>void}
  const {user,readOnly,events,requests}=useOperations();
  const wa=useWhatsappConnection();const [open,setOpen]=useState(false);
  const {config,setConfig}=wa;
+ const codePanel=useRef<HTMLDivElement|null>(null);
+ useEffect(()=>{if(wa.code)setOpen(true);},[wa.code]);
+ useEffect(()=>{
+  if(!open||!wa.code)return;
+  const frame=requestAnimationFrame(()=>{
+   codePanel.current?.focus({preventScroll:true});
+   codePanel.current?.scrollIntoView({block:'center',behavior:'instant'});
+  });
+  return()=>cancelAnimationFrame(frame);
+ },[open,wa.code]);
  const patch=(value:Partial<typeof config>)=>setConfig(previous=>({...previous,...value}));
  if(user?.role!=='AdminGlobal')return <section aria-label="Vincular WhatsApp" className="rounded-2xl border border-emerald-900/70 bg-slate-950/60 p-4">
   <h2 className="flex items-center gap-3 text-sm font-semibold text-slate-100"><MessageCircle size={22} className="text-emerald-300"/>WhatsApp · vincular número</h2>
@@ -32,9 +42,9 @@ export function WhatsappPilotPanel({onSwitchAccount}:{onSwitchAccount?:()=>void}
     <div className="flex flex-wrap items-center gap-3 sm:col-span-2"><button type="submit" value="save" className={secondary} disabled={wa.running||wa.busy}>{wa.busy?'Procesando…':'Guardar configuración'}</button><button type="submit" value="start" className={button} disabled={wa.running||wa.busy}>Iniciar / reanudar recepción</button>{wa.running?<button type="button" className={secondary} onClick={wa.stop}>Detener recepción</button>:<button type="button" className={secondary} disabled={wa.busy} onClick={()=>{wa.reset();void wa.start(config);}}>Nueva vinculación</button>}</div>
    </form>}
    <p role="status" className="text-sm text-slate-300">{wa.status}</p>
-   <WhatsappDiagnosticsPanel/>
-   {wa.code&&<div className="rounded-xl border border-emerald-700 bg-emerald-950/30 p-4"><p className="text-sm">En el teléfono receptor: WhatsApp → Dispositivos vinculados → Vincular un dispositivo → Vincular con número de teléfono.</p><p className="mt-3 select-all break-all font-mono text-3xl tracking-widest text-emerald-200">{wa.code}</p><p className="mt-2 text-xs text-slate-400">Ingrese este código ahora desde el teléfono receptor. Espere a ver «WhatsApp conectado · recepción activa» antes de enviar mensajes. Si vence, inicie de nuevo para obtener otro código. No lo comparta.</p></div>}
+   {wa.code&&<div ref={codePanel} tabIndex={-1} role="region" aria-label="Código de vinculación WhatsApp" className="scroll-mt-6 rounded-xl border-2 border-emerald-400 bg-emerald-950/80 p-5 shadow-lg outline-none"><h3 className="text-base font-semibold text-emerald-100">Tu código de vinculación</h3><p className="mt-3 select-all break-all font-mono text-4xl font-bold tracking-widest text-white" aria-label="Código para ingresar en WhatsApp">{wa.code}</p><p className="mt-4 text-sm text-emerald-100">En el teléfono receptor: WhatsApp → Dispositivos vinculados → Vincular un dispositivo → Vincular con número de teléfono.</p><p className="mt-2 text-xs text-slate-400">Ingrese este código ahora desde el teléfono receptor. Espere a ver «WhatsApp conectado · recepción activa» antes de enviar mensajes. Si vence, inicie de nuevo para obtener otro código. No lo comparta.</p></div>}
    {wa.error&&<p role="alert" className="rounded-lg bg-rose-950/40 p-3 text-sm text-rose-200">{wa.error}</p>}
+   <WhatsappDiagnosticsPanel/>
    {wa.saved.length>0&&<div className="space-y-2 text-sm text-emerald-200"><p>{wa.saved.length} solicitudes confirmadas durante esta pestaña.</p>{wa.saved.map(id=><p key={id} className="break-all text-xs">{requests.some(r=>r.id===id)?'Visible en la plataforma':'Esperando actualización de la lista'} · {id}</p>)}</div>}
    <p className="text-xs text-slate-400">{wa.wake?'Pantalla activa solicitada al navegador. ':''}En celular, mantenga Astrea en primer plano para evitar que Android suspenda la recepción. Al cerrar o recargar la pestaña deberá iniciar una nueva vinculación; las solicitudes permanecen guardadas. Detener recepción conserva el vínculo para reanudar en esta pestaña. Para retirarlo por completo, use «Dispositivos vinculados» en WhatsApp.</p>
   </div>}
