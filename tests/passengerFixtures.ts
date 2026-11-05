@@ -1,0 +1,6 @@
+import type {PassengerEvent,Passenger,PassengerTrip} from '../src/lib/passengerLogistics';
+export const at=(hour:number)=>`2099-03-01T${String(hour).padStart(2,'0')}:00:00.000Z`;
+export const makePassenger=(patch:Partial<Passenger>={}):Passenger=>({id:'p1',name:'Reserva 1',pickup:'Punto Norte',locality:'Sector Norte',places:1,accessible:false,deadline:at(10),returnRequired:true,returnReadyAt:at(15),returnDeadline:at(18),createdAt:at(7),consentAt:at(7),outboundTripId:'',returnTripId:'',outboundState:'waiting',returnState:'waiting',...patch});
+export const makeTrip=(patch:Partial<PassengerTrip>={}):PassengerTrip=>({id:'out1',vehicle:'ABC123',coordinator:'Coordinación',pickup:'Punto Norte',direction:'outbound',startAt:at(8),endAt:at(9),capacity:4,accessible:false,status:'scheduled',km:20,kmPerLiter:10,fuelPrice:4000,hireCost:50000,...patch});
+export const makeEvent=(patch:Partial<PassengerEvent>={}):PassengerEvent=>({id:'passenger-tenant-A--event',tenantId:'passenger-tenant-A',kind:'passenger-logistics-v1',type:'Logística de eventos',title:'Encuentro cultural',location:'Centro de eventos',startAt:at(10),endAt:at(15),createdBy:'passenger-admin',createdAt:at(7),revision:1,passengers:[],trips:[],history:[],...patch});
+export const returnTrip=()=>makeTrip({id:'back1',direction:'return',startAt:at(15),endAt:at(16)});

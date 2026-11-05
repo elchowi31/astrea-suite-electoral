@@ -7,6 +7,7 @@ import { OperationsEditingReferences } from './components/operations/OperationsE
 import { OperationsProvider } from './components/operations/OperationsContext';
 import {WhatsappConnectionProvider,WhatsappConnectionStatus} from './components/operations/WhatsappConnectionContext';
 const OperationsOverview = lazy(()=>import('./components/operations/OperationsOverview').then(m=>({default:m.OperationsOverview})));
+const PassengerEventsView = lazy(()=>import('./components/PassengerEventsView').then(m=>({default:m.PassengerEventsView})));
 const ResourcesView = lazy(()=>import('./components/operations/ResourcesView').then(m=>({default:m.ResourcesView})));
 import { DevicePersistencePanel } from './components/DevicePersistence';
 import { RouteTrackingProvider } from './components/RouteTrackingProvider';
@@ -694,6 +695,7 @@ export default function App() {
           )}
 
           {currentUser && activeTab === 'resources' && <ResourcesView onSwitchAccount={()=>setShowAuthModal(true)}/>}
+          {currentUser && activeTab === 'passengers' && <PassengerEventsView tenantId={currentTenant.tenantId} user={currentUser} readOnly={demoActive}/>}
 
           {currentUser && activeTab === 'users' && <UserManagementView currentUser={currentUser} currentTenant={currentTenant} users={users} leaders={leaders} candidates={candidates} />}
 

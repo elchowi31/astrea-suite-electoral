@@ -4,7 +4,7 @@ import { UserProfile, UserRole } from '../types';
 import { getRoleHierarchyLevel, getTerritorialScope } from '../lib/permissions';
 import {isTrackingAdministrator} from '../lib/trackingPermissions';
 
-export type ActiveTab = 'resources' | 'device' | 'routes' | 'users' | 'dashboard' | 'campaign_structure' | 'hierarchy_pyramid' | 'login' | 'simulator' | 'costs_report' | 'zone_projections' | 'workspace' | 'map' | 'finances' | 'leaders' | 'transport' | 'candidates' | 'districts' | 'proposals' | 'drive' | 'ai' | 'tenants';
+export type ActiveTab = 'passengers' | 'resources' | 'device' | 'routes' | 'users' | 'dashboard' | 'campaign_structure' | 'hierarchy_pyramid' | 'login' | 'simulator' | 'costs_report' | 'zone_projections' | 'workspace' | 'map' | 'finances' | 'leaders' | 'transport' | 'candidates' | 'districts' | 'proposals' | 'drive' | 'ai' | 'tenants';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -64,6 +64,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, driveF
       { id: 'device', label: 'Mi dispositivo', icon: ShieldCheck, trackingAdminOnly: true },
       { id: 'transport', label: 'Transporte', icon: Truck, badge: vehicleCount, minLevel: 10 },
       { id: 'resources', label: 'Solicitudes y jornadas', icon: ClipboardList, minLevel: 10 },
+      { id: 'passengers', label: 'Pasajeros y eventos', icon: Users, minLevel: 10 },
     ] },
     { label: 'Administración', tone: 'text-amber-300', items: [
       { id: 'users', label: 'Usuarios y accesos', icon: Users, minLevel: 35 },
