@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {summarizeServiceCosts} from '../src/lib/serviceCosts.ts';
 import type {CampaignExpense} from '../src/types';
-const expense=(patch:Partial<CampaignExpense>={}):CampaignExpense=>({id:'one',tenantId:'tenant',component:'Transporte y Movilización',amount:200000,quantity:10,unitMeasure:'personas',date:'2026-11-05',status:'Pagado',municipality:'Astrea',responsibleLeaderId:'responsible',...patch});
+const expense=(patch:Partial<CampaignExpense>={}):CampaignExpense=>({id:'one',tenantId:'tenant',description:'Servicio registrado',component:'Transporte y Movilización',amount:200000,quantity:10,unitMeasure:'personas',date:'2026-11-05',status:'Pagado',municipality:'Astrea',responsibleLeaderId:'responsible',...patch});
 test('cost per recorded unit divides expenses by quantity and keeps different units separate',()=>{
  const s=summarizeServiceCosts([expense(),expense({id:'two',amount:60000,quantity:3}),expense({id:'three',amount:100000,quantity:1,unitMeasure:'viaje'})],'tenant');
  assert.equal(s.total,360000);assert.equal(s.units.length,2);

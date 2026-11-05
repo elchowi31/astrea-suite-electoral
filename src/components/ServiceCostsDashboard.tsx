@@ -25,11 +25,11 @@ function CostChart({title,data,color,chronological=false}:{title:string;data:Cos
  </section>;
 }
 
-export function ServiceCostsDashboard({expenses,leaders,tenantId}:{expenses:CampaignExpense[];leaders:Leader[];tenantId:string}){
+export function ServiceCostsDashboard({expenses,leaders,tenantId}:{expenses:CampaignExpense[];leaders:Leader[];tenantId:string;key?:React.Key}){
  const [responsible,setResponsible]=useState(''),[status,setStatus]=useState(''),[from,setFrom]=useState(''),[to,setTo]=useState('');
  const [territory,setTerritory]=useState('');
  const names=useMemo(()=>new Map(leaders.filter(l=>l.tenantId===tenantId).map(l=>[l.id,l.fullName])),[leaders,tenantId]);
- const available=useMemo(()=>expenses.filter(e=>e.tenantId===tenantId),[expenses,tenantId]);
+ const available:CampaignExpense[]=useMemo(()=>expenses.filter(e=>e.tenantId===tenantId),[expenses,tenantId]);
  const responsibleIds=[...new Set(available.map(e=>e.responsibleLeaderId||'unassigned'))];
  const territories=[...new Set(available.map(e=>e.veredaOrBarrio||'Sin vereda/barrio'))].sort();
  const invalidRange=!!from&&!!to&&from>to;
