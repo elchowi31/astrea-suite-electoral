@@ -1,3 +1,4 @@
+import {AgentError} from '../src/lib/requestAgent';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
@@ -148,4 +149,81 @@ test('unsupported media gets a text response without entering the resource form'
   intake:async()=>{intakeCalls++;return {reply:'wrong form',requestId:''};}
  });
  assert.equal(intakeCalls,0);assert.equal(sent.length,1);assert.match(sent[0],/mensajes de texto/);assert.equal(persisted.handled.length,1);
+});
+
+function checkpointFixture(){
+ let record:any=null,revision=0,posts=0;
+ let fault:''|'lost-response'|'transient'|'forbidden'|'missing-version'='';
+ const fetcher:typeof fetch=async(_url,init)=>{
+  if(init?.method!=='POST')return new Response(JSON.stringify(record||{}),{status:record?200:404});
+  posts++;
+  if(fault==='forbidden')return new Response('{}',{status:403});
+  if(fault==='transient'){fault='';return new Response('{}',{status:503});}
+  const write=JSON.parse(String(init.body)).writes[0],guard=write.currentDocument;
+  if((guard.exists===false&&record)||(guard.updateTime&&guard.updateTime!==record?.updateTime))return new Response('{}',{status:409});
+  record={fields:write.update.fields,updateTime:String(++revision)};
+  if(fault==='lost-response'){fault='';throw new TypeError('Simulated lost response after commit');}
+  if(fault==='missing-version'){fault='';return new Response('{}');}
+  return new Response(JSON.stringify({writeResults:[{updateTime:record.updateTime}]}));
+ };
+ return {fetcher,options:{base:'https://firestore.test/documents',uid:'admin',token:'test',config,session,fetcher},setFault(value:typeof fault){fault=value;},get posts(){return posts;},get record(){return record;}};
+}
+for(const fault of ['lost-response','missing-version','transient'] as const)test('session checkpoint recovers '+fault+' and restores keys on renewal',async()=>{
+ const fixture=checkpointFixture(),store=await loadWhatsappSession(fixture.options);
+ fixture.setFault(fault);
+ await store.auth.keys.set({'pre-key':{'recover':{private:Buffer.from('recoverable-key')}}});
+ await store.flush();
+ store.state.conversations.contact='retained-draft';await store.save();await store.flush();
+ const restored=await loadWhatsappSession(fixture.options);
+ assert.deepEqual((await restored.auth.keys.get('pre-key',['recover'])).recover.private,Buffer.from('recoverable-key'));
+ assert.equal(restored.state.conversations.contact,'retained-draft');
+ assert.equal(fixture.posts,fault==='transient'?4:3,'uncertain successful commits must not be rewritten');
+});
+test('permission failures stay visible, queued callers do not flood writes, and a later authorized save is possible',async()=>{
+ const fixture=checkpointFixture(),store=await loadWhatsappSession(fixture.options);
+ fixture.setFault('forbidden');
+ const before=fixture.posts;
+ const pending=Array.from({length:20},(_,i)=>{store.state.conversations['contact-'+i]='draft-'+i;return store.save();});
+ const results=await Promise.allSettled(pending);
+ assert.ok(results.every(r=>r.status==='rejected'));
+ assert.equal(fixture.posts,before+1,'do not retry denied access for each queued notification');
+ await assert.rejects(store.flush(),/HTTP 403/);
+ fixture.setFault('');await store.save();await store.flush();
+ const restored=await loadWhatsappSession(fixture.options);
+ assert.equal(Object.keys(restored.state.conversations).length,20);
+ assert.equal(restored.state.conversations['contact-19'],'draft-19');
+});
+test('rapid key changes coalesce into a checkpoint with all values and no plaintext secrets',async()=>{
+ const fixture=checkpointFixture(),store=await loadWhatsappSession(fixture.options),before=fixture.posts;
+ await Promise.all(Array.from({length:40},(_,i)=>store.auth.keys.set({'pre-key':{[String(i)]:{private:Buffer.from('secret-'+i)}}})));
+ await store.flush();
+ assert.equal(fixture.posts,before+1);
+ const restored=await loadWhatsappSession(fixture.options);
+ const keys=await restored.auth.keys.get('pre-key',Array.from({length:40},(_,i)=>String(i)));
+ assert.equal(Object.keys(keys).length,40);assert.deepEqual(keys['39'].private,Buffer.from('secret-39'));
+ assert.ok(!JSON.stringify(fixture.record).includes('secret-'));
+ assert.ok(!JSON.stringify(fixture.record).includes(session.key));
+});
+test('lost acknowledgements never adopt a different writer checkpoint',async()=>{
+ const fixture=checkpointFixture(),first=await loadWhatsappSession(fixture.options),second=await loadWhatsappSession(fixture.options);
+ second.state.conversations.owner='newer';await second.save();
+ first.state.conversations.owner='stale';
+ await assert.rejects(first.save(),/otra conexión/);await assert.rejects(first.flush(),/otra conexión/);
+ assert.equal((await loadWhatsappSession(fixture.options)).state.conversations.owner,'newer');
+});
+test('shutdown preserves the actual persistence error and ignores late credential events',async()=>{
+ const persisted=state(),events:any[]=[];let saveCalls=0;
+ const ev=new EventEmitter();
+ const problem=new AgentError('No se pudo conservar la vinculación: Firestore rechazó el acceso (HTTP 403).',403);
+ const res=Object.assign(new EventEmitter(),{destroyed:false,writableEnded:false,statusCode:0,setHeader(){},flushHeaders(){},write(line:string){events.push(JSON.parse(line));},end(){this.writableEnded=true;}});
+ const socket={ev,end(){ev.emit('creds.update',{registrationId:999});}};
+ await runWhatsappPilot({projectId:'test',databaseId:'test',token:'test',uid:'admin',config,session,res:res as any,checkActive:async()=>{}},{segmentMs:1000,
+  makeSocket:(()=>{queueMicrotask(()=>ev.emit('creds.update',{registrationId:123}));return socket;}) as any,
+  loadSession:(async()=>({state:persisted,auth:{creds:persisted.creds,keys:{}},save:async()=>{saveCalls++;throw problem;},flush:async()=>{throw problem;}})) as any,
+  lease:(()=>({acquire:async()=>{},release:async()=>{}})) as any,
+  createDiagnostics:(()=>({record:async()=>{},flush:async()=>{}})) as any
+ });
+ assert.equal(saveCalls,1);assert.equal(persisted.creds.registrationId,123);
+ assert.equal(events.at(-1).type,'fatal');assert.match(events.at(-1).message,/HTTP 403/);
+ assert.doesNotMatch(events.at(-1).message,/finalizar el guardado/);
 });
