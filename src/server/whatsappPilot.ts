@@ -1,12 +1,13 @@
 import type {ServerResponse} from 'node:http';
 import makeWASocket,{DisconnectReason,type WASocket} from '@whiskeysockets/baileys';
 import pino from 'pino';
-import {PILOT_SECONDS,incomingPilotText,pilotIntake,pilotLease,type PilotConfig} from './whatsappPilotCore.js';
+import {createWhatsappDiagnostics,type DiagnosticStage,type DiagnosticDetails} from './whatsappDiagnostics.js';
+import {PILOT_SECONDS,resolvePilotText,pilotIntake,pilotLease,type PilotConfig} from './whatsappPilotCore.js';
 import {loadWhatsappSession,type TabSession} from './whatsappSessionStore.js';
 import {AgentError} from '../lib/requestAgent.js';
 
 // Each invocation is bounded; only the user's open tab can renew it.
-export async function runWhatsappPilot(options:{projectId:string;databaseId:string;token:string;uid:string;config:PilotConfig;session:TabSession;res:ServerResponse;checkActive:()=>Promise<void>},dependencies:{makeSocket?:typeof makeWASocket;loadSession?:typeof loadWhatsappSession;lease?:typeof pilotLease;segmentMs?:number}={}){
+export async function runWhatsappPilot(options:{projectId:string;databaseId:string;token:string;uid:string;config:PilotConfig;session:TabSession;res:ServerResponse;checkActive:()=>Promise<void>},dependencies:{makeSocket?:typeof makeWASocket;loadSession?:typeof loadWhatsappSession;lease?:typeof pilotLease;segmentMs?:number;createDiagnostics?:typeof createWhatsappDiagnostics;intake?:ReturnType<typeof pilotIntake>}={}){
  const {res,config}=options;
  const base=`https://firestore.googleapis.com/v1/projects/${options.projectId}/databases/${encodeURIComponent(options.databaseId)}/documents`;
  const lease=(dependencies.lease||pilotLease)({base,token:options.token,phone:config.phone});await lease.acquire();
@@ -19,13 +20,17 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
  const emit=(event:Record<string,unknown>)=>{if(!res.destroyed&&!res.writableEnded)res.write(JSON.stringify(event)+'\n');};
  const stop=(type:string,message:string)=>{if(stopped)return;stopped=true;connected=false;outcome={type,message};finish();};
  const failed=(error:unknown)=>stop('fatal',error instanceof AgentError?error.message:'Se detuvo la recepción. Revise la conexión antes de continuar.');
- const intake=pilotIntake({...options,runId:options.session.id,conversations:store.state.conversations,saveCursor:store.save});
+ const intake=dependencies.intake||pilotIntake({...options,runId:options.session.id,conversations:store.state.conversations,saveCursor:store.save});
  const queue=(task:()=>Promise<void>)=>{work=work.then(task).catch(failed);};
+ const diagnostics=(dependencies.createDiagnostics||createWhatsappDiagnostics)({...options,base});
+ let diagnosticWarning=false,beats=0;
+ const trace=(stage:DiagnosticStage,details:DiagnosticDetails={})=>{void diagnostics.record(stage,details).catch(()=>{if(!diagnosticWarning){diagnosticWarning=true;emit({type:'notice',message:'No se pudo actualizar el diagnóstico de recepción. El receptor continúa activo.'});}});};
+ trace('starting',{detail:'Receptor iniciado; esperando mensajes de texto privados.',queued:store.state.inbox.length,recoveredHandled:store.state.handled.length});
  res.statusCode=200;res.setHeader('Content-Type','application/x-ndjson; charset=utf-8');res.setHeader('Cache-Control','no-store, no-transform');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Accel-Buffering','no');res.flushHeaders();
  emit({type:'starting',message:store.auth.creds.registered?'Recuperando la vinculación…':'Preparando la vinculación…'});
  const onClose=()=>stop('renew','La pestaña perdió la conexión.');res.on('close',onClose);
  const deadline=setTimeout(()=>stop('renew','Renovando la conexión sin desvincular WhatsApp…'),dependencies.segmentMs||PILOT_SECONDS*1000);
- const heartbeat=setInterval(()=>{emit({type:'heartbeat',connected});if(connected&&!stopped)queue(drain);},10000);
+ const heartbeat=setInterval(()=>{emit({type:'heartbeat',connected});if(connected&&!stopped){if(++beats%3===0)trace('heartbeat');queue(drain);}},10000);
  async function drain(){
   if(processing||stopped||!connected||!socket)return;processing=true;
   try{
@@ -36,13 +41,16 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
      try{item.result=await intake(item.phone,item.messageId,item.text);}
      catch(e){if(e instanceof AgentError&&e.status===400)item.result={reply:e.message};else throw e;}
      await store.save();
+     trace('prepared',{detail:'Respuesta preparada; pendiente de envío.',reply:item.result.reply,queued:store.state.inbox.length});
     }
-    if(item.result.requestId)emit({type:'saved',requestId:item.result.requestId});
+    if(item.result.requestId){emit({type:'saved',requestId:item.result.requestId});trace('saved',{detail:'Solicitud confirmada y guardada en Firestore.',requestId:item.result.requestId});}
     if(stopped||!connected)break;
     try{await socket.sendMessage(item.jid,{text:item.result.reply});}
-    catch{emit({type:'notice',message:'Una respuesta sigue pendiente de entrega. Se reintentará al recuperar la conexión.'});break;}
+    catch{trace('pending_reply',{detail:'WhatsApp no confirmó el envío; se reintentará.',queued:store.state.inbox.length});emit({type:'notice',message:'Una respuesta sigue pendiente de entrega. Se reintentará al recuperar la conexión.'});break;}
     await store.markHandled(item.messageId);
     store.state.inbox.shift();await store.save();
+    trace('replied',{detail:'Respuesta enviada a WhatsApp. La lectura en el teléfono aún no está confirmada.',reply:item.result.reply,senderHint:item.phone.slice(-4),queued:store.state.inbox.length});
+    emit({type:'activity',message:'Mensaje recibido y respuesta enviada. Complete el cuestionario y escriba «confirmar» para guardar la solicitud.'});
    }
   }finally{processing=false;}
  }
@@ -63,7 +71,7 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
    if(update.connection==='open'){
     const phone=current.user?.id?.split('@')[0].split(':')[0];
     if(phone!==config.phone){stop('fatal','La cuenta vinculada no coincide con el número indicado.');return;}
-    connected=true;emit({type:'connected',message:'WhatsApp conectado · recepción activa'});queue(drain);
+    connected=true;trace('connected',{detail:'Vinculación activa; esperando mensajes privados nuevos.'});emit({type:'connected',message:'WhatsApp conectado · recepción activa'});queue(drain);
    }
    if(update.connection==='close'){
     connected=false;const code=(update.lastDisconnect?.error as any)?.output?.statusCode;
@@ -76,12 +84,24 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
    // Append includes offline messages from the renewal gap. Only this tab's time range is accepted.
    if(!['notify','append'].includes(event.type)||stopped)return;
    for(const message of event.messages){
-    const incoming=incomingPilotText(message,store.state.startedAt,true);if(!incoming)continue;
-    if(++accepted>150){stop('renew','Renovando la conexión para continuar procesando mensajes…');break;}
+    if(message.key.fromMe||!message.key.id)continue;
+    const jid=message.key.remoteJid||'';
+    if(!jid.endsWith('@s.whatsapp.net')&&!jid.endsWith('@lid'))continue;
     queue(async()=>{
-     if(store.state.inbox.some(i=>i.messageId===incoming.messageId)||await store.wasHandled(incoming.messageId))return;
+     const result=await resolvePilotText(message,store.state.startedAt,current.signalRepository?.lidMapping?.getPNForLID?.bind(current.signalRepository.lidMapping));
+     const incoming=result.incoming;
+     if(!incoming){
+      const reasons={before_session:'El mensaje es anterior al inicio de esta recepción. Envíe uno nuevo.',invalid_timestamp:'La fecha del mensaje no es válida.',unsupported_content:'No se recibió texto compatible (máximo 500 caracteres). Envíe una frase de texto.',unresolved_sender:'WhatsApp envió un identificador privado sin equivalencia de número disponible.',own_or_missing_id:'Mensaje propio o sin identificador.',not_private:'Solo se atienden conversaciones privadas.'};
+      // System and history packets are not messages from the user; do not flood the trace.
+      if(result.reason==='unresolved_sender'||(result.reason==='unsupported_content'&&message.message)||result.reason==='invalid_timestamp'||result.reason==='before_session')trace('ignored',{detail:reasons[result.reason]});
+      return;
+     }
+     if(++accepted>150){stop('renew','Renovando la conexión para continuar procesando mensajes.');return;}
+     if(store.state.inbox.some(i=>i.messageId===incoming.messageId)||await store.wasHandled(incoming.messageId)){trace('duplicate',{detail:'Mensaje ya recibido; no se vuelve a registrar.'});return;}
      if(store.state.inbox.length>=100)throw new AgentError('Hay demasiados mensajes pendientes. Revise las solicitudes antes de reanudar.',429);
-     store.state.inbox.push(incoming);await store.save();await drain();
+     store.state.inbox.push(incoming);await store.save();
+     trace('received',{detail:'Mensaje privado recibido y conservado para procesar.',text:incoming.text,senderHint:incoming.phone.slice(-4),queued:store.state.inbox.length});
+     emit({type:'activity',message:'Mensaje de WhatsApp recibido. Preparando respuesta.'});await drain();
     });
    }
   });
@@ -94,9 +114,11 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
   try{
    await Promise.race([work.then(()=>store.flush()),new Promise<never>((_,reject)=>{const timer=setTimeout(()=>reject(new Error('Drain timeout')),25000);timer.unref();})]);
   }catch{outcome={type:'fatal',message:'No se pudo finalizar el guardado de la sesión. Revise los registros antes de reanudar.'};}
+  trace('stopped',{detail:outcome.message,queued:store.state.inbox.length});await diagnostics.flush();
   await lease.release().catch(()=>{});
   // Rotate only after writes and lease release complete.
   emit(outcome);if(!res.writableEnded&&!res.destroyed)res.end();
  }
 }
+
 
