@@ -23,4 +23,30 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run check
+  firestore-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci --no-audit --no-fund
+      - name: Firestore persistence, realtime listeners and isolation
+        env:
+          ASTREA_AGENT_EMULATOR: 'true'
+          GCLOUD_PROJECT: demo-astrea
+          CI: 'true'
+        run: >-
+          npx --yes --package firebase-tools@15.28.1 firebase emulators:exec
+          --project demo-astrea --config firebase.emulator.json --only auth,firestore
+          "node --import tsx --test --test-concurrency=1 tests/firestore.rules.test.ts tests/requestAgent.integration.test.ts tests/whatsappSetup.integration.test.ts"
+
 

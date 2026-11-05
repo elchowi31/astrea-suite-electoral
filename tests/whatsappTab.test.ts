@@ -68,6 +68,19 @@ test('durable receipts prevent replay beyond 1000 messages without growing the s
  assert.equal(records.size,1003,'one session and one durable receipt per message');
 });
 const response=(events:unknown[])=>new Response(events.map(e=>JSON.stringify(e)+'\n').join(''),{headers:{'Content-Type':'application/x-ndjson'}});
+test('pairing waits for the registration QR event and does not race the initial handshake',async()=>{
+ const persisted=state();persisted.creds.registered=false;
+ const events:any[]=[];let requests=0,requestsAtConnecting=-1;
+ const ev=new EventEmitter();
+ const res=Object.assign(new EventEmitter(),{destroyed:false,writableEnded:false,statusCode:0,setHeader(){},flushHeaders(){},write(line:string){const event=JSON.parse(line);events.push(event);if(event.type==='pairing')queueMicrotask(()=>res.emit('close'));},end(){this.writableEnded=true;}});
+ const socket={ev,end(){},requestPairingCode:async()=>{requests++;return 'TEST1234';}};
+ await runWhatsappPilot({projectId:'test',databaseId:'test',token:'test',uid:'admin',config,session,res:res as any,checkActive:async()=>{}},{segmentMs:1000,
+  makeSocket:(()=>{queueMicrotask(()=>{ev.emit('connection.update',{connection:'connecting'});requestsAtConnecting=requests;ev.emit('connection.update',{qr:'synthetic-registration-challenge'});ev.emit('connection.update',{qr:'repeated-challenge'});});return socket;}) as any,
+  loadSession:(async()=>({state:persisted,auth:{creds:persisted.creds,keys:{}},save:async()=>{},flush:async()=>{}})) as any,
+  lease:(()=>({owner:'test',acquire:async()=>{},release:async()=>{}})) as any});
+ assert.equal(requestsAtConnecting,0,'connecting happens before registration has finished');
+ assert.equal(requests,1);assert.equal(events.filter(e=>e.type==='pairing').length,1);
+});
 test('tab renews with fresh authorized requests and unchanged session; stop prevents another request',async()=>{
  const abort=new AbortController();const bodies:unknown[]=[];const events:string[]=[];let calls=0;
  await runWhatsappTab({body:{config,session},signal:abort.signal,request:async init=>{calls++;bodies.push(JSON.parse(String(init.body)));return response([{type:'connected'},{type:'renew'}]);},onEvent:e=>{events.push(e.type);if(calls===3&&e.type==='connected')abort.abort();},wait:async()=>{}});
@@ -86,3 +99,4 @@ test('rotation closes socket without logout and signals renewal only after check
  await runWhatsappPilot({projectId:'test',databaseId:'test',token:'test',uid:'admin',config,session,res:res as any,checkActive:async()=>{}},{segmentMs:25,makeSocket:(()=>{queueMicrotask(()=>ev.emit('connection.update',{connection:'open'}));return socket;}) as any,loadSession:(async()=>({state:persisted,auth:{creds:persisted.creds,keys:{}},save:async()=>{order.push('save');},markHandled:async(id:string)=>{persisted.handled.push(id);},wasHandled:async(id:string)=>persisted.handled.includes(id),flush:async()=>{order.push('flush');}})) as any,lease:(()=>({owner:'lease',acquire:async()=>{},release:async()=>{order.push('release');}})) as any});
  assert.equal(logouts,0);assert.equal(sends,1);assert.equal(persisted.inbox.length,0);assert.ok(persisted.handled.includes('pending'));assert.ok(order.indexOf('renew')>order.indexOf('flush'));assert.ok(order.indexOf('renew')>order.indexOf('release'));assert.equal(events.at(-1).type,'renew');
 });
+
