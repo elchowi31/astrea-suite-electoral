@@ -79,7 +79,7 @@ test('natural affirmations submit a reviewed request once and close with its ref
 });
 test('negations, corrections and missing fields never submit or repeat the review summary',()=>{
  const review=advanceAgent(undefined,{...base,action:'edit',patch:complete},context);
- for(const text of ['no confirmo','sí, pero cambia la cantidad a 4','confirmo pero falta el regreso','¿qué día?','gracias','necesito corregir','no está bien']){
+ for(const text of ['no confirmo','¿confirmo?','sí, pero cambia la cantidad a 4','confirmo pero falta el regreso','¿qué día?','gracias','necesito corregir','no está bien']){
   const next=advanceAgent(review,{...base,revision:review.revision,text},context);
   assert.equal(next.status,'review',text);assert.equal(next.requestId,'');
   assert.deepEqual(next.draft,review.draft);

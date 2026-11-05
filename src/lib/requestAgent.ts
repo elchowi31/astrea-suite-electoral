@@ -13,6 +13,7 @@ export class AgentError extends Error { constructor(message:string,public status
 const normalize=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 /** Match the entire affirmative answer: negations and proposed corrections never submit. */
 export function isRequestConfirmation(text:string):boolean {
+  if(/[¿?]/.test(text))return false;
   const command=normalize(text).replace(/[¡!¿?.,;:]/g,' ').replace(/\s+/g,' ').trim();
   return /^(?:(?:si )?(?:confirmar|confirmo)(?: (?:la |mi |esta )?solicitud| y guardar)?|si(?: esta (?:bien|correcto|correcta))?|ok|okay|listo|correcto|de acuerdo|todo (?:bien|correcto)|esta (?:bien|correcto|correcta))(?: por favor)?(?: gracias)?$/.test(command);
 }
