@@ -54,6 +54,43 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
    const other=env.authenticatedContext(b.uid,{email:'other@test.invalid'}).firestore();
    await assertFails(getDoc(doc(other,'usuarios',a.uid,'agent_conversations',input.conversationId)));
   });
+  await t.test('concurrent deliveries of the same message create one revision and one receipt',async()=>{
+   const message={...input,conversationId:'concurrent-same-message'};
+   const results=await Promise.all([backend().turn(message),backend().turn(message)]);
+   assert.ok(results.some(r=>r.duplicate));assert.ok(results.every(r=>r.conversation.revision===1));
+   const db=env.authenticatedContext(a.uid,{email:'agent@test.invalid'}).firestore();
+   assert.equal((await getDocs(query(collection(db,'usuarios',a.uid,'agent_conversations',message.conversationId,'receipts'),where('tenantId','==',tenantId)))).size,1);
+  });
+  await t.test('concurrent different messages cannot overwrite the same draft revision',async()=>{
+   const conversationId='concurrent-different-messages';
+   const results=await Promise.allSettled([
+    backend().turn({...input,conversationId,messageId:'concurrent-message-a'}),
+    backend().turn({...input,conversationId,messageId:'concurrent-message-b',patch:{...draft,quantity:9}})
+   ]);
+   assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+   const rejected=results.find(r=>r.status==='rejected') as PromiseRejectedResult;assert.equal(rejected.reason.status,409);
+   const reload=await backend().turn({...input,conversationId,action:'resume',patch:undefined});assert.equal(reload.conversation.revision,1);
+  });
+  await t.test('an event cancelled between its read and commit prevents all submission writes',async()=>{
+   const conversationId='event-changed-during-commit';await backend().turn({...input,conversationId});
+   let changed=false;
+   const racing=createAgentBackend({projectId:'demo-astrea',databaseId:'(default)',token:a.token,uid:a.uid,tenantId,origin:'http://127.0.0.1:8088',fetcher:async(url,init)=>{
+    if(String(url).endsWith(':commit')&&!changed){
+     changed=true;
+     await env.withSecurityRulesDisabled(async ctx=>updateDoc(doc(ctx.firestore(),'jornadas_operativas','agent-event'),{status:'Cancelado'}));
+    }
+    return fetch(url,init);
+   }});
+   await assert.rejects(racing.turn({...input,conversationId,messageId:'racing-confirmation',revision:1,action:'confirm',patch:undefined}),/jornada/);
+   await env.withSecurityRulesDisabled(async ctx=>{
+    const db=ctx.firestore();
+    assert.equal((await getDoc(doc(db,'solicitudes_recursos',`agent-${a.uid}-${conversationId}`))).exists(),false);
+    assert.equal((await getDoc(doc(db,'auditoria',`agent-${a.uid}-${conversationId}`))).exists(),false);
+    assert.equal((await getDoc(doc(db,'usuarios',a.uid,'agent_conversations',conversationId,'receipts','racing-confirmation'))).exists(),false);
+    assert.equal((await getDoc(doc(db,'usuarios',a.uid,'agent_conversations',conversationId))).data()!.revision,1);
+    await updateDoc(doc(db,'jornadas_operativas','agent-event'),{status:'Planificado'});
+   });
+  });
   const confirmation:AgentTurn={...input,patch:undefined,messageId:'confirm-message',revision:1,action:'confirm'};
   await t.test('a separate Firestore listener receives the confirmed request without a page reload',async()=>{
    const draftInput:AgentTurn={...input,conversationId:'live-listener-check',patch:{resource:'Alimentación',quantity:2,unitCost:0,municipality:'Astrea',description:'Prueba técnica de formulario; no entregar recursos.',leaderId:'agent-leader'}};

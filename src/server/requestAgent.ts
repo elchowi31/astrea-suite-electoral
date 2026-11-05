@@ -23,15 +23,24 @@ export function createAgentBackend(options:{projectId:string;databaseId:string;t
   const base=`${options.origin||'https://firestore.googleapis.com'}/v1/${root}`;
   async function call(path:string,body?:unknown,method=body===undefined?'GET':'POST'){
     const res=await request(`${base}${path}`,{method,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(15000)});
-    if(res.status===404)return null;
-    if(!res.ok){if(res.status===409)throw new AgentError('La conversación cambió. Recargue y vuelva a intentar.',409);if(res.status===403)throw new AgentError('Sin permiso para guardar en Firestore. Revise el perfil y las reglas publicadas.',403);throw new AgentError('Firestore no confirmó la operación. Reintente el mismo mensaje.',503);}
+    if(res.status===404&&method==='GET')return null;
+    if(!res.ok){
+      const error=await res.json().catch(()=>null);
+      if(res.status===409||res.status===412||(res.status===400&&['FAILED_PRECONDITION','ABORTED','ALREADY_EXISTS'].includes(error?.error?.status)))throw new AgentError('La conversación cambió. Recargue y vuelva a intentar.',409);
+      if(res.status===403){
+        const stage=path===':commit'?'guardado atómico':path.includes('/receipts/')?'lectura de recibo':path.includes('/agent_conversations/')?'lectura de borrador':'lectura de catálogo';
+        throw new AgentError(`Sin permiso en Firestore (${stage}). Revise el perfil y las reglas publicadas.`,403);
+      }
+      throw new AgentError('Firestore no confirmó la operación. Reintente el mismo mensaje.',503);
+    }
     return res.json();
   }
-  async function read(path:string,transaction?:string){
-    // batchGet carries transaction bytes in JSON (also supported by the emulator).
-    const d=transaction?(await call(':batchGet',{documents:[`${root}/${path}`],transaction}))?.find((row:any)=>row.found)?.found:await call(`/${path}`);
-    return d?decodeFields(d.fields):undefined;
+  async function snapshot(path:string){
+    const document=await call(`/${path}`);
+    if(document&&!document.updateTime)throw new AgentError('Firestore no devolvió la versión del documento. Reintente el mismo mensaje.',503);
+    return {data:document?decodeFields(document.fields):undefined,precondition:document?{updateTime:document.updateTime}:{exists:false}};
   }
+  async function read(path:string){const document=await call(`/${path}`);return document?decodeFields(document.fields):undefined;}
   async function catalog(collectionId:string,label:string,ids?:string[]){
     if(ids)return (await Promise.all([...new Set(ids)].map(async id=>{
       if(!/^[\w-]{1,120}$/.test(id))return undefined;
@@ -59,30 +68,54 @@ export function createAgentBackend(options:{projectId:string;databaseId:string;t
       return {conversation,context,reply:conversation.messages.at(-1)?.text||question(conversation.draft,context),verified:true};
     }
     const receiptPath=`${path}/receipts/${input.messageId}`;
-    const begun=await call(':beginTransaction',{options:{readWrite:{}}});const transaction=begun.transaction;
-    try{
-      const previous=await read(path,transaction) as AgentConversation|undefined;
+    // Firebase user tokens use optimistic transactions, as the web SDK does.
+    // Read versions and verify every dependency in one atomic commit; do not
+    // call the server-only beginTransaction/rollback RPCs with a user's token.
+    for(let attempt=0;attempt<3;attempt++){
+      const current=await snapshot(path);
+      const previous=current.data as AgentConversation|undefined;
       if(previous&&(previous.ownerUid!==uid||previous.tenantId!==tenantId))throw new AgentError('Conversación de otro ámbito.',403);
-      if(await read(receiptPath,transaction)){
-        await call(':rollback',{transaction});
-        if(!previous)throw new AgentError('Conversación no disponible.',409);
-        await verifySubmitted(previous);
-        return {conversation:previous,context,reply:previous.messages.at(-1)?.text||'',verified:true,duplicate:true};
+      if(await read(receiptPath)){
+        // A concurrent commit can create the receipt after our first read.
+        const saved=await read(path) as AgentConversation|undefined;
+        if(!saved||saved.ownerUid!==uid||saved.tenantId!==tenantId)throw new AgentError('Conversación no disponible.',409);
+        await verifySubmitted(saved);
+        return {conversation:saved,context,reply:saved.messages.at(-1)?.text||'',verified:true,duplicate:true};
       }
       const conversation=advanceAgent(previous,input,context);
       const writes:any[]=[];
-      const write=(p:string,data:Record<string,any>)=>writes.push({update:{name:`${root}/${p}`,fields:encodeFields(data)}});
+      const write=(p:string,data:Record<string,any>,currentDocument:Record<string,unknown>)=>writes.push({update:{name:`${root}/${p}`,fields:encodeFields(data)},currentDocument});
       if(conversation.status==='submitted'){
         const record=makeRequest(conversation);
-        const leader=await read(`lideres/${record.leaderId}`,transaction);
-        if(leader?.tenantId!==tenantId)throw new AgentError('El responsable ya no está disponible.');
-        if(record.eventId){const event=await read(`jornadas_operativas/${record.eventId}`,transaction);if(event?.tenantId!==tenantId||['Cancelado','Finalizado'].includes(event.status))throw new AgentError('La jornada ya no está activa.');}
-        write(`solicitudes_recursos/${record.id}`,record);
-        writes[writes.length-1].currentDocument={exists:false};
-        write(`auditoria/${record.id}`,{id:record.id,tenantId,actorId:uid,entity:'solicitudes_recursos',entityId:record.id,action:'create',metadata:{source:'request-agent',conversationId:conversation.id},createdAt:record.createdAt});
+        const leaderPath=`lideres/${record.leaderId}`,leader=await snapshot(leaderPath);
+        if(leader.data?.tenantId!==tenantId)throw new AgentError('El responsable ya no está disponible.');
+        writes.push({verify:`${root}/${leaderPath}`,currentDocument:leader.precondition});
+        if(record.eventId){
+          const eventPath=`jornadas_operativas/${record.eventId}`,event=await snapshot(eventPath);
+          if(event.data?.tenantId!==tenantId||['Cancelado','Finalizado'].includes(event.data.status))throw new AgentError('La jornada ya no está activa.');
+          writes.push({verify:`${root}/${eventPath}`,currentDocument:event.precondition});
+        }
+        write(`solicitudes_recursos/${record.id}`,record,{exists:false});
+        write(`auditoria/${record.id}`,{id:record.id,tenantId,actorId:uid,entity:'solicitudes_recursos',entityId:record.id,action:'create',metadata:{source:'request-agent',conversationId:conversation.id},createdAt:record.createdAt},{exists:false});
       }
-      write(path,conversation);write(receiptPath,{messageId:input.messageId,revision:conversation.revision,createdAt:conversation.updatedAt,tenantId,ownerUid:uid});
-      await call(':commit',{transaction,writes});
+      write(path,conversation,current.precondition);
+      write(receiptPath,{messageId:input.messageId,revision:conversation.revision,createdAt:conversation.updatedAt,tenantId,ownerUid:uid},{exists:false});
+      try{await call(':commit',{writes});}
+      catch(error){
+        // Re-read after contention; receipts make a repeated delivery idempotent.
+        // A different message keeps its revision check and cannot overwrite edits.
+        if(error instanceof AgentError&&attempt<2){
+          if(error.status===409)continue;
+          // Rules can reject a stale update/immutable receipt before Firestore
+          // reports its failed precondition. Retry only with evidence of a
+          // concurrently changed draft that this user can still read.
+          if(error.status===403){
+            const latest=await snapshot(path);
+            if(JSON.stringify(latest.precondition)!==JSON.stringify(current.precondition))continue;
+          }
+        }
+        throw error;
+      }
       const saved=await read(path) as AgentConversation|undefined;
       if(!saved||saved.revision<conversation.revision)throw new AgentError('No se pudo verificar el guardado. Reintente el mismo mensaje.',503);
       if(conversation.status==='submitted'){
@@ -90,7 +123,8 @@ export function createAgentBackend(options:{projectId:string;databaseId:string;t
         if(!savedRequest||Object.entries(expected).some(([k,v])=>JSON.stringify(savedRequest[k])!==JSON.stringify(v)))throw new AgentError('El guardado requiere revisión. No se confirma la solicitud.',503);
       }
       return {conversation:saved,context,reply:saved.messages.at(-1)?.text||'',verified:true};
-    }catch(e){try{await call(':rollback',{transaction});}catch{}throw e;}
+    }
+    throw new AgentError('La conversación cambió. Reintente el mismo mensaje.',409);
   }
   return {turn};
 }
