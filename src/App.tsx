@@ -693,7 +693,7 @@ export default function App() {
             </div>
           )}
 
-          {currentUser && activeTab === 'resources' && <ResourcesView/>}
+          {currentUser && activeTab === 'resources' && <ResourcesView onSwitchAccount={()=>setShowAuthModal(true)}/>}
 
           {currentUser && activeTab === 'users' && <UserManagementView currentUser={currentUser} currentTenant={currentTenant} users={users} leaders={leaders} candidates={candidates} />}
 
