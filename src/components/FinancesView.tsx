@@ -1,3 +1,4 @@
+import { ServiceCostsDashboard } from './ServiceCostsDashboard';
 import { EditRecordButton } from './common/EditRecordButton';
 import { createRecordId } from '../lib/recordIds';
 import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
@@ -117,7 +118,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
   const [expenseUnit,setExpenseUnit]=useState('servicio');
   // Navigation Sub-tabs
   const { saving, saveError, submit, runSave } = useFirestoreForm();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'aportantes' | 'gastos' | 'topes_cne'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'service_costs' | 'aportantes' | 'gastos' | 'topes_cne'>('service_costs');
 
   // Dynamic Filters for Finances
   const [filterDonorPerson, setFilterDonorPerson] = useState<string>('TODOS');
@@ -584,7 +585,8 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
       </div>
 
       {/* Sub-Navigation Tabs */}
-      <div className="flex border-b border-slate-800 space-x-1">
+      <div className="flex flex-wrap gap-1 border-b border-slate-800">
+        <button onClick={() => setActiveTab('service_costs')} className={`flex min-h-11 items-center gap-2 rounded-t-xl px-4 py-2.5 text-xs font-bold ${activeTab === 'service_costs' ? 'border-t-2 border-cyan-400 bg-slate-900 text-cyan-300' : 'text-slate-400 hover:text-slate-200'}`}><BarChart3 className="h-4 w-4"/>Costos por servicio</button>
         <button
           onClick={() => setActiveTab('dashboard')}
           className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition cursor-pointer flex items-center gap-2 ${
@@ -718,6 +720,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
       {/* ========================================================================= */}
       {/* TAB 1: DASHBOARD & COMPARATIVAS VISUALES CON RECHARTS */}
       {/* ========================================================================= */}
+      {activeTab === 'service_costs' && <ServiceCostsDashboard key={currentTenant.tenantId} expenses={filteredExpenses} leaders={operation.leaders} tenantId={currentTenant.tenantId}/>}
       {activeTab === 'dashboard' && (
         <div className="space-y-6">
           
