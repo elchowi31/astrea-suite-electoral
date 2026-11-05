@@ -12,9 +12,9 @@ export function WhatsappConnectionProvider({children}:{children:React.ReactNode}
  const [config,setConfig]=useState<Config>(()=>defaultWhatsappConfig(user));
  const [busy,setBusy]=useState(true);const preparing=useRef(false),generation=useRef(0);
  const [running,setRunning]=useState(false),[connected,setConnected]=useState(false),[status,setStatus]=useState('Sin conexión'),[code,setCode]=useState(''),[error,setError]=useState(''),[saved,setSaved]=useState<string[]>([]),[wake,setWake]=useState(false);
- const controller=useRef<AbortController|null>(null),identity=useRef<{id:string;key:string;scope:string}|null>(null),mounted=useRef(true);
- const stop=()=>{controller.current?.abort();setConnected(false);setCode('');};
- const reset=()=>{stop();identity.current=null;setSaved([]);setError('');setStatus('Nueva vinculación preparada. Retire la anterior desde Dispositivos vinculados de WhatsApp.');};
+ const controller=useRef<AbortController|null>(null),identity=useRef<{id:string;key:string;scope:string;paired:boolean}|null>(null),mounted=useRef(true);
+ const stop=()=>{controller.current?.abort();if(!identity.current?.paired)identity.current=null;setConnected(false);setCode('');};
+ const reset=()=>{stop();identity.current=null;setSaved([]);setError('');setStatus('Nueva vinculación preparada.');};
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;controller.current?.abort();identity.current=null;};},[]);
  useEffect(()=>{
   const current=++generation.current;let cancelled=false;
@@ -48,14 +48,17 @@ export function WhatsappConnectionProvider({children}:{children:React.ReactNode}
   const config=await save(input);if(!config)return;
   const normalized={phone:config.phone,leaderId:config.leaderId,eventId:config.eventId,municipality:config.municipality,tenantId:tenant.tenantId};
   const scope=JSON.stringify(normalized);
-  if(!identity.current||identity.current.scope!==scope)identity.current={id:randomHex(16),key:randomHex(32),scope};
+  if(!identity.current||identity.current.scope!==scope)identity.current={id:randomHex(16),key:randomHex(32),scope,paired:false};
   const session={id:identity.current.id,key:identity.current.key,resumeId:randomHex(16)};
   const active=new AbortController();controller.current=active;setRunning(true);setConnected(false);setError('');setCode('');setStatus('Iniciando WhatsApp…');
   const event=(e:WhatsappEvent)=>{
    if(!mounted.current||active.signal.aborted)return;
    if(e.type==='heartbeat'){setConnected(!!e.connected);if(e.connected)setStatus('WhatsApp conectado · recepción activa');return;}
+   if(e.resetSession&&identity.current?.id===session.id)identity.current=null;
+   if((e.type==='paired'||e.type==='connected')&&identity.current?.id===session.id)identity.current.paired=true;
    if(e.message)setStatus(e.message);
    if(e.type==='pairing'){setCode(e.code||'');setConnected(false);}
+   if(e.type==='paired'){setCode('');setConnected(false);}
    if(e.type==='connected'){setCode('');setConnected(true);setError('');}
    if(['retry','renew','fatal'].includes(e.type)){setConnected(false);setCode('');}
    if(e.type==='fatal'||e.type==='notice')setError(e.message||'Revise la conexión.');

@@ -93,14 +93,14 @@ test('tab backs off for exclusive lease, retries broken streams and stops on per
 });
 test('rotation closes socket without logout and signals renewal only after checkpoint and exclusive lease release',async()=>{
  const order:string[]=[];const events:any[]=[];const res=Object.assign(new EventEmitter(),{destroyed:false,writableEnded:false,statusCode:0,setHeader(){},flushHeaders(){},write(line:string){const event=JSON.parse(line);events.push(event);order.push(event.type);},end(){this.writableEnded=true;}});
- const persisted=state();persisted.creds.registered=true;persisted.inbox=[{phone:'573009999999',jid:'573009999999@s.whatsapp.net',messageId:'pending',text:'confirmar',result:{reply:'Guardado',requestId:'request-1'}}];
+ const persisted=state();persisted.creds.me={id:config.phone+':1@s.whatsapp.net'};persisted.creds.account={accountSignature:Buffer.from('signed'),deviceSignature:Buffer.from('signed')};persisted.inbox=[{phone:'573009999999',jid:'573009999999@s.whatsapp.net',messageId:'pending',text:'confirmar',result:{reply:'Guardado',requestId:'request-1'}}];
  let logouts=0,sends=0;const ev=new EventEmitter();
  const socket={ev,user:{id:config.phone+'@s.whatsapp.net'},end(){order.push('socket-end');},logout:async()=>{logouts++;},sendMessage:async()=>{sends++;}};
  await runWhatsappPilot({projectId:'test',databaseId:'test',token:'test',uid:'admin',config,session,res:res as any,checkActive:async()=>{}},{segmentMs:25,makeSocket:(()=>{queueMicrotask(()=>ev.emit('connection.update',{connection:'open'}));return socket;}) as any,loadSession:(async()=>({state:persisted,auth:{creds:persisted.creds,keys:{}},save:async()=>{order.push('save');},markHandled:async(id:string)=>{persisted.handled.push(id);},wasHandled:async(id:string)=>persisted.handled.includes(id),flush:async()=>{order.push('flush');}})) as any,lease:(()=>({owner:'lease',acquire:async()=>{},release:async()=>{order.push('release');}})) as any});
  assert.equal(logouts,0);assert.equal(sends,1);assert.equal(persisted.inbox.length,0);assert.ok(persisted.handled.includes('pending'));assert.ok(order.indexOf('renew')>order.indexOf('flush'));assert.ok(order.indexOf('renew')>order.indexOf('release'));assert.equal(events.at(-1).type,'renew');
 });
 test('a real-shaped LID message is received, processed, answered and receipted once across duplicate notifications',async()=>{
- const persisted=state();persisted.creds.registered=true;persisted.startedAt=Date.now()-5000;
+ const persisted=state();persisted.creds.me={id:config.phone+':1@s.whatsapp.net'};persisted.creds.account={accountSignature:Buffer.from('signed'),deviceSignature:Buffer.from('signed')};persisted.startedAt=Date.now()-5000;
  const ev=new EventEmitter(),events:any[]=[],activity:string[]=[],intakes:string[]=[],sent:any[]=[];
  const res=Object.assign(new EventEmitter(),{destroyed:false,writableEnded:false,statusCode:0,setHeader(){},flushHeaders(){},write(line:string){events.push(JSON.parse(line));},end(){this.writableEnded=true;}});
  const socket={ev,user:{id:config.phone+'@s.whatsapp.net'},signalRepository:{lidMapping:{getPNForLID:async()=> '573009999999@s.whatsapp.net'}},end(){},sendMessage:async(jid:string,message:any)=>{sent.push({jid,...message});}};

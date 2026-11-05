@@ -1,4 +1,4 @@
-export type WhatsappEvent={type:string;message?:string;code?:string;requestId?:string;connected?:boolean};
+export type WhatsappEvent={type:string;message?:string;code?:string;requestId?:string;connected?:boolean;resetSession?:boolean};
 export function waitForRenewal(ms:number,signal:AbortSignal){
  return new Promise<void>(resolve=>{
   if(signal.aborted){resolve();return;}

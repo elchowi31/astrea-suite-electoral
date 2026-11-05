@@ -1,7 +1,7 @@
 import {decodeFields,encodeFields} from './requestAgent.js';
 import {writeCheckpoint} from './firestoreCheckpoint.js';
 
-export type DiagnosticStage='starting'|'connected'|'heartbeat'|'received'|'ignored'|'prepared'|'replied'|'saved'|'duplicate'|'pending_reply'|'stopped';
+export type DiagnosticStage='starting'|'pairing'|'paired'|'connected'|'heartbeat'|'received'|'ignored'|'prepared'|'replied'|'saved'|'duplicate'|'pending_reply'|'stopped';
 export type DiagnosticDetails={detail?:string;senderHint?:string;text?:string;reply?:string;requestId?:string;queued?:number;recoveredHandled?:number};
 /** An operator-visible trace, scoped to the authenticated owner and organization.
  * It never stores credentials, encryption keys, full phone numbers or history sync. */
