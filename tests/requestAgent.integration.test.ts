@@ -161,9 +161,10 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
    const initial=new Promise<void>(resolve=>{initialResolve=resolve;});
    const changed=new Promise<Record<string,any>>((resolve,reject)=>{
     timer=setTimeout(()=>reject(Error('Private LID request did not reach realtime listener')),15000);
-    unsubscribe=onSnapshot(doc(db,'solicitudes_recursos',requestId),snapshot=>{
+    unsubscribe=onSnapshot(query(collection(db,'solicitudes_recursos'),where('tenantId','==',tenantId)),snapshot=>{
      if(snapshot.metadata.fromCache||snapshot.metadata.hasPendingWrites)return;
-     if(snapshot.exists())resolve(snapshot.data());else initialResolve();
+     const record=snapshot.docs.find(row=>row.id===requestId);
+     if(record)resolve(record.data());else initialResolve();
     },reject);
    });
    try{
