@@ -66,10 +66,11 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
    let unsubscribe=()=>{};
    const changed=new Promise<Record<string,any>>((resolve,reject)=>{
     timer=setTimeout(()=>reject(new Error('No realtime server snapshot received')),15000);
-    unsubscribe=onSnapshot(doc(db,'solicitudes_recursos',requestId),snapshot=>{
+    unsubscribe=onSnapshot(query(collection(db,'solicitudes_recursos'),where('tenantId','==',tenantId)),snapshot=>{
      if(snapshot.metadata.fromCache||snapshot.metadata.hasPendingWrites)return;
-     if(!snapshot.exists()){initialResolve();return;}
-     resolve(snapshot.data());
+     const record=snapshot.docs.find(row=>row.id===requestId);
+     if(!record){initialResolve();return;}
+     resolve(record.data());
     },reject);
    });
    try{
