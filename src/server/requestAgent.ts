@@ -104,7 +104,16 @@ export function createAgentBackend(options:{projectId:string;databaseId:string;t
       catch(error){
         // Re-read after contention; receipts make a repeated delivery idempotent.
         // A different message keeps its revision check and cannot overwrite edits.
-        if(error instanceof AgentError&&error.status===409&&attempt<2)continue;
+        if(error instanceof AgentError&&attempt<2){
+          if(error.status===409)continue;
+          // Rules can reject a stale update/immutable receipt before Firestore
+          // reports its failed precondition. Retry only with evidence of a
+          // concurrently changed draft that this user can still read.
+          if(error.status===403){
+            const latest=await snapshot(path);
+            if(JSON.stringify(latest.precondition)!==JSON.stringify(current.precondition))continue;
+          }
+        }
         throw error;
       }
       const saved=await read(path) as AgentConversation|undefined;

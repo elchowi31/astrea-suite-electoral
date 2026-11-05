@@ -71,3 +71,15 @@ test('persistent precondition conflicts stop after three atomic attempts',async(
  }});
  await assert.rejects(backend.turn(input),(e:any)=>e.status===409);assert.equal(attempts,3);
 });
+test('rules rejecting an already-written receipt are recovered only after a readable version change',async()=>{
+ const f=fixture();let raced=false;
+ const backend=createAgentBackend({...f.options,fetcher:async(url,init)=>{
+  if(String(url).endsWith(':commit')&&!raced){
+   raced=true;await createAgentBackend(f.options).turn(input);
+   return new Response(JSON.stringify({error:{status:'PERMISSION_DENIED'}}),{status:403});
+  }
+  return f.fetcher(url,init);
+ }});
+ const result=await backend.turn(input);assert.equal(result.duplicate,true);assert.equal(result.conversation.revision,1);
+ assert.equal(f.commits.length,1);
+});
