@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {initializeTestEnvironment,assertFails,assertSucceeds} from '@firebase/rules-unit-testing';
-import {doc,setDoc,getDoc,updateDoc,collection,getDocs,query,where} from 'firebase/firestore';
+import {doc,setDoc,getDoc,updateDoc,collection,getDocs,query,where,onSnapshot} from 'firebase/firestore';
 import {createAgentBackend} from '../src/server/requestAgent';
 import type {AgentTurn} from '../src/lib/requestAgent';
 import {pilotIntake,pilotLease} from '../src/server/whatsappPilotCore';
@@ -55,6 +55,34 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
    await assertFails(getDoc(doc(other,'usuarios',a.uid,'agent_conversations',input.conversationId)));
   });
   const confirmation:AgentTurn={...input,patch:undefined,messageId:'confirm-message',revision:1,action:'confirm'};
+  await t.test('a separate Firestore listener receives the confirmed request without a page reload',async()=>{
+   const draftInput:AgentTurn={...input,conversationId:'live-listener-check',patch:{resource:'Alimentación',quantity:2,unitCost:0,municipality:'Astrea',description:'Prueba técnica de formulario; no entregar recursos.',leaderId:'agent-leader'}};
+   const prepared=await backend().turn(draftInput);
+   const db=env.authenticatedContext(a.uid,{email:'agent@test.invalid'}).firestore();
+   const requestId=`agent-${a.uid}-${draftInput.conversationId}`;
+   let initialResolve!:()=>void;
+   const initial=new Promise<void>(resolve=>{initialResolve=resolve;});
+   let timer:ReturnType<typeof setTimeout>;
+   let unsubscribe=()=>{};
+   const changed=new Promise<Record<string,any>>((resolve,reject)=>{
+    timer=setTimeout(()=>reject(new Error('No realtime server snapshot received')),15000);
+    unsubscribe=onSnapshot(query(collection(db,'solicitudes_recursos'),where('tenantId','==',tenantId)),snapshot=>{
+     if(snapshot.metadata.fromCache||snapshot.metadata.hasPendingWrites)return;
+     const record=snapshot.docs.find(row=>row.id===requestId);
+     if(!record){initialResolve();return;}
+     resolve(record.data());
+    },reject);
+   });
+   try{
+    // Wait until the reader is subscribed, then write through the independent REST backend.
+    await Promise.race([initial,changed]);
+    const result=await backend().turn({...confirmation,conversationId:draftInput.conversationId,revision:prepared.conversation.revision});
+    assert.equal(result.conversation.requestId,requestId);
+    const received=await changed;
+    assert.equal(received.quantity,2);assert.equal(received.status,'Pendiente');
+    assert.match(result.reply,/guardada/i);
+   }finally{clearTimeout(timer!);unsubscribe();}
+  });
   await t.test('confirmation atomically creates one pending request and audit',async()=>{
    saved=await backend().turn(confirmation);assert.equal(saved.conversation.status,'submitted');
    const replay=await backend().turn(confirmation);assert.equal(replay.conversation.requestId,saved.conversation.requestId);
@@ -134,3 +162,4 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
   });
  }finally{await env.cleanup();}
 });
+

@@ -53,9 +53,12 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
   current.ev.on('creds.update',update=>{Object.assign(store.auth.creds,update);void store.save().catch(failed);});
   current.ev.on('connection.update',update=>{
    if(stopped||current!==socket)return;
-   if((update.connection==='connecting'||update.qr)&&!store.auth.creds.registered&&!pairRequested){
+   // requestPairingCode mutates creds.me before sending. Calling it on the
+   // early 'connecting' event can race the registration handshake and make
+   // Baileys attempt a login with an identity that is not paired yet.
+   if(update.qr&&!store.auth.creds.registered&&!pairRequested){
     pairRequested=true;
-    void current.requestPairingCode(config.phone).then(code=>{if(!stopped)emit({type:'pairing',code,message:'Vincule WhatsApp con este código. La vinculación se conserva durante esta pestaña.'});}).catch(()=>stop('retry','WhatsApp no generó el código. Reintentando conexión…'));
+    void current.requestPairingCode(config.phone).then(code=>{if(!stopped&&current===socket)emit({type:'pairing',code,message:'Vincule WhatsApp con este código. La vinculación se conserva durante esta pestaña.'});}).catch(()=>stop('fatal','No se pudo generar el código de WhatsApp. Use «Nueva vinculación» para volver a intentarlo.'));
    }
    if(update.connection==='open'){
     const phone=current.user?.id?.split('@')[0].split(':')[0];
@@ -65,8 +68,8 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
    if(update.connection==='close'){
     connected=false;const code=(update.lastDisconnect?.error as any)?.output?.statusCode;
     if(code===DisconnectReason.restartRequired&&restarts++===0){current.end(undefined);connect();}
-    else if([DisconnectReason.loggedOut,DisconnectReason.badSession,DisconnectReason.connectionReplaced].includes(code))stop('fatal','WhatsApp revocó o reemplazó esta sesión. Cree una nueva vinculación desde el panel.');
-    else stop('retry','Recuperando la conexión con WhatsApp…');
+    else if([DisconnectReason.loggedOut,DisconnectReason.badSession,DisconnectReason.connectionReplaced].includes(code))stop('fatal',store.auth.creds.registered?`WhatsApp cerró o reemplazó la sesión (código ${code}). Use «Nueva vinculación».`:`WhatsApp rechazó la vinculación inicial (código ${code}). No llegó a conectarse. Use «Nueva vinculación».`);
+    else stop('retry',`WhatsApp interrumpió la conexión${Number.isInteger(code)?` (código ${code})`:''}. Se reintentará automáticamente.`);
    }
   });
   current.ev.on('messages.upsert',event=>{
@@ -96,3 +99,4 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
   emit(outcome);if(!res.writableEnded&&!res.destroyed)res.end();
  }
 }
+
