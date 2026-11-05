@@ -47,6 +47,6 @@ jobs:
         run: >-
           npx --yes --package firebase-tools@15.28.1 firebase emulators:exec
           --project demo-astrea --config firebase.emulator.json --only auth,firestore
-          "node --import tsx --test --test-concurrency=1 tests/firestore.rules.test.ts tests/requestAgent.integration.test.ts tests/whatsappSetup.integration.test.ts"
+          "node --import tsx --test --test-concurrency=1 tests/firestore.rules.test.ts tests/requestAgent.integration.test.ts tests/whatsappSetup.integration.test.ts tests/passengerLogistics.integration.test.ts"
 
 
