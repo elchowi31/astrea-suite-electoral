@@ -236,6 +236,25 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
     assert.ok(raw.ciphertext);assert.ok(!JSON.stringify(raw).includes('test-private-key'));assert.ok(!JSON.stringify(raw).includes(session.key));
    });
   });
+  await t.test('encrypted session reconciles a lost Firestore commit response and continues after rotation',async()=>{
+   const config={phone:'573000000000',tenantId,leaderId:'agent-leader',eventId:'agent-event',municipality:'Astrea'};
+   const session={id:'7'.repeat(32),key:'8'.repeat(64),resumeId:'9'.repeat(32)};
+   const options={base:'http://127.0.0.1:8088/v1/projects/demo-astrea/databases/(default)/documents',token:'owner',uid:a.uid,config,session};
+   let loseResponse=false;
+   const checkpoint=await loadWhatsappSession({...options,fetcher:async(url,init)=>{
+    const response=await fetch(url,init);
+    if(loseResponse&&String(url).endsWith(':commit')&&response.ok){loseResponse=false;await response.text();throw new TypeError('Lost committed response');}
+    return response;
+   }});
+   loseResponse=true;
+   await checkpoint.auth.keys.set({'pre-key':{'recover':{private:Buffer.from('private-recovery-key'),public:Buffer.from('public-recovery-key')}}});
+   checkpoint.state.conversations.contact='recovered-conversation';await checkpoint.save();await checkpoint.flush();
+   const restored=await loadWhatsappSession(options);
+   assert.equal(restored.state.conversations.contact,'recovered-conversation');
+   assert.deepEqual((await restored.auth.keys.get('pre-key',['recover'])).recover.private,Buffer.from('private-recovery-key'));
+   restored.state.conversations.contact='next-conversation';await restored.save();
+   assert.equal((await loadWhatsappSession(options)).state.conversations.contact,'next-conversation');
+  });
   await t.test('a private LID completes a questionnaire, publishes realtime and survives encrypted renewal without a phone number',async()=>{
    const config={phone:'573000000000',tenantId,leaderId:'agent-leader',eventId:'agent-event',municipality:'Astrea'};
    const session={id:'b'.repeat(32),key:'c'.repeat(64),resumeId:'d'.repeat(32)};

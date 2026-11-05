@@ -67,7 +67,7 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
   if(stopped)return;connected=false;
   socket=(dependencies.makeSocket||makeWASocket)({auth:store.auth,logger:pino({level:'silent'}) as any,markOnlineOnConnect:false,syncFullHistory:false,shouldSyncHistoryMessage:()=>false,connectTimeoutMs:25000,defaultQueryTimeoutMs:15000});
   const current=socket;
-  current.ev.on('creds.update',update=>{Object.assign(store.auth.creds,update);void store.save().catch(failed);});
+  current.ev.on('creds.update',update=>{if(stopped||current!==socket)return;Object.assign(store.auth.creds,update);void store.save().catch(failed);});
   current.ev.on('connection.update',update=>{
    if(stopped||current!==socket)return;
    // requestPairingCode mutates creds.me before sending. Calling it on the
@@ -136,7 +136,11 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
   socket?.end(undefined);
   try{
    await Promise.race([work.then(()=>store.flush()),new Promise<never>((_,reject)=>{const timer=setTimeout(()=>reject(new Error('Drain timeout')),25000);timer.unref();})]);
-  }catch{outcome={type:'fatal',message:'No se pudo finalizar el guardado de la sesión. Revise los registros antes de reanudar.'};}
+  }catch(error){
+   // Keep the actionable persistence error; do not hide it behind a generic shutdown message.
+   if(error instanceof AgentError)outcome={...outcome,type:'fatal',message:error.message};
+   else if(outcome.type!=='fatal')outcome={type:'fatal',message:'El guardado de la sesión no terminó a tiempo. Los guardados anteriores se conservan; intente reanudar la recepción.'};
+  }
   trace('stopped',{detail:outcome.message,queued:store.state.inbox.length});await diagnostics.flush();
   await lease.release().catch(()=>{});
   // Rotate only after writes and lease release complete.

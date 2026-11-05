@@ -46,14 +46,61 @@ export async function loadWhatsappSession(options:{base:string;token:string;uid:
  if(fields&&fields.binding!==binding)throw new AgentError('Esta vinculación pertenece a otro ámbito.',403);
  const state:SessionState=fields?openSession(fields.ciphertext,options.session.key,binding):{version:1,receiptsVersion:1,startedAt:Date.now(),creds:initAuthCreds(),keys:{},conversations:{},inbox:[],handled:[]};
  let revision=record?.updateTime||'';
- let writes=Promise.resolve();
+ // Coalesce queued snapshots, but keep each caller's failure observable.
+ // A failed promise must not permanently poison every later save.
+ let writes=Promise.resolve(),requested=0,persisted=0,failedThrough=0;
+ let lastFailure:unknown;
+ const failure=(status:number)=>new AgentError(
+  status===401||status===403?`No se pudo conservar la vinculación: Firestore rechazó el acceso (HTTP ${status}). Revise la sesión de administrador antes de reanudar.`:
+  status===409?`No se pudo conservar la vinculación: otra conexión modificó la sesión. Detenga la otra recepción antes de reanudar.`:
+  `No se pudo conservar la vinculación (${status?'Firestore HTTP '+status:'conexión interrumpida o tiempo de espera'}). Los guardados anteriores se conservan; puede reanudar la recepción.`,
+  status===401||status===403||status===409?status:503);
+ async function persistSnapshot(){
+  // Reuse the exact ciphertext on a retry: it identifies this attempted commit.
+  const ciphertext=sealSession(state,options.session.key,binding);
+  const checkpoint=encodeFields({binding,ciphertext,updatedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+86400000).toISOString()});
+  for(let attempt=0;attempt<2;attempt++){
+   let status=0;
+   try{
+    const saved=await writeCheckpoint({base:options.base,path,headers,request,revision,fields:checkpoint,timeout:7000});
+    status=saved.status;
+    if(saved.ok&&saved.updateTime){revision=saved.updateTime;return;}
+   }catch{/* The commit may have succeeded even when its response was lost. */}
+   if(status===401||status===403)throw failure(status);
+   // Never adopt a different writer's revision. Only an exact, authorized
+   // read-back of this ciphertext can reconcile an uncertain successful write.
+   try{
+    const check=await request(url,{headers,signal:AbortSignal.timeout(5000)});
+    if(check.status===401||check.status===403)throw failure(check.status);
+    if(check.ok){
+     const document=await check.json(),latest=decodeFields(document.fields);
+     if(latest.binding!==binding)throw new AgentError('Esta vinculación pertenece a otro ámbito.',403);
+     if(!document.updateTime)throw failure(503);
+     if(latest.ciphertext===ciphertext){revision=document.updateTime;return;}
+     if(document.updateTime!==revision)throw failure(409);
+    }else if(check.status===404&&revision)throw failure(409);
+   }catch(error){if(error instanceof AgentError)throw error;}
+   const transient=status===0||status===200||[408,429,500,502,503,504].includes(status);
+   if(!transient||attempt===1)throw failure(status);
+   await new Promise(resolve=>setTimeout(resolve,250));
+  }
+ }
  const save=()=>{
-  writes=writes.then(async()=>{
-   const ciphertext=sealSession(state,options.session.key,binding);
-   const saved=await writeCheckpoint({base:options.base,path,headers,request,revision,fields:encodeFields({binding,ciphertext,updatedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+86400000).toISOString()})});
-   if(!saved.ok||!saved.updateTime)throw new AgentError('No se pudo conservar la vinculación. La recepción se detuvo para proteger los mensajes.',503);
-   revision=saved.updateTime;
-  });return writes;
+  const ticket=++requested;
+  const pending=writes.then(async()=>{
+   if(ticket<=persisted)return;
+   if(ticket<=failedThrough)throw lastFailure;
+   const snapshotGeneration=requested;
+   try{await persistSnapshot();persisted=snapshotGeneration;lastFailure=undefined;}
+   catch(error){lastFailure=error;failedThrough=requested;throw error;}
+  });
+  writes=pending.catch(()=>{});
+  return pending;
+ };
+ const flush=async()=>{
+  // Include saves enqueued while an earlier write was finishing.
+  for(;;){const pending=writes;await pending;if(pending===writes)break;}
+  if(lastFailure)throw lastFailure;
  };
  const auth:AuthenticationState={creds:state.creds,keys:{
   get:async(type,ids)=>Object.fromEntries(ids.map(id=>{
@@ -93,5 +140,5 @@ export async function loadWhatsappSession(options:{base:string;token:string;uid:
   for(let index=0;index<legacy.length;index+=20)await Promise.all(legacy.slice(index,index+20).map(markHandled));
   state.receiptsVersion=1;await save();
  }
- return {state,auth,save,wasHandled,markHandled,flush:()=>writes};
+ return {state,auth,save,wasHandled,markHandled,flush};
 }
