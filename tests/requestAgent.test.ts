@@ -1,3 +1,4 @@
+import {requestReference} from '../src/lib/requestReference';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {advanceAgent,agentRequest,validateAgentTurn,question,type AgentConversation,type AgentContext,type AgentTurn} from '../src/lib/requestAgent';
@@ -62,4 +63,35 @@ test('the next question matches the requested resource',()=>{
  for(const [text,resource] of [['Necesito 2 desayunos','Alimentación'],['Necesito 5 meriendas','Refrigerios e hidratación'],['Necesito 4 galones de ACPM','Combustible'],['Necesito 20 sillas','Sede y mobiliario']] as const){
   assert.equal(advanceAgent(undefined,{...base,text},context).draft.resource,resource);
  }
+});
+
+test('natural affirmations submit a reviewed request once and close with its reference',()=>{
+ const review=advanceAgent(undefined,{...base,action:'edit',patch:complete},context);
+ for(const text of ['Si confirmo la solicitud','¡Sí, confirmo la solicitud!','sí','confirmo','confirmar.','sí, por favor','de acuerdo','OK, gracias','confirmar y guardar']){
+  const closed=advanceAgent(review,{...base,revision:review.revision,text},context);
+  assert.equal(closed.status,'submitted',text);
+  assert.match(closed.messages.at(-1)!.text,/Número de requisición:/);
+  assert.ok(closed.messages.at(-1)!.text.includes(requestReference(closed.requestId)));
+  assert.match(closed.messages.at(-1)!.text,/no necesitas enviar más datos/);
+  assert.equal(agentRequest(closed).status,'Pendiente');
+  assert.throws(()=>advanceAgent(closed,{...base,revision:closed.revision,text:'gracias'},context),/terminó/);
+ }
+});
+test('negations, corrections and missing fields never submit or repeat the review summary',()=>{
+ const review=advanceAgent(undefined,{...base,action:'edit',patch:complete},context);
+ for(const text of ['no confirmo','¿confirmo?','sí, pero cambia la cantidad a 4','confirmo pero falta el regreso','¿qué día?','gracias','necesito corregir','no está bien']){
+  const next=advanceAgent(review,{...base,revision:review.revision,text},context);
+  assert.equal(next.status,'review',text);assert.equal(next.requestId,'');
+  assert.deepEqual(next.draft,review.draft);
+  assert.match(next.messages.at(-1)!.text,/Aún no se ha creado una requisición/);
+  assert.doesNotMatch(next.messages.at(-1)!.text,/Revise antes/);
+ }
+ const incomplete=advanceAgent(undefined,base,context);
+ assert.throws(()=>advanceAgent(incomplete,{...base,revision:incomplete.revision,text:'Sí confirmo la solicitud'},context),/Complete/);
+});
+test('display references are stable while legacy ids retain their canonical reference',()=>{
+ const id='agent-user-a-'+'0123456789abcdef'.repeat(4);
+ assert.equal(requestReference(id),'REQ-01234-56789-ABCDE-F0123');
+ assert.equal(requestReference('agent-user-a-legacy-conversation'),'agent-user-a-legacy-conversation');
+ assert.notEqual(requestReference(id),requestReference('agent-user-a-'+'abcdef0123456789'.repeat(4)));
 });

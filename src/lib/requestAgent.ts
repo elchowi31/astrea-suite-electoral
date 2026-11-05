@@ -1,3 +1,4 @@
+import { requestReference } from './requestReference.js';
 import { RESOURCE_CATALOG, TRANSPORT_RESOURCE, validateRequest, type ResourceRequest } from './operations.js';
 
 export type AgentDraft = Partial<Pick<ResourceRequest, 'resource'|'quantity'|'unitCost'|'description'|'municipality'|'leaderId'|'eventId'|'direction'>>;
@@ -10,6 +11,18 @@ export type AgentContext = {tenantId:string;uid:string;leaders:{id:string;name:s
 export type AgentTurn = {conversationId:string;messageId:string;revision:number;action:AgentAction;text?:string;patch?:AgentDraft};
 export class AgentError extends Error { constructor(message:string,public status=400){super(message);} }
 const normalize=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+/** Match the entire affirmative answer: negations and proposed corrections never submit. */
+export function isRequestConfirmation(text:string):boolean {
+  if(/[¿?]/.test(text))return false;
+  const command=normalize(text).replace(/[¡!¿?.,;:]/g,' ').replace(/\s+/g,' ').trim();
+  return /^(?:(?:si )?(?:confirmar|confirmo)(?: (?:la |mi |esta )?solicitud| y guardar)?|si(?: esta (?:bien|correcto|correcta))?|ok|okay|listo|correcto|de acuerdo|todo (?:bien|correcto)|esta (?:bien|correcto|correcta))(?: por favor)?(?: gracias)?$/.test(command);
+}
+export function requestCreatedReply(requestId:string):string {
+  return `¡Listo! Tu solicitud quedó creada y guardada.\nNúmero de requisición: ${requestReference(requestId)}\nEstado: Pendiente de revisión.\nEl equipo de coordinación revisará tu petición para gestionar la asignación según disponibilidad.\nPor ahora no necesitas enviar más datos. Gracias por contar con nosotros.\nSi necesitas registrar otra petición, escribe «nueva solicitud».`;
+}
+export function requestClosedReply(requestId:string):string {
+  return `¡Con gusto! Tu solicitud ya quedó guardada con la requisición ${requestReference(requestId)}. No necesitas confirmarla otra vez.\nGuarda este número para consultar tu petición. Si necesitas algo distinto, escribe «nueva solicitud».`;
+}
 const fields=['resource','quantity','municipality','description','leaderId','eventId','unitCost','direction'] as const;
 export function validateAgentTurn(value:any): asserts value is AgentTurn {
   if(!value||!['message','edit','confirm','handoff','resume','cancel'].includes(value.action)
@@ -50,7 +63,7 @@ export function question(d:AgentDraft,c:AgentContext):string {
     case 'leaderId':return c.leaders.length?`Seleccione el responsable en la ficha o escriba su nombre exacto: ${c.leaders.slice(0,12).map(l=>l.name).join('; ')}.`:'No hay líderes disponibles. Registre primero al responsable en la plataforma.';
     case 'eventId':return c.events.length?`Seleccione la jornada en la ficha o escriba su nombre exacto: ${c.events.slice(0,12).map(e=>e.name).join('; ')}.`:'No hay jornadas activas. Cree una jornada antes de solicitar transporte.';
     case 'unitCost':return '¿Cuál es el costo unitario estimado en pesos? Escriba 0 si aún no tiene cotización.';
-    default:return `Revise antes de guardar:\n${d.resource}: ${d.quantity}\nMunicipio: ${d.municipality}\nResponsable: ${c.leaders.find(l=>l.id===d.leaderId)?.name||''}\nJornada: ${c.events.find(e=>e.id===d.eventId)?.name||'Operación general'}\nDescripción: ${d.description}\nSentido: ${d.direction||'Ida'}\nCosto unitario: ${d.unitCost} COP · total estimado: ${Math.round(d.quantity!*d.unitCost!)} COP\nPulse «Confirmar y guardar» o escriba «confirmar». Quedará pendiente de aprobación.`;
+    default:return `Revise antes de guardar:\n${d.resource}: ${d.quantity}\nMunicipio: ${d.municipality}\nResponsable: ${c.leaders.find(l=>l.id===d.leaderId)?.name||''}\nJornada: ${c.events.find(e=>e.id===d.eventId)?.name||'Operación general'}\nDescripción: ${d.description}\nSentido: ${d.direction||'Ida'}\nCosto unitario: ${d.unitCost} COP · total estimado: ${Math.round(d.quantity!*d.unitCost!)} COP\nSi todo está correcto, responde «sí, confirmo» o pulsa «Confirmar y guardar». La petición quedará pendiente de revisión por coordinación.`;
   }
 }
 export function parseMessage(text:string,d:AgentDraft,c:AgentContext):AgentDraft {
@@ -83,10 +96,12 @@ export function advanceAgent(previous:AgentConversation|undefined,turn:AgentTurn
   if(turn.action==='handoff'||(turn.action==='message'&&/^(humano|asesor|persona)$/.test(command))){status='human';reply='Asistente pausado. Puede continuar con el formulario «Nueva solicitud». Aún no se ha creado ninguna solicitud ni enviado aviso a un coordinador.';}
   else if(turn.action==='cancel'){status='cancelled';reply='Borrador cancelado. No se creó una solicitud.';}
   else {
-    const confirm=turn.action==='confirm'||(turn.action==='message'&&command==='confirmar');
+    const confirm=turn.action==='confirm'||(turn.action==='message'&&isRequestConfirmation(turn.text||''));
     if(confirm){
       if(current.status!=='review'||missingField(draft))throw new AgentError('Complete y revise la ficha antes de confirmar.');
-      status='submitted';reply='Solicitud guardada en Firestore, pendiente de aprobación. No representa cupo asignado, entrega ni gasto pagado.';
+      status='submitted';reply=requestCreatedReply(`agent-${c.uid}-${current.id}`);
+    }else if(current.status==='review'&&turn.action==='message'){
+      reply='Ya tengo los datos de tu petición. Para registrarla, responde «sí, confirmo». Si necesitas corregir algo, escribe «cancelar» y luego «nueva solicitud». Aún no se ha creado una requisición.';
     }else {
       draft=turn.action==='edit'?{...draft,...turn.patch}:parseMessage(turn.text||'',draft,c);
       validateDraft(draft);status=missingField(draft)?'draft':'review';reply=question(draft,c);

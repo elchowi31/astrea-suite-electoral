@@ -59,7 +59,7 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
     await store.markHandled(item.messageId);
     store.state.inbox.shift();await store.save();
     trace('replied',{detail:'Respuesta enviada a WhatsApp. La lectura en el teléfono aún no está confirmada.',reply:item.result.reply,senderHint:item.phone?item.phone.slice(-4):'',conversationHint:(item.senderKey||item.phone).slice(-12),queued:store.state.inbox.length,processingMs:replySentAt-processingStartedAt,...(item.receivedAt?{responseMs:Math.max(0,replySentAt-item.receivedAt)}:{})});
-    emit({type:'activity',message:'Mensaje recibido y respuesta enviada. Complete el cuestionario y escriba «confirmar» para guardar la solicitud.'});
+    emit({type:'activity',message:item.result.requestId?'Solicitud creada y respuesta de cierre enviada con su número de requisición.':'Mensaje recibido y respuesta enviada.'});
    }
   }finally{processing=false;}
  }
