@@ -17,7 +17,7 @@ export function validatePilotConfig(body:Record<string,unknown>):PilotConfig{
 export type PilotContent={conversation?:string|null;extendedTextMessage?:{text?:string|null}|null;ephemeralMessage?:{message?:PilotContent|null}|null};
 export type PilotMessage={key:{id?:string|null;fromMe?:boolean|null;remoteJid?:string|null;remoteJidAlt?:string|null;senderPn?:string|null};messageTimestamp?:unknown;message?:PilotContent|null};
 export type IncomingReason='own_or_missing_id'|'not_private'|'before_session'|'invalid_timestamp'|'unsupported_content'|'unresolved_sender';
-export function inspectPilotText(message:PilotMessage,startedAt:number,strictCutoff=false){
+export function inspectPilotText(message:PilotMessage,startedAt:number,strictCutoff=false,allowPrivateId=false){
  if(message.key.fromMe||!message.key.id)return {incoming:null,reason:'own_or_missing_id' as IncomingReason};
  const jid=message.key.remoteJid||'';
  if(!jid.endsWith('@s.whatsapp.net')&&!jid.endsWith('@lid'))return {incoming:null,reason:'not_private' as IncomingReason};
@@ -27,21 +27,27 @@ export function inspectPilotText(message:PilotMessage,startedAt:number,strictCut
  let content=message.message;for(let i=0;i<5&&content?.ephemeralMessage;i++)content=content.ephemeralMessage.message;
  const text=(content?.conversation||content?.extendedTextMessage?.text||'').trim();
  if(!text||text.length>500)return {incoming:null,reason:'unsupported_content' as IncomingReason};
- const phone=canonicalSender(jid,message.key.senderPn)||canonicalSender(jid,message.key.remoteJidAlt);
- if(!phone)return {incoming:null,reason:'unresolved_sender' as IncomingReason};
- return {incoming:{phone,jid,text,messageId:createHash('sha256').update(`${jid}:${message.key.id}`).digest('hex')},reason:null};
+ const phone=canonicalSender(jid,message.key.senderPn)||canonicalSender(jid,message.key.remoteJidAlt)||'';
+ const lid=/^(\d{1,30})(?::\d{1,5})?@lid$/.exec(jid);
+ if(!phone&&(!allowPrivateId||!lid))return {incoming:null,reason:'unresolved_sender' as IncomingReason};
+ // The channel identity is not a phone number and never grants an Astrea role.
+ const senderKey=lid?`lid:${createHash('sha256').update(`${lid[1]}@lid`).digest('hex')}`:phone;
+ return {incoming:{phone,senderKey,jid,text,messageId:createHash('sha256').update(`${jid}:${message.key.id}`).digest('hex')},reason:null};
 }
 export function incomingPilotText(message:PilotMessage,startedAt:number,strictCutoff=false){
  return inspectPilotText(message,startedAt,strictCutoff).incoming;
 }
-/** LIDs are opaque identifiers. Resolve through Baileys' authenticated mapping store,
- * never reinterpret LID digits or display names as a verified phone number. */
+/** A private authenticated LID is sufficient to reply to its conversation.
+ * The optional mapping enriches the sender, but must never block reception or
+ * reinterpret LID digits, display names or text as a verified phone number. */
 export async function resolvePilotText(message:PilotMessage,startedAt:number,lookup?:(jid:string)=>Promise<string|null|undefined>){
- const inspected=inspectPilotText(message,startedAt,true);
- if(inspected.reason!=='unresolved_sender'||!lookup)return inspected;
- const pn=await lookup(message.key.remoteJid!);
- if(!pn)return inspected;
- return inspectPilotText({...message,key:{...message.key,remoteJidAlt:pn}},startedAt,true);
+ const inspected=inspectPilotText(message,startedAt,true,true);
+ if(!inspected.incoming||inspected.incoming.phone||!lookup)return inspected;
+ try{
+  const pn=await lookup(message.key.remoteJid!);
+  if(pn&&canonicalSender(message.key.remoteJid!,pn))return inspectPilotText({...message,key:{...message.key,remoteJidAlt:pn}},startedAt,true,true);
+ }catch{/* The authenticated chat remains replyable without a phone mapping. */}
+ return inspected;
 }
 // A compare-and-set lease prevents two serverless instances pairing the same number.
 // This collection is accessible only through the existing platform-admin rule.
@@ -71,17 +77,24 @@ export function pilotLease(options:{base:string;token:string;phone:string;fetche
 }
 export function pilotIntake(options:{projectId:string;databaseId:string;token:string;uid:string;config:PilotConfig;runId:string;origin?:string;fetcher?:typeof fetch;checkActive:()=>Promise<void>;conversations?:Record<string,string>;saveCursor?:()=>Promise<void>}){
  const {config}=options;const conversations=options.conversations||{};
- return async(phone:string,messageId:string,text:string)=>{
+ return async(senderKey:string,messageId:string,text:string,verifiedPhone?:string)=>{
   await options.checkActive();
-  const initial=createHash('sha256').update(`${options.runId}:${phone}`).digest('hex');
-  let conversationId=conversations[phone]||initial;
-  const backend=createAgentBackend({...options,tenantId:config.tenantId,leaderIds:[config.leaderId],eventIds:[config.eventId],requestNotes:`WHATSAPP · Remitente +${phone}. Registro recibido durante una sesión autorizada por ${options.uid}. Pendiente de revisión por coordinación.`});
+  if(!/^\d{8,15}$/.test(senderKey)&&!/^lid:[a-f0-9]{64}$/.test(senderKey))throw new AgentError('Identificador de conversación no válido.');
+  const phone=/^\d{8,15}$/.test(verifiedPhone||'')?verifiedPhone!:/^\d{8,15}$/.test(senderKey)?senderKey:'';
+  const initial=createHash('sha256').update(`${options.runId}:${senderKey}`).digest('hex');
+  // Keep an existing LID draft when the mapping arrives, and recover legacy
+  // phone-keyed drafts when first seeing an authenticated LID/PN association.
+  let conversationId=conversations[senderKey]||(phone?conversations[phone]:'')||createHash('sha256').update(`${options.runId}:${phone||senderKey}`).digest('hex');
+  const saveConversation=async()=>{conversations[senderKey]=conversationId;if(phone)conversations[phone]=conversationId;await options.saveCursor?.();};
+  if(conversations[senderKey]!==conversationId||(phone&&conversations[phone]!==conversationId))await saveConversation();
+  const senderNote=phone?`Remitente +${phone}`:`Remitente con identificador privado de WhatsApp; teléfono no compartido. Referencia ${senderKey.slice(-12)}`;
+  const backend=createAgentBackend({...options,tenantId:config.tenantId,leaderIds:[config.leaderId],eventIds:[config.eventId],requestNotes:`WHATSAPP · ${senderNote}. Registro recibido durante una sesión autorizada por ${options.uid}. Pendiente de revisión por coordinación.`});
   const turn={conversationId,messageId,revision:0,action:'resume' as const};
   let current=await backend.turn(turn);
   if(['submitted','cancelled'].includes(current.conversation.status)){
    if(text.trim().toLowerCase()!=='nueva solicitud')return {reply:current.conversation.requestId?`Solicitud ya guardada. Radicado: ${current.conversation.requestId}. Escriba «nueva solicitud» para registrar otra.`:'Borrador cancelado. Escriba «nueva solicitud».',requestId:''};
-   conversationId=createHash('sha256').update(`${initial}:${messageId}`).digest('hex');conversations[phone]=conversationId;
-   await options.saveCursor?.();
+   conversationId=createHash('sha256').update(`${initial}:${messageId}`).digest('hex');
+   await saveConversation();
    current=await backend.turn({...turn,conversationId});
    text='hola';
   }

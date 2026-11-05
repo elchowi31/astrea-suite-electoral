@@ -5,7 +5,7 @@ import {initializeTestEnvironment,assertFails,assertSucceeds} from '@firebase/ru
 import {doc,setDoc,getDoc,updateDoc,collection,getDocs,query,where,onSnapshot} from 'firebase/firestore';
 import {createAgentBackend} from '../src/server/requestAgent';
 import type {AgentTurn} from '../src/lib/requestAgent';
-import {pilotIntake,pilotLease} from '../src/server/whatsappPilotCore';
+import {pilotIntake,pilotLease,resolvePilotText} from '../src/server/whatsappPilotCore';
 import {loadWhatsappSession} from '../src/server/whatsappSessionStore';
 const enabled=process.env.ASTREA_AGENT_EMULATOR==='true';
 test('Agent REST API: Firestore transactions, rules, reload, deduplication and tenant isolation',{skip:!enabled,timeout:120000},async t=>{
@@ -140,6 +140,52 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
     const raw=(await getDoc(doc(ctx.firestore(),'usuarios',a.uid,'whatsapp_sessions',session.id))).data()!;
     assert.ok(raw.ciphertext);assert.ok(!JSON.stringify(raw).includes('test-private-key'));assert.ok(!JSON.stringify(raw).includes(session.key));
    });
+  });
+  await t.test('a private LID completes a questionnaire, publishes realtime and survives encrypted renewal without a phone number',async()=>{
+   const config={phone:'573000000000',tenantId,leaderId:'agent-leader',eventId:'agent-event',municipality:'Astrea'};
+   const session={id:'b'.repeat(32),key:'c'.repeat(64),resumeId:'d'.repeat(32)};
+   const options={base:'http://127.0.0.1:8088/v1/projects/demo-astrea/databases/(default)/documents',token:'owner',uid:a.uid,config,session};
+   let checkpoint=await loadWhatsappSession(options);
+   const intake=()=>pilotIntake({projectId:'demo-astrea',databaseId:'(default)',token:a.token,uid:a.uid,config,runId:session.id,origin:'http://127.0.0.1:8088',conversations:checkpoint.state.conversations,saveCursor:checkpoint.save,checkActive:async()=>{}});
+   const incoming=(await resolvePilotText({key:{id:'private-first',remoteJid:'123456789012345@lid'},messageTimestamp:Math.floor(Date.now()/1000),message:{conversation:'Necesito 3 almuerzos'}},Date.now()-3000)).incoming!;
+   assert.equal(incoming.phone,'');assert.ok(incoming.senderKey);
+   const first=await intake()(incoming.senderKey,incoming.messageId,incoming.text,incoming.phone);assert.ok(!first.requestId);
+   checkpoint=await loadWhatsappSession(options);
+   const conversationId=checkpoint.state.conversations[incoming.senderKey];assert.ok(conversationId);
+   const review=await intake()(incoming.senderKey,'private-detail','Almuerzos para el evento de mañana.');assert.match(review.reply,/Revise antes/);
+   const db=env.authenticatedContext(a.uid,{email:'agent@test.invalid'}).firestore();
+   const draft=(await getDoc(doc(db,'usuarios',a.uid,'agent_conversations',conversationId))).data()!;
+   assert.equal(draft.draft.quantity,3);assert.equal(draft.status,'review');
+   const requestId=`agent-${a.uid}-${conversationId}`;
+   let initialResolve!:()=>void,unsubscribe=()=>{},timer:ReturnType<typeof setTimeout>;
+   const initial=new Promise<void>(resolve=>{initialResolve=resolve;});
+   const changed=new Promise<Record<string,any>>((resolve,reject)=>{
+    timer=setTimeout(()=>reject(Error('Private LID request did not reach realtime listener')),15000);
+    unsubscribe=onSnapshot(query(collection(db,'solicitudes_recursos'),where('tenantId','==',tenantId)),snapshot=>{
+     if(snapshot.metadata.fromCache||snapshot.metadata.hasPendingWrites)return;
+     const record=snapshot.docs.find(row=>row.id===requestId);
+     if(record)resolve(record.data());else initialResolve();
+    },reject);
+   });
+   try{
+    await Promise.race([initial,changed]);
+    checkpoint=await loadWhatsappSession(options);
+    const confirmed=await intake()(incoming.senderKey,'private-confirm','confirmar');
+    assert.equal(confirmed.requestId,requestId);assert.match(confirmed.reply,/guardada/i);
+    const record=await changed;assert.equal(record.quantity,3);assert.equal(record.amount,0);assert.equal(record.status,'Pendiente');assert.equal(record.tenantId,tenantId);
+    assert.match(record.notes,/teléfono no compartido/);assert.doesNotMatch(record.notes,/123456789012345|Remitente \+/);
+    checkpoint=await loadWhatsappSession(options);
+    const replay=await intake()(incoming.senderKey,'private-confirm','confirmar');assert.match(replay.reply,new RegExp(requestId));
+    // Authenticated mapping appearing later must not restart or merge another person's draft.
+    const mapped=await intake()(incoming.senderKey,'private-mapped','hola','573008888888');assert.match(mapped.reply,new RegExp(requestId));
+    assert.equal(checkpoint.state.conversations['573008888888'],conversationId);
+    const another=(await resolvePilotText({key:{id:'other-private',remoteJid:'123456789012346@lid'},messageTimestamp:Math.floor(Date.now()/1000),message:{conversation:'Necesito 1 almuerzo'}},Date.now()-3000)).incoming!;
+    await intake()(another.senderKey,another.messageId,another.text);
+    assert.notEqual(checkpoint.state.conversations[another.senderKey],conversationId);
+    await intake()(incoming.senderKey,'private-new','nueva solicitud','573008888888');
+    assert.notEqual(checkpoint.state.conversations[incoming.senderKey],conversationId);
+    assert.equal(checkpoint.state.conversations[incoming.senderKey],checkpoint.state.conversations['573008888888']);
+   }finally{clearTimeout(timer!);unsubscribe();}
   });
   await t.test('draft and receipt reads respect profile revocation, tenant changes and admin claims',async()=>{
    const db=env.authenticatedContext(a.uid,{email:'agent@test.invalid'}).firestore();

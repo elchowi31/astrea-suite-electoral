@@ -27,7 +27,7 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
  const diagnostics=(dependencies.createDiagnostics||createWhatsappDiagnostics)({...options,base});
  let diagnosticWarning=false,beats=0;
  const trace=(stage:DiagnosticStage,details:DiagnosticDetails={})=>{void diagnostics.record(stage,details).catch(()=>{if(!diagnosticWarning){diagnosticWarning=true;emit({type:'notice',message:'No se pudo actualizar el diagnóstico de recepción. El receptor continúa activo.'});}});};
- trace('starting',{detail:'Receptor iniciado; esperando mensajes de texto privados.',queued:store.state.inbox.length,recoveredHandled:store.state.handled.length});
+ trace('starting',{detail:'Receptor iniciado; admite conversaciones con número o identificador privado.',queued:store.state.inbox.length,recoveredHandled:store.state.handled.length});
  res.statusCode=200;res.setHeader('Content-Type','application/x-ndjson; charset=utf-8');res.setHeader('Cache-Control','no-store, no-transform');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Accel-Buffering','no');res.flushHeaders();
  emit({type:'starting',message:hasPairedWhatsappIdentity(store.auth.creds)?'Recuperando la vinculación…':'Preparando la vinculación…'});
  const onClose=()=>{if(hasPairedWhatsappIdentity(store.auth.creds))stop('renew','La pestaña perdió la conexión.');else incomplete('La conexión se interrumpió antes de completar la vinculación.');};res.on('close',onClose);
@@ -40,7 +40,7 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
     const item=store.state.inbox[0];await options.checkActive();
     if(await store.wasHandled(item.messageId)){store.state.inbox.shift();await store.save();continue;}
     if(!item.result){
-     try{item.result=await intake(item.phone,item.messageId,item.text);}
+     try{item.result=await intake(item.senderKey||item.phone,item.messageId,item.text,item.phone);}
      catch(e){if(e instanceof AgentError&&e.status===400)item.result={reply:e.message};else throw e;}
      await store.save();
      trace('prepared',{detail:'Respuesta preparada; pendiente de envío.',reply:item.result.reply,queued:store.state.inbox.length});
@@ -51,7 +51,7 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
     catch{trace('pending_reply',{detail:'WhatsApp no confirmó el envío; se reintentará.',queued:store.state.inbox.length});emit({type:'notice',message:'Una respuesta sigue pendiente de entrega. Se reintentará al recuperar la conexión.'});break;}
     await store.markHandled(item.messageId);
     store.state.inbox.shift();await store.save();
-    trace('replied',{detail:'Respuesta enviada a WhatsApp. La lectura en el teléfono aún no está confirmada.',reply:item.result.reply,senderHint:item.phone.slice(-4),queued:store.state.inbox.length});
+    trace('replied',{detail:'Respuesta enviada a WhatsApp. La lectura en el teléfono aún no está confirmada.',reply:item.result.reply,senderHint:item.phone?item.phone.slice(-4):'',queued:store.state.inbox.length});
     emit({type:'activity',message:'Mensaje recibido y respuesta enviada. Complete el cuestionario y escriba «confirmar» para guardar la solicitud.'});
    }
   }finally{processing=false;}
@@ -100,7 +100,7 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
      const result=await resolvePilotText(message,store.state.startedAt,current.signalRepository?.lidMapping?.getPNForLID?.bind(current.signalRepository.lidMapping));
      const incoming=result.incoming;
      if(!incoming){
-      const reasons={before_session:'El mensaje es anterior al inicio de esta recepción. Envíe uno nuevo.',invalid_timestamp:'La fecha del mensaje no es válida.',unsupported_content:'No se recibió texto compatible (máximo 500 caracteres). Envíe una frase de texto.',unresolved_sender:'WhatsApp envió un identificador privado sin equivalencia de número disponible.',own_or_missing_id:'Mensaje propio o sin identificador.',not_private:'Solo se atienden conversaciones privadas.'};
+      const reasons={before_session:'El mensaje es anterior al inicio de esta recepción. Envíe uno nuevo.',invalid_timestamp:'La fecha del mensaje no es válida.',unsupported_content:'No se recibió texto compatible (máximo 500 caracteres). Envíe una frase de texto.',unresolved_sender:'WhatsApp no entregó un identificador válido de conversación privada.',own_or_missing_id:'Mensaje propio o sin identificador.',not_private:'Solo se atienden conversaciones privadas.'};
       // System and history packets are not messages from the user; do not flood the trace.
       if(result.reason==='unresolved_sender'||(result.reason==='unsupported_content'&&message.message)||result.reason==='invalid_timestamp'||result.reason==='before_session')trace('ignored',{detail:reasons[result.reason]});
       return;
@@ -109,7 +109,7 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
      if(store.state.inbox.some(i=>i.messageId===incoming.messageId)||await store.wasHandled(incoming.messageId)){trace('duplicate',{detail:'Mensaje ya recibido; no se vuelve a registrar.'});return;}
      if(store.state.inbox.length>=100)throw new AgentError('Hay demasiados mensajes pendientes. Revise las solicitudes antes de reanudar.',429);
      store.state.inbox.push(incoming);await store.save();
-     trace('received',{detail:'Mensaje privado recibido y conservado para procesar.',text:incoming.text,senderHint:incoming.phone.slice(-4),queued:store.state.inbox.length});
+     trace('received',{detail:incoming.phone?'Mensaje privado recibido y conservado para procesar.':'Mensaje recibido mediante identificador privado; no requiere compartir el número.',text:incoming.text,senderHint:incoming.phone?incoming.phone.slice(-4):'',queued:store.state.inbox.length});
      emit({type:'activity',message:'Mensaje de WhatsApp recibido. Preparando respuesta.'});await drain();
     });
    }

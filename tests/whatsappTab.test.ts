@@ -99,18 +99,18 @@ test('rotation closes socket without logout and signals renewal only after check
  await runWhatsappPilot({projectId:'test',databaseId:'test',token:'test',uid:'admin',config,session,res:res as any,checkActive:async()=>{}},{segmentMs:25,makeSocket:(()=>{queueMicrotask(()=>ev.emit('connection.update',{connection:'open'}));return socket;}) as any,loadSession:(async()=>({state:persisted,auth:{creds:persisted.creds,keys:{}},save:async()=>{order.push('save');},markHandled:async(id:string)=>{persisted.handled.push(id);},wasHandled:async(id:string)=>persisted.handled.includes(id),flush:async()=>{order.push('flush');}})) as any,lease:(()=>({owner:'lease',acquire:async()=>{},release:async()=>{order.push('release');}})) as any});
  assert.equal(logouts,0);assert.equal(sends,1);assert.equal(persisted.inbox.length,0);assert.ok(persisted.handled.includes('pending'));assert.ok(order.indexOf('renew')>order.indexOf('flush'));assert.ok(order.indexOf('renew')>order.indexOf('release'));assert.equal(events.at(-1).type,'renew');
 });
-test('a real-shaped LID message is received, processed, answered and receipted once across duplicate notifications',async()=>{
+for(const mappingAvailable of [true,false])test(`a private LID message with mapping=${mappingAvailable} is answered and receipted once`,async()=>{
  const persisted=state();persisted.creds.me={id:config.phone+':1@s.whatsapp.net'};persisted.creds.account={accountSignature:Buffer.from('signed'),deviceSignature:Buffer.from('signed')};persisted.startedAt=Date.now()-5000;
  const ev=new EventEmitter(),events:any[]=[],activity:string[]=[],intakes:string[]=[],sent:any[]=[];
  const res=Object.assign(new EventEmitter(),{destroyed:false,writableEnded:false,statusCode:0,setHeader(){},flushHeaders(){},write(line:string){events.push(JSON.parse(line));},end(){this.writableEnded=true;}});
- const socket={ev,user:{id:config.phone+'@s.whatsapp.net'},signalRepository:{lidMapping:{getPNForLID:async()=> '573009999999@s.whatsapp.net'}},end(){},sendMessage:async(jid:string,message:any)=>{sent.push({jid,...message});}};
+ const socket={ev,user:{id:config.phone+'@s.whatsapp.net'},signalRepository:{lidMapping:{getPNForLID:async()=>mappingAvailable?'573009999999@s.whatsapp.net':null}},end(){},sendMessage:async(jid:string,message:any)=>{sent.push({jid,...message});}};
  const msg={key:{id:'new-lid-message',remoteJid:'11122233344455@lid'},messageTimestamp:Math.floor(Date.now()/1000),message:{ephemeralMessage:{message:{conversation:'Necesito 3 almuerzos'}}}};
  await runWhatsappPilot({projectId:'test',databaseId:'test',token:'test',uid:'admin',config,session,res:res as any,checkActive:async()=>{}},{segmentMs:80,
   makeSocket:(()=>{queueMicrotask(()=>{ev.emit('connection.update',{connection:'open'});ev.emit('messages.upsert',{type:'notify',messages:[msg,msg]});});return socket;}) as any,
   loadSession:(async()=>({state:persisted,auth:{creds:persisted.creds,keys:{}},save:async()=>{},flush:async()=>{},wasHandled:async(id:string)=>persisted.handled.includes(id),markHandled:async(id:string)=>{persisted.handled.push(id);}})) as any,
   lease:(()=>({acquire:async()=>{},release:async()=>{}})) as any,
   createDiagnostics:(()=>({record:async(stage:string)=>{activity.push(stage);},flush:async()=>{}})) as any,
-  intake:async(phone,_id,text)=>{assert.equal(phone,'573009999999');intakes.push(text);return {reply:'Indique la descripción de la necesidad.',requestId:''};}
+  intake:async(senderKey,_id,text,phone)=>{assert.match(senderKey,/^lid:[a-f0-9]{64}$/);assert.equal(phone,mappingAvailable?'573009999999':'');intakes.push(text);return {reply:'Indique la descripción de la necesidad.',requestId:''};}
  });
  assert.deepEqual(intakes,['Necesito 3 almuerzos']);assert.equal(sent.length,1);assert.equal(sent[0].jid,'11122233344455@lid');assert.equal(persisted.handled.length,1);assert.equal(persisted.inbox.length,0);
  assert.ok(activity.includes('received'));assert.ok(activity.includes('prepared'));assert.ok(activity.includes('replied'));assert.ok(activity.includes('duplicate'));assert.ok(!activity.includes('saved'),'a question is not yet a submitted request');

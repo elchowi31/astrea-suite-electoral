@@ -37,8 +37,8 @@ test('LID senders resolve through the authenticated mapping and ephemeral text i
  assert.equal(inspectPilotText(msg,startedAt,true).reason,'unresolved_sender');
  const resolved=await resolvePilotText(msg,startedAt,async jid=>{assert.equal(jid,'12345678901234@lid');return '573009999999@s.whatsapp.net';});
  assert.equal(resolved.incoming?.phone,'573009999999');assert.equal(resolved.incoming?.jid,msg.key.remoteJid);assert.equal(resolved.incoming?.text,'Necesito 3 almuerzos');
- assert.equal((await resolvePilotText(msg,startedAt,async()=>null)).incoming,null);
- assert.equal((await resolvePilotText(msg,startedAt,async()=>'12345678901234@lid')).incoming,null,'opaque LIDs must never become phone numbers');
+ assert.equal((await resolvePilotText(msg,startedAt,async()=>null)).incoming?.phone,'');
+ assert.equal((await resolvePilotText(msg,startedAt,async()=>'12345678901234@lid')).incoming?.phone,'','opaque LIDs must never become phone numbers');
  assert.equal(incomingPilotText({...msg,key:{...msg.key,senderPn:'invalid',remoteJidAlt:'573009999999@s.whatsapp.net'}},startedAt,true)?.phone,'573009999999');
 });
 test('reception resolves exact scoped references without the 500-row catalog limit',async()=>{
@@ -55,3 +55,22 @@ test('reception resolves exact scoped references without the 500-row catalog lim
  assert.deepEqual(result.context.events,[{id:'event',name:'Recepción WhatsApp'}]);
 });
 
+
+test('private LIDs work without phone lookup and keep their channel identity when a number becomes available',async()=>{
+ const start=Date.now()-3000;
+ const msg={key:{id:'lid-only',remoteJid:'123456789012345@lid'},messageTimestamp:Math.floor(Date.now()/1000),message:{conversation:'Necesito 3 almuerzos'}};
+ const missing=await resolvePilotText(msg,start);
+ assert.equal(missing.incoming?.phone,'');assert.equal(missing.incoming?.jid,msg.key.remoteJid);
+ assert.match(missing.incoming!.senderKey,/^lid:[a-f0-9]{64}$/);
+ const failed=await resolvePilotText(msg,start,async()=>{throw Error('mapping unavailable');});
+ assert.deepEqual(failed,missing);
+ const mapped=await resolvePilotText(msg,start,async()=> '573009999999@s.whatsapp.net');
+ assert.equal(mapped.incoming?.phone,'573009999999');assert.equal(mapped.incoming?.senderKey,missing.incoming?.senderKey);
+ const device=await resolvePilotText({...msg,key:{...msg.key,remoteJid:'123456789012345:3@lid'}},start);
+ assert.equal(device.incoming?.senderKey,missing.incoming?.senderKey);
+ const other=await resolvePilotText({...msg,key:{...msg.key,remoteJid:'123456789012346@lid'}},start);
+ assert.notEqual(other.incoming?.senderKey,missing.incoming?.senderKey);
+ for(const patch of [{key:{...msg.key,fromMe:true}},{key:{...msg.key,remoteJid:'123456789012345@g.us'}},{key:{...msg.key,remoteJid:'bad@lid'}},{messageTimestamp:0},{message:{conversation:'x'.repeat(501)}}]){
+  assert.equal((await resolvePilotText({...msg,...patch},start)).incoming,null);
+ }
+});
