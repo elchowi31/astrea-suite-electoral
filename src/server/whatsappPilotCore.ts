@@ -87,7 +87,8 @@ export function pilotIntake(options:{projectId:string;databaseId:string;token:st
   if(!/^\d{8,15}$/.test(senderKey)&&!/^lid:[a-f0-9]{64}$/.test(senderKey))throw new AgentError('Identificador de conversación no válido.');
   const phone=/^\d{8,15}$/.test(verifiedPhone||'')?verifiedPhone!:/^\d{8,15}$/.test(senderKey)?senderKey:'';
   const command=normalizeCommand(text);
-  if(/^(hola|buenas|buenos dias|buenas tardes|buenas noches|ayuda|menu|opciones|formulario)$/.test(command))return {reply:WHATSAPP_HELP,requestId:''};
+  const help=/^(hola|buenas|buenos dias|buenas tardes|buenas noches|ayuda|menu|opciones|formulario)$/.test(command);
+  if(help&&!conversations[senderKey]&&!(phone&&conversations[phone]))return {reply:WHATSAPP_HELP,requestId:''};
   if(/^(?:quiero (?:llenar|responder|hacer) (?:una? )?)?(encuesta|cuestionario)$/.test(command))return {reply:'Este canal dispone del formulario de solicitudes de recursos por chat. Las encuestas independientes todavía no están habilitadas aquí.\n'+WHATSAPP_HELP,requestId:''};
   const initial=createHash('sha256').update(`${options.runId}:${senderKey}`).digest('hex');
   // Keep an existing LID draft when the mapping arrives, and recover legacy
@@ -99,8 +100,9 @@ export function pilotIntake(options:{projectId:string;databaseId:string;token:st
   const backend=createAgentBackend({...options,tenantId:config.tenantId,leaderIds:[config.leaderId],eventIds:[config.eventId],requestNotes:`WHATSAPP · ${senderNote}. Registro recibido durante una sesión autorizada por ${options.uid}. Pendiente de revisión por coordinación.`});
   const turn={conversationId,messageId,revision:0,action:'resume' as const};
   let current=await backend.turn(turn);
+  if(help)return {reply:WHATSAPP_HELP+(current.conversation.requestId?`\nÚltima solicitud guardada. Radicado: ${current.conversation.requestId}`:''),requestId:''};
   if(current.conversation.status==='human'&&command!=='cancelar')return {reply:'Esta conversación está pausada para atención manual. Para reiniciar el formulario escriba «cancelar» y después «nueva solicitud». Aún no se ha enviado aviso a un coordinador.',requestId:''};
-  if(['estado','continuar'].includes(command))return {reply:current.reply||WHATSAPP_HELP,requestId:current.conversation.requestId};
+  if(['estado','continuar'].includes(command))return {reply:(current.reply||WHATSAPP_HELP)+(current.conversation.requestId?`\nRadicado: ${current.conversation.requestId}`:''),requestId:current.conversation.requestId};
   if(['submitted','cancelled'].includes(current.conversation.status)){
    if(command!=='nueva solicitud')return {reply:current.conversation.requestId?`Solicitud ya guardada. Radicado: ${current.conversation.requestId}. Escriba «nueva solicitud» para registrar otra.`:'Borrador cancelado. Escriba «nueva solicitud».',requestId:''};
    conversationId=createHash('sha256').update(`${initial}:${messageId}`).digest('hex');

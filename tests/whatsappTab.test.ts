@@ -145,7 +145,7 @@ test('unsupported media gets a text response without entering the resource form'
   loadSession:(async()=>({state:persisted,auth:{creds:persisted.creds,keys:{}},save:async()=>{},flush:async()=>{},wasHandled:async(id:string)=>persisted.handled.includes(id),markHandled:async(id:string)=>{persisted.handled.push(id);}})) as any,
   lease:(()=>({acquire:async()=>{},release:async()=>{}})) as any,
   createDiagnostics:(()=>({record:async()=>{},flush:async()=>{}})) as any,
-  intake:async()=>{intakeCalls++;return {reply:'wrong form'};}
+  intake:async()=>{intakeCalls++;return {reply:'wrong form',requestId:''};}
  });
  assert.equal(intakeCalls,0);assert.equal(sent.length,1);assert.match(sent[0],/mensajes de texto/);assert.equal(persisted.handled.length,1);
 });
