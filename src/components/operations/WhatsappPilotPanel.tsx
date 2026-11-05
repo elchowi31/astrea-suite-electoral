@@ -1,4 +1,5 @@
 import React,{useState} from 'react';
+import {WhatsappDiagnosticsPanel} from './WhatsappDiagnosticsPanel';
 import {MessageCircle} from 'lucide-react';
 import {useOperations} from './OperationsContext';
 import {useWhatsappConnection} from './WhatsappConnectionContext';
@@ -31,6 +32,7 @@ export function WhatsappPilotPanel({onSwitchAccount}:{onSwitchAccount?:()=>void}
     <div className="flex flex-wrap items-center gap-3 sm:col-span-2"><button type="submit" value="save" className={secondary} disabled={wa.running||wa.busy}>{wa.busy?'Procesando…':'Guardar configuración'}</button><button type="submit" value="start" className={button} disabled={wa.running||wa.busy}>Iniciar / reanudar recepción</button>{wa.running?<button type="button" className={secondary} onClick={wa.stop}>Detener recepción</button>:<button type="button" className={secondary} disabled={wa.busy} onClick={wa.reset}>Nueva vinculación</button>}</div>
    </form>}
    <p role="status" className="text-sm text-slate-300">{wa.status}</p>
+   <WhatsappDiagnosticsPanel/>
    {wa.code&&<div className="rounded-xl border border-emerald-700 bg-emerald-950/30 p-4"><p className="text-sm">En el teléfono receptor: WhatsApp → Dispositivos vinculados → Vincular un dispositivo → Vincular con número de teléfono.</p><p className="mt-3 select-all break-all font-mono text-3xl tracking-widest text-emerald-200">{wa.code}</p><p className="mt-2 text-xs text-slate-400">No comparta este código. Las renovaciones automáticas conservan la misma vinculación.</p></div>}
    {wa.error&&<p role="alert" className="rounded-lg bg-rose-950/40 p-3 text-sm text-rose-200">{wa.error}</p>}
    {wa.saved.length>0&&<div className="space-y-2 text-sm text-emerald-200"><p>{wa.saved.length} solicitudes confirmadas durante esta pestaña.</p>{wa.saved.map(id=><p key={id} className="break-all text-xs">{requests.some(r=>r.id===id)?'Visible en la plataforma':'Esperando actualización de la lista'} · {id}</p>)}</div>}
@@ -38,3 +40,4 @@ export function WhatsappPilotPanel({onSwitchAccount}:{onSwitchAccount?:()=>void}
   </div>}
  </section>;
 }
+

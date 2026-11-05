@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {validatePilotConfig,incomingPilotText,pilotLease} from '../src/server/whatsappPilotCore';
+import {validatePilotConfig,incomingPilotText,pilotLease,resolvePilotText,inspectPilotText} from '../src/server/whatsappPilotCore';
 import {encodeFields,decodeFields,createAgentBackend} from '../src/server/requestAgent';
 
 test('pilot requires explicit scope and international phone',()=>{
@@ -31,6 +31,16 @@ test('serverless lease allows one instance, rejects races and fences stale relea
  record=null;
  const results=await Promise.allSettled([make().acquire(),make().acquire()]);assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
 });
+test('LID senders resolve through the authenticated mapping and ephemeral text is unwrapped',async()=>{
+ const now=Date.now(),startedAt=now-3000;
+ const msg={key:{id:'private-lid',remoteJid:'12345678901234@lid'},messageTimestamp:Math.floor(now/1000),message:{ephemeralMessage:{message:{extendedTextMessage:{text:'Necesito 3 almuerzos'}}}}};
+ assert.equal(inspectPilotText(msg,startedAt,true).reason,'unresolved_sender');
+ const resolved=await resolvePilotText(msg,startedAt,async jid=>{assert.equal(jid,'12345678901234@lid');return '573009999999@s.whatsapp.net';});
+ assert.equal(resolved.incoming?.phone,'573009999999');assert.equal(resolved.incoming?.jid,msg.key.remoteJid);assert.equal(resolved.incoming?.text,'Necesito 3 almuerzos');
+ assert.equal((await resolvePilotText(msg,startedAt,async()=>null)).incoming,null);
+ assert.equal((await resolvePilotText(msg,startedAt,async()=>'12345678901234@lid')).incoming,null,'opaque LIDs must never become phone numbers');
+ assert.equal(incomingPilotText({...msg,key:{...msg.key,senderPn:'invalid',remoteJidAlt:'573009999999@s.whatsapp.net'}},startedAt,true)?.phone,'573009999999');
+});
 test('reception resolves exact scoped references without the 500-row catalog limit',async()=>{
  const fetcher:typeof fetch=async(input)=>{
   const path=String(input);assert.ok(!path.includes(':runQuery'),'a scoped session must not depend on catalog ordering');
@@ -44,3 +54,4 @@ test('reception resolves exact scoped references without the 500-row catalog lim
  assert.deepEqual(result.context.leaders,[{id:'owner',name:'Wilson José Arias'}]);
  assert.deepEqual(result.context.events,[{id:'event',name:'Recepción WhatsApp'}]);
 });
+

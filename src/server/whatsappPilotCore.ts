@@ -14,17 +14,34 @@ export function validatePilotConfig(body:Record<string,unknown>):PilotConfig{
  if(!result.municipality||result.municipality.length>120)throw new AgentError('Revise el municipio de recepción.');
  return result;
 }
-export type PilotMessage={key:{id?:string|null;fromMe?:boolean|null;remoteJid?:string|null;remoteJidAlt?:string|null;senderPn?:string|null};messageTimestamp?:unknown;message?:{conversation?:string|null;extendedTextMessage?:{text?:string|null}|null}|null};
-export function incomingPilotText(message:PilotMessage,startedAt:number,strictCutoff=false){
- if(message.key.fromMe||!message.key.id)return null;
+export type PilotContent={conversation?:string|null;extendedTextMessage?:{text?:string|null}|null;ephemeralMessage?:{message?:PilotContent|null}|null};
+export type PilotMessage={key:{id?:string|null;fromMe?:boolean|null;remoteJid?:string|null;remoteJidAlt?:string|null;senderPn?:string|null};messageTimestamp?:unknown;message?:PilotContent|null};
+export type IncomingReason='own_or_missing_id'|'not_private'|'before_session'|'invalid_timestamp'|'unsupported_content'|'unresolved_sender';
+export function inspectPilotText(message:PilotMessage,startedAt:number,strictCutoff=false){
+ if(message.key.fromMe||!message.key.id)return {incoming:null,reason:'own_or_missing_id' as IncomingReason};
  const jid=message.key.remoteJid||'';
- const phone=canonicalSender(jid,message.key.senderPn||message.key.remoteJidAlt);
- const timestamp=Number(message.messageTimestamp);
- const cutoff=strictCutoff?Math.ceil(startedAt/1000)*1000:startedAt-2000;
- if(!phone||!Number.isFinite(timestamp)||timestamp*1000<cutoff||timestamp*1000>Date.now()+60000)return null;
- const text=(message.message?.conversation||message.message?.extendedTextMessage?.text||'').trim();
- if(!text||text.length>500)return null;
- return {phone,jid,text,messageId:createHash('sha256').update(`${jid}:${message.key.id}`).digest('hex')};
+ if(!jid.endsWith('@s.whatsapp.net')&&!jid.endsWith('@lid'))return {incoming:null,reason:'not_private' as IncomingReason};
+ const timestamp=Number(message.messageTimestamp),cutoff=strictCutoff?Math.ceil(startedAt/1000)*1000:startedAt-2000;
+ if(!Number.isFinite(timestamp)||timestamp*1000>Date.now()+60000)return {incoming:null,reason:'invalid_timestamp' as IncomingReason};
+ if(timestamp*1000<cutoff)return {incoming:null,reason:'before_session' as IncomingReason};
+ let content=message.message;for(let i=0;i<5&&content?.ephemeralMessage;i++)content=content.ephemeralMessage.message;
+ const text=(content?.conversation||content?.extendedTextMessage?.text||'').trim();
+ if(!text||text.length>500)return {incoming:null,reason:'unsupported_content' as IncomingReason};
+ const phone=canonicalSender(jid,message.key.senderPn)||canonicalSender(jid,message.key.remoteJidAlt);
+ if(!phone)return {incoming:null,reason:'unresolved_sender' as IncomingReason};
+ return {incoming:{phone,jid,text,messageId:createHash('sha256').update(`${jid}:${message.key.id}`).digest('hex')},reason:null};
+}
+export function incomingPilotText(message:PilotMessage,startedAt:number,strictCutoff=false){
+ return inspectPilotText(message,startedAt,strictCutoff).incoming;
+}
+/** LIDs are opaque identifiers. Resolve through Baileys' authenticated mapping store,
+ * never reinterpret LID digits or display names as a verified phone number. */
+export async function resolvePilotText(message:PilotMessage,startedAt:number,lookup?:(jid:string)=>Promise<string|null|undefined>){
+ const inspected=inspectPilotText(message,startedAt,true);
+ if(inspected.reason!=='unresolved_sender'||!lookup)return inspected;
+ const pn=await lookup(message.key.remoteJid!);
+ if(!pn)return inspected;
+ return inspectPilotText({...message,key:{...message.key,remoteJidAlt:pn}},startedAt,true);
 }
 // A compare-and-set lease prevents two serverless instances pairing the same number.
 // This collection is accessible only through the existing platform-admin rule.
@@ -76,3 +93,4 @@ export function pilotIntake(options:{projectId:string;databaseId:string;token:st
   return {reply:result.reply+(result.conversation.requestId?`\nRadicado: ${result.conversation.requestId}\nEscriba «nueva solicitud» para iniciar otra.`:'\nAstrea · Las entregas y asignaciones requieren aprobación de coordinación.'),requestId:result.conversation.requestId};
  };
 }
+
