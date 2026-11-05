@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {advanceAgent,agentRequest,validateAgentTurn,type AgentConversation,type AgentContext,type AgentTurn} from '../src/lib/requestAgent';
+import {advanceAgent,agentRequest,validateAgentTurn,question,type AgentConversation,type AgentContext,type AgentTurn} from '../src/lib/requestAgent';
 import {canonicalSender,createKitAstreaHandler} from '../integrations/claude-kit/astrea-adapter';
 import {encodeFields,decodeFields} from '../src/server/requestAgent';
 const context:AgentContext={uid:'user-a',tenantId:'team-a',leaders:[{id:'leader-a',name:'Responsable de prueba'}],events:[{id:'event-a',name:'Jornada de prueba'}]};
@@ -52,4 +52,14 @@ test('kit ignores history, self messages, unknown senders and pause; uses sender
  paused=true;await handler(sock,{type:'notify',messages:[msg]});assert.equal(calls.length,0);
  paused=false;await handler(sock,{type:'notify',messages:[msg]});assert.equal(calls.length,2);assert.equal(sent.length,1);
  assert.equal(calls[1].body.tenantId,'team-a');assert.equal(calls[1].headers.Authorization,'Bearer scoped-test-token');assert.equal(calls[1].body.messageId.length,64);
+});
+
+test('the next question matches the requested resource',()=>{
+ const draft={quantity:3,municipality:'Astrea',leaderId:'leader-a',eventId:'event-a',unitCost:0};
+ for(const [resource,expected] of [['Transporte de pasajeros',/origen, destino, fecha y hora/],['Alimentación',/entrega/],['Refrigerios e hidratación',/entrega/],['Combustible',/tipo de combustible/]] as const){
+  assert.match(question({...draft,resource},context),expected);
+ }
+ for(const [text,resource] of [['Necesito 2 desayunos','Alimentación'],['Necesito 5 meriendas','Refrigerios e hidratación'],['Necesito 4 galones de ACPM','Combustible'],['Necesito 20 sillas','Sede y mobiliario']] as const){
+  assert.equal(advanceAgent(undefined,{...base,text},context).draft.resource,resource);
+ }
 });

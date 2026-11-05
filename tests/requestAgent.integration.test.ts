@@ -147,6 +147,35 @@ test('Agent REST API: Firestore transactions, rules, reload, deduplication and t
    assert.equal(record.quantity,3);assert.equal(record.amount,0);assert.equal(record.status,'Pendiente');assert.equal(record.leaderId,'agent-leader');assert.match(record.notes,/573001234567/);assert.match(record.notes,/WHATSAPP/);assert.doesNotMatch(record.notes,/PRUEBA|no ejecutar como operación real/);
    active=false;await assert.rejects(intake('573009999999','inbound-4','Necesito 2 almuerzos'),/Disabled/);
   });
+  await t.test('different WhatsApp senders complete independent resource forms and help does not consume answers',async()=>{
+   const conversations:Record<string,string>={};
+   const intake=pilotIntake({projectId:'demo-astrea',databaseId:'(default)',token:a.token,uid:a.uid,config:{phone:'573000000000',tenantId,leaderId:'agent-leader',eventId:'agent-event',municipality:'Astrea'},runId:'multi-sender-validation',origin:'http://127.0.0.1:8088',conversations,checkActive:async()=>{}});
+   const senders=['573007770001','14155550123','lid:'+ '9'.repeat(64)];
+   assert.match((await intake(senders[0],'welcome-01','Hola')).reply,/asistente/);
+   assert.equal(Object.keys(conversations).length,0,'welcome must not create an empty request draft');
+   const first=await intake(senders[0],'multi-food','Necesito 3 almuerzos');assert.match(first.reply,/entrega/);
+   const second=await intake(senders[1],'multi-transport','Transporte para 2 personas');assert.match(second.reply,/origen, destino/);
+   const third=await intake(senders[2],'multi-fuel','Necesito 5 galones de gasolina');assert.match(third.reply,/tipo de combustible/);
+   assert.match((await intake(senders[0],'multi-help','ayuda')).reply,/confirmar/);
+   assert.match((await intake(senders[0],'multi-survey','quiero llenar una encuesta')).reply,/todavía no están habilitadas/);
+   await intake(senders[0],'multi-food-detail','Entrega en el salón comunal mañana a las 12:00.');
+   await intake(senders[1],'multi-ride-detail','Origen terminal, destino salón comunal, mañana a las 08:00. Solo ida.');
+   await intake(senders[2],'multi-fuel-detail','Gasolina para el vehículo del evento, mañana en la estación.');
+   const saved=await Promise.all(senders.map((sender,i)=>intake(sender,'multi-confirm-'+i,'confirmar')));
+   assert.equal(new Set(saved.map(row=>row.requestId)).size,3);
+   const db=env.authenticatedContext(a.uid,{email:'agent@test.invalid'}).firestore();
+   for(let i=0;i<saved.length;i++){
+    const record=(await getDoc(doc(db,'solicitudes_recursos',saved[i].requestId))).data()!;
+    assert.equal(record.quantity,[3,2,5][i]);assert.equal(record.resource,['Alimentación','Transporte de pasajeros','Combustible'][i]);assert.equal(record.status,'Pendiente');
+    const replay=await intake(senders[i],'multi-confirm-'+i,'confirmar');assert.match(replay.reply,new RegExp(saved[i].requestId));
+   }
+   const paused='573007770099';
+   await intake(paused,'pause-start','humano');
+   assert.match((await intake(paused,'pause-message','Necesito 1 almuerzo')).reply,/pausada/);
+   assert.match((await intake(paused,'pause-cancel','cancelar')).reply,/cancelado/);
+   assert.match((await intake(senders[0],'multi-new','nueva solicitud')).reply,/Qué necesita/);
+   assert.equal((await getDoc(doc(db,'usuarios',a.uid,'agent_conversations',conversations[senders[1]]))).data()!.status,'submitted');
+  });
   await t.test('WhatsApp rotation restores encrypted authentication and a second conversation from actual emulator documents',async()=>{
    const config={phone:'573000000000',tenantId,leaderId:'agent-leader',eventId:'agent-event',municipality:'Astrea'};
    const session={id:'e'.repeat(32),key:'f'.repeat(64),resumeId:'a'.repeat(32)};

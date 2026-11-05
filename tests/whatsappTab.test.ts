@@ -117,3 +117,35 @@ for(const mappingAvailable of [true,false])test(`a private LID message with mapp
 });
 
 
+
+test('an undeliverable reply preserves its chat order and does not block another sender',async()=>{
+ const persisted=state();persisted.creds.me={id:config.phone+':1@s.whatsapp.net'};persisted.creds.account={accountSignature:Buffer.from('signed'),deviceSignature:Buffer.from('signed')};
+ const item=(id:string,phone:string)=>({messageId:id,phone,senderKey:phone,jid:phone+'@s.whatsapp.net',text:'detalle',receivedAt:Date.now()-1000,result:{reply:id}});
+ persisted.inbox=[item('blocked-first','573000000001'),item('other-chat','573000000002'),item('blocked-second','573000000001')];
+ const ev=new EventEmitter(),sent:string[]=[],traces:any[]=[];
+ const res=Object.assign(new EventEmitter(),{destroyed:false,writableEnded:false,statusCode:0,setHeader(){},flushHeaders(){},write(){},end(){this.writableEnded=true;}});
+ const socket={ev,user:{id:config.phone+'@s.whatsapp.net'},end(){},sendMessage:async(jid:string,message:any)=>{if(jid.startsWith('573000000001'))throw Error('temporary delivery failure');sent.push(message.text);}};
+ await runWhatsappPilot({projectId:'test',databaseId:'test',token:'test',uid:'admin',config,session,res:res as any,checkActive:async()=>{}},{segmentMs:80,
+  makeSocket:(()=>{queueMicrotask(()=>ev.emit('connection.update',{connection:'open'}));return socket;}) as any,
+  loadSession:(async()=>({state:persisted,auth:{creds:persisted.creds,keys:{}},save:async()=>{},flush:async()=>{},wasHandled:async(id:string)=>persisted.handled.includes(id),markHandled:async(id:string)=>{persisted.handled.push(id);}})) as any,
+  lease:(()=>({acquire:async()=>{},release:async()=>{}})) as any,
+  createDiagnostics:(()=>({record:async(stage:string,details:any)=>{traces.push({stage,...details});},flush:async()=>{}})) as any
+ });
+ assert.deepEqual(sent,['other-chat']);assert.deepEqual(persisted.inbox.map(i=>i.messageId),['blocked-first','blocked-second']);
+ assert.deepEqual(persisted.handled,['other-chat']);
+ const reply=traces.find(row=>row.stage==='replied');assert.ok(reply.responseMs>=1000);assert.ok(reply.processingMs>=0);
+});
+test('unsupported media gets a text response without entering the resource form',async()=>{
+ const persisted=state();persisted.startedAt=Date.now()-3000;persisted.creds.me={id:config.phone+':1@s.whatsapp.net'};persisted.creds.account={accountSignature:Buffer.from('signed'),deviceSignature:Buffer.from('signed')};
+ const ev=new EventEmitter(),sent:string[]=[];let intakeCalls=0;
+ const res=Object.assign(new EventEmitter(),{destroyed:false,writableEnded:false,statusCode:0,setHeader(){},flushHeaders(){},write(){},end(){this.writableEnded=true;}});
+ const socket={ev,user:{id:config.phone+'@s.whatsapp.net'},end(){},sendMessage:async(_jid:string,message:any)=>{sent.push(message.text);}};
+ await runWhatsappPilot({projectId:'test',databaseId:'test',token:'test',uid:'admin',config,session,res:res as any,checkActive:async()=>{}},{segmentMs:80,
+  makeSocket:(()=>{queueMicrotask(()=>{ev.emit('connection.update',{connection:'open'});ev.emit('messages.upsert',{type:'notify',messages:[{key:{id:'audio-message',remoteJid:'573000000001@s.whatsapp.net'},messageTimestamp:Math.floor(Date.now()/1000),message:{audioMessage:{}}}]});});return socket;}) as any,
+  loadSession:(async()=>({state:persisted,auth:{creds:persisted.creds,keys:{}},save:async()=>{},flush:async()=>{},wasHandled:async(id:string)=>persisted.handled.includes(id),markHandled:async(id:string)=>{persisted.handled.push(id);}})) as any,
+  lease:(()=>({acquire:async()=>{},release:async()=>{}})) as any,
+  createDiagnostics:(()=>({record:async()=>{},flush:async()=>{}})) as any,
+  intake:async()=>{intakeCalls++;return {reply:'wrong form',requestId:''};}
+ });
+ assert.equal(intakeCalls,0);assert.equal(sent.length,1);assert.match(sent[0],/mensajes de texto/);assert.equal(persisted.handled.length,1);
+});

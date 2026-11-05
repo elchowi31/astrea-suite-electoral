@@ -14,7 +14,7 @@ export function validatePilotConfig(body:Record<string,unknown>):PilotConfig{
  if(!result.municipality||result.municipality.length>120)throw new AgentError('Revise el municipio de recepción.');
  return result;
 }
-export type PilotContent={conversation?:string|null;extendedTextMessage?:{text?:string|null}|null;ephemeralMessage?:{message?:PilotContent|null}|null};
+export type PilotContent={conversation?:string|null;extendedTextMessage?:{text?:string|null}|null;ephemeralMessage?:{message?:PilotContent|null}|null;audioMessage?:unknown;imageMessage?:unknown;videoMessage?:unknown;documentMessage?:unknown;stickerMessage?:unknown;locationMessage?:unknown;contactMessage?:unknown;contactsArrayMessage?:unknown};
 export type PilotMessage={key:{id?:string|null;fromMe?:boolean|null;remoteJid?:string|null;remoteJidAlt?:string|null;senderPn?:string|null};messageTimestamp?:unknown;message?:PilotContent|null};
 export type IncomingReason='own_or_missing_id'|'not_private'|'before_session'|'invalid_timestamp'|'unsupported_content'|'unresolved_sender';
 export function inspectPilotText(message:PilotMessage,startedAt:number,strictCutoff=false,allowPrivateId=false){
@@ -25,14 +25,17 @@ export function inspectPilotText(message:PilotMessage,startedAt:number,strictCut
  if(!Number.isFinite(timestamp)||timestamp*1000>Date.now()+60000)return {incoming:null,reason:'invalid_timestamp' as IncomingReason};
  if(timestamp*1000<cutoff)return {incoming:null,reason:'before_session' as IncomingReason};
  let content=message.message;for(let i=0;i<5&&content?.ephemeralMessage;i++)content=content.ephemeralMessage.message;
- const text=(content?.conversation||content?.extendedTextMessage?.text||'').trim();
- if(!text||text.length>500)return {incoming:null,reason:'unsupported_content' as IncomingReason};
+ const originalText=(content?.conversation||content?.extendedTextMessage?.text||'').trim();
+ const media=!!content&&['audioMessage','imageMessage','videoMessage','documentMessage','stickerMessage','locationMessage','contactMessage','contactsArrayMessage'].some(key=>(content as any)[key]);
+ if(!originalText&&!media)return {incoming:null,reason:'unsupported_content' as IncomingReason};
+ const unsupportedReply=originalText.length>1500?'El mensaje supera 1500 caracteres. Envíe una versión más corta o divídalo en mensajes. Escriba «ayuda» para ver las opciones.':!originalText?'Por ahora atiendo mensajes de texto. Escriba qué necesita, por ejemplo «Transporte para 3 personas» o «Necesito 5 almuerzos». No he registrado el archivo como una solicitud.':'';
+ const text=unsupportedReply?'[Contenido que requiere respuesta en texto]':originalText;
  const phone=canonicalSender(jid,message.key.senderPn)||canonicalSender(jid,message.key.remoteJidAlt)||'';
  const lid=/^(\d{1,30})(?::\d{1,5})?@lid$/.exec(jid);
  if(!phone&&(!allowPrivateId||!lid))return {incoming:null,reason:'unresolved_sender' as IncomingReason};
  // The channel identity is not a phone number and never grants an Astrea role.
  const senderKey=lid?`lid:${createHash('sha256').update(`${lid[1]}@lid`).digest('hex')}`:phone;
- return {incoming:{phone,senderKey,jid,text,messageId:createHash('sha256').update(`${jid}:${message.key.id}`).digest('hex')},reason:null};
+ return {incoming:{phone,senderKey,jid,text,sourceSentAt:timestamp*1000,...(unsupportedReply?{unsupportedReply}:{}),messageId:createHash('sha256').update(`${jid}:${message.key.id}`).digest('hex')},reason:null};
 }
 export function incomingPilotText(message:PilotMessage,startedAt:number,strictCutoff=false){
  return inspectPilotText(message,startedAt,strictCutoff).incoming;
@@ -75,12 +78,18 @@ export function pilotLease(options:{base:string;token:string;phone:string;fetche
   }
  };
 }
+export const WHATSAPP_HELP='Hola, soy el asistente de solicitudes de Astrea.\nPuedo ayudarle con transporte, alimentación, refrigerios, combustible y otros recursos para eventos.\nEjemplos: «Transporte para 3 personas», «Necesito 5 almuerzos», «Necesito 10 refrigerios».\nLe preguntaré los datos faltantes y mostraré un resumen. Solo se registra la solicitud cuando escriba «confirmar».\nComandos: «estado», «continuar», «cancelar» y «nueva solicitud». Cada conversación es independiente.';
+const normalizeCommand=(text:string)=>text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/[!¡?¿.,]+$/g,'');
 export function pilotIntake(options:{projectId:string;databaseId:string;token:string;uid:string;config:PilotConfig;runId:string;origin?:string;fetcher?:typeof fetch;checkActive:()=>Promise<void>;conversations?:Record<string,string>;saveCursor?:()=>Promise<void>}){
  const {config}=options;const conversations=options.conversations||{};
  return async(senderKey:string,messageId:string,text:string,verifiedPhone?:string)=>{
   await options.checkActive();
   if(!/^\d{8,15}$/.test(senderKey)&&!/^lid:[a-f0-9]{64}$/.test(senderKey))throw new AgentError('Identificador de conversación no válido.');
   const phone=/^\d{8,15}$/.test(verifiedPhone||'')?verifiedPhone!:/^\d{8,15}$/.test(senderKey)?senderKey:'';
+  const command=normalizeCommand(text);
+  const help=/^(hola|buenas|buenos dias|buenas tardes|buenas noches|ayuda|menu|opciones|formulario)$/.test(command);
+  if(help&&!conversations[senderKey]&&!(phone&&conversations[phone]))return {reply:WHATSAPP_HELP,requestId:''};
+  if(/^(?:quiero (?:llenar|responder|hacer) (?:una? )?)?(encuesta|cuestionario)$/.test(command))return {reply:'Este canal dispone del formulario de solicitudes de recursos por chat. Las encuestas independientes todavía no están habilitadas aquí.\n'+WHATSAPP_HELP,requestId:''};
   const initial=createHash('sha256').update(`${options.runId}:${senderKey}`).digest('hex');
   // Keep an existing LID draft when the mapping arrives, and recover legacy
   // phone-keyed drafts when first seeing an authenticated LID/PN association.
@@ -91,8 +100,11 @@ export function pilotIntake(options:{projectId:string;databaseId:string;token:st
   const backend=createAgentBackend({...options,tenantId:config.tenantId,leaderIds:[config.leaderId],eventIds:[config.eventId],requestNotes:`WHATSAPP · ${senderNote}. Registro recibido durante una sesión autorizada por ${options.uid}. Pendiente de revisión por coordinación.`});
   const turn={conversationId,messageId,revision:0,action:'resume' as const};
   let current=await backend.turn(turn);
+  if(help)return {reply:WHATSAPP_HELP+(current.conversation.requestId?`\nÚltima solicitud guardada. Radicado: ${current.conversation.requestId}`:''),requestId:''};
+  if(current.conversation.status==='human'&&command!=='cancelar')return {reply:'Esta conversación está pausada para atención manual. Para reiniciar el formulario escriba «cancelar» y después «nueva solicitud». Aún no se ha enviado aviso a un coordinador.',requestId:''};
+  if(['estado','continuar'].includes(command))return {reply:(current.reply||WHATSAPP_HELP)+(current.conversation.requestId?`\nRadicado: ${current.conversation.requestId}`:''),requestId:current.conversation.requestId};
   if(['submitted','cancelled'].includes(current.conversation.status)){
-   if(text.trim().toLowerCase()!=='nueva solicitud')return {reply:current.conversation.requestId?`Solicitud ya guardada. Radicado: ${current.conversation.requestId}. Escriba «nueva solicitud» para registrar otra.`:'Borrador cancelado. Escriba «nueva solicitud».',requestId:''};
+   if(command!=='nueva solicitud')return {reply:current.conversation.requestId?`Solicitud ya guardada. Radicado: ${current.conversation.requestId}. Escriba «nueva solicitud» para registrar otra.`:'Borrador cancelado. Escriba «nueva solicitud».',requestId:''};
    conversationId=createHash('sha256').update(`${initial}:${messageId}`).digest('hex');
    await saveConversation();
    current=await backend.turn({...turn,conversationId});
@@ -102,7 +114,7 @@ export function pilotIntake(options:{projectId:string;databaseId:string;token:st
    const patch:AgentDraft={leaderId:config.leaderId,eventId:config.eventId,municipality:config.municipality,unitCost:0,direction:'Ida'};
    current=await backend.turn({...turn,conversationId,messageId:`init-${messageId}`,action:'edit',patch});
   }
-  const result=await backend.turn({...turn,conversationId,revision:current.conversation.revision,action:text.toLowerCase()==='cancelar'?'cancel':'message',text});
+  const result=await backend.turn({...turn,conversationId,revision:current.conversation.revision,action:command==='cancelar'?'cancel':'message',text});
   return {reply:result.reply+(result.conversation.requestId?`\nRadicado: ${result.conversation.requestId}\nEscriba «nueva solicitud» para iniciar otra.`:'\nAstrea · Las entregas y asignaciones requieren aprobación de coordinación.'),requestId:result.conversation.requestId};
  };
 }
