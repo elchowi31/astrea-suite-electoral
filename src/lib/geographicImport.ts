@@ -60,8 +60,11 @@ export function parseKml(xml: string, parser: Pick<DOMParser, 'parseFromString'>
     }
     if (!geometries.length) continue;
     const properties: Record<string, string> = {};
-    for (const data of descendants(placemark, 'Data')) { const key = data.getAttribute('name'); if (key && !['__proto__','constructor','prototype'].includes(key)) properties[key.slice(0,100)] = text(data, 'value').slice(0,2000); }
-    features.push({ id: `feature-${features.length + 1}`, name: text(placemark, 'name').slice(0,160) || `Elemento ${features.length + 1}`, description: text(placemark, 'description').slice(0,2000), geometries, properties });
+    for (const data of [...descendants(placemark, 'Data'), ...descendants(placemark, 'SimpleData')]) {
+      const key = data.getAttribute('name');
+      if (key && !['__proto__','constructor','prototype'].includes(key)) properties[key] = data.localName === 'SimpleData' ? data.textContent?.trim() || '' : text(data, 'value');
+    }
+    features.push({ id: `feature-${features.length + 1}`, name: text(placemark, 'name').slice(0,160) || `Elemento ${features.length + 1}`, description: text(placemark, 'description'), geometries, properties });
   }
   const networkLinks=descendants(document,'NetworkLink').map(node=>descendants(node,'href')[0]?.textContent?.trim()||'').filter(Boolean);
   if(networkLinks.length>5)throw new Error('Máximo cinco enlaces externos por archivo.');
@@ -158,7 +161,14 @@ export async function importGeographicFile(file: Pick<File, 'name' | 'size' | 'a
   return { ...result, filename: file.name };
 }
 export function importedPoints(layers: GeographicLayer[]): TerritoryPoint[] {
-  return layers.flatMap(layer => layer.features.flatMap(feature => feature.geometries.filter(geometry => geometry.type === 'Point').map((geometry,index) => ({ ...geometry.coordinates[0], id: `import-${layer.id}-${feature.id}-${index}`, recordId: layer.id, type: 'import' as const, name: feature.name, subtitle: layer.name, municipality: feature.properties.municipio || feature.properties.municipality || '', status: 'Importado' }))));
+  return layers.flatMap(layer => layer.features.flatMap(feature => feature.geometries.filter(geometry => geometry.type === 'Point').map((geometry,index) => ({ ...geometry.coordinates[0], id: `import-${layer.id}-${feature.id}-${index}`, recordId: layer.id, layerId: layer.id, featureId: feature.id, type: 'import' as const, name: feature.name, subtitle: geographicProperty(feature, ['veredaobarrio','barrio','vereda','zona']) || layer.name, municipality: geographicProperty(feature, ['municipio','municipality']), status: 'Importado' }))));
+}
+export function geographicProperty(feature: GeoFeature, aliases: string[]): string {
+  return Object.entries(feature.properties).find(([key,value]) => aliases.includes(normalize(key)) && value.trim())?.[1] || '';
+}
+export function geographicFeatureMatches(feature: GeoFeature, search: string): boolean {
+  const term = normalize(search);
+  return !term || normalize([feature.name, feature.description, ...Object.values(feature.properties)].join(' ')).includes(term);
 }
 export function importedRoute(feature: GeoFeature): TerritorialRoute {
   const geometry = feature.geometries.find(item => item.type === 'LineString');

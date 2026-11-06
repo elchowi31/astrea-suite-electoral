@@ -2,8 +2,9 @@ import type { Leader, TransportVehicle } from '../types.js';
 
 export type Coordinate = { latitude: number; longitude: number };
 export type TerritoryPoint = Coordinate & {
-  id: string; recordId: string; type: 'leader' | 'vehicle' | 'import'; name: string;
+  id: string; recordId: string; type: 'leader' | 'vehicle' | 'import' | 'member'; name: string;
   subtitle: string; municipality: string; status: string; capturedAt?: string;
+  layerId?: string; featureId?: string;
 };
 export type RouteStop = Coordinate & { name: string };
 export type TerritorialRoute = {
