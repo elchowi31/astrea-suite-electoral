@@ -781,6 +781,8 @@ export default function App() {
               userRole={userRole}
               readOnly={demoActive}
               members={[currentUser,...users]}
+              candidates={visibleCandidates}
+              onExit={()=>setActiveTab('dashboard')}
               onOpenTracking={(routeId) => { setRouteToOpen(routeId||''); setDemoEnabled(false); setActiveTab('routes'); window.scrollTo({top:0,behavior:'instant'}); }}
               leaders={visibleLeaders.filter((l) => l.tenantId === currentTenant.tenantId)}
               vehicles={visibleVehicles.filter((v) => v.tenantId === currentTenant.tenantId)}
