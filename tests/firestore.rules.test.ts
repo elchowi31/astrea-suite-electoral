@@ -24,6 +24,33 @@ after(async()=>{if (env) await env.cleanup();});
 const check=(name:string,fn:()=>Promise<void>)=>test(name,{skip:!enabled},fn);
 const dbFor=(uid:string)=>env.authenticatedContext(uid,{email:`${uid}@test.invalid`}).firestore();
 
+check('Reward plans persist with revision control and only administrators certify work',async()=>{
+  const id='team-a--rewards-check',operator=dbFor('operator'),admin=dbFor('admin');
+  const plan={id,tenantId:'team-a',ownerId:'operator',name:'Work hours',revision:1,updatedAt:'2026-11-06',targetHours:7000,farmCount:1,teamCount:1,farms:[{id:'farm-1',name:'Farm',fruit:'Fruit',production:8,manualHours:[null]}]};
+  await assertSucceeds(getDoc(doc(operator,'planes_recompensas',id)));
+  await assertSucceeds(setDoc(doc(operator,'planes_recompensas',id),plan));
+  await assertSucceeds(getDoc(doc(admin,'planes_recompensas',id)));
+  await assertFails(getDoc(doc(dbFor('other'),'planes_recompensas',id)));
+  await assertFails(updateDoc(doc(dbFor('reader'),'planes_recompensas',id),{name:'Changed',revision:2}));
+  await assertFails(updateDoc(doc(operator,'planes_recompensas',id),{revision:1}));
+  const approval={id,tenantId:'team-a',revision:1,hours:{'farm-1':[7000]},approvedBy:'operator',updatedAt:'2026-11-06'};
+  await assertFails(setDoc(doc(operator,'validaciones_recompensas',id),approval));
+  await assertSucceeds(setDoc(doc(admin,'validaciones_recompensas',id),{...approval,approvedBy:'admin'}));
+  await assertFails(setDoc(doc(admin,'validaciones_recompensas',id),{...approval,revision:2,approvedBy:'admin'}));
+  const batch=writeBatch(admin);batch.update(doc(admin,'planes_recompensas',id),{revision:2});batch.set(doc(admin,'validaciones_recompensas',id),{...approval,revision:2,approvedBy:'admin'});await assertSucceeds(batch.commit());
+});
+check('Imported table rows survive a fresh read, remain private to their owner and tenant admins',async()=>{
+  const id='team-a--data-check-0',operator=dbFor('operator');
+  const row={id,tenantId:'team-a',ownerId:'operator',importId:'check',filename:'teams.csv',name:'Teams',sheet:'Datos',columns:['nombre','codigo'],rows:[{nombre:'Equipo A',codigo:'00123'}],part:0,createdAt:'2026-11-06'};
+  await assertSucceeds(setDoc(doc(operator,'bases_datos',id),row));
+  const saved=await assertSucceeds(getDoc(doc(dbFor('operator'),'bases_datos',id)));if(saved.data()?.rows[0].codigo!=='00123')throw new Error('Identifier was altered');
+  await assertSucceeds(getDoc(doc(dbFor('admin'),'bases_datos',id)));
+  for(const uid of ['reader','mayor','other','inactive'])await assertFails(getDoc(doc(dbFor(uid),'bases_datos',id)));
+  await assertSucceeds(getDocs(query(collection(operator,'bases_datos'),where('tenantId','==','team-a'),where('ownerId','==','operator'))));
+  await assertFails(getDocs(query(collection(operator,'bases_datos'),where('tenantId','==','team-a'))));
+  await assertFails(setDoc(doc(operator,'bases_datos','spoof'),{...row,id:'spoof',ownerId:'admin'}));
+});
+
 check('Unique event planillas enforce document identity, consent, scoped access and revision-controlled corrections',async()=>{
   const eventId='team-a--attendance',leaderId='attendance-leader',candidateId='attendance-candidate',voterId='attendance-person';
   await env.withSecurityRulesDisabled(async ctx=>{

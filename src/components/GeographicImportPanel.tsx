@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { collection, doc, writeBatch } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
-import { importGeographicFile, layerChunks, type GeographicLayer, type ImportResult } from '../lib/geographicImport';
+import { auth, db, authenticatedFetch } from '../lib/firebase';
+import { parseKml, importGeographicFile, layerChunks, type GeographicLayer, type ImportResult } from '../lib/geographicImport';
 import type { TerritorialRoute } from '../lib/territorialMaps';
 import {GeographicFeatureEditor} from './GeographicFeatureEditor';
 import {GeographicLayerCard} from './GeographicLayerCard';
@@ -32,9 +32,17 @@ export function GeographicImportPanel({ tenantId,layers,hidden,onToggle,onViewLa
     {busy && <p role="status" className="text-xs text-cyan-200">Procesando archivo o guardando cambios…</p>}
     {preview && <div className="space-y-3 rounded-xl border border-cyan-800 p-3"><p className="text-sm text-cyan-200">Vista previa: {preview.filename} · {preview.features.length} elementos</p>
       {preview.warnings.map(warning=><p key={warning} className="text-xs text-amber-300">{warning}</p>)}
+      {!!preview.networkLinks?.length&&<button className={button} disabled={busy||readOnly} onClick={async()=>{
+        setBusy(true);setMessage('');try{
+          const parts=[];for(const link of preview.networkLinks!){const response=await authenticatedFetch('/api/maps/import-link',{method:'POST',body:JSON.stringify({link,tenantId})});const payload=await response.json();if(!response.ok)throw new Error(payload.error||'No se pudo recuperar el mapa.');parts.push(parseKml(payload.kml));}
+          if(parts.some(part=>part.networkLinks?.length))throw new Error('El mapa contiene más enlaces. Exporte las geometrías completas desde My Maps.');
+          const features=[...preview.features,...parts.flatMap(part=>part.features)].map((feature,i)=>({...feature,id:`feature-${i+1}`}));
+          setPreview({...preview,features,networkLinks:[],warnings:['Ubicaciones recuperadas de Google My Maps. Revise y guarde la capa.']});
+        }catch(error){setMessage((error as Error).message);}finally{setBusy(false);}
+      }}>Recuperar ubicaciones de My Maps</button>}
       <ul className="max-h-40 overflow-auto text-xs text-slate-300">{preview.features.slice(0,30).map(feature=><li key={feature.id}>{feature.name} · {feature.geometries.map(geometry=>geometry.type==='Point'?'punto':geometry.type==='Polygon'?'polígono':'ruta').join(', ')}</li>)}</ul>
       <label className="block text-xs text-slate-300">Nombre de capa<input aria-label="Nombre de capa" value={name} maxLength={160} className={`mt-1 ${input}`} onChange={event=>setName(event.target.value)} /></label>
-      <div className="flex gap-2"><button className={button} disabled={busy || !name.trim() || readOnly} onClick={async()=> {
+      <div className="flex gap-2"><button className={button} disabled={busy || !name.trim() || readOnly || !preview.features.length} onClick={async()=> {
         setBusy(true); setMessage(''); try { if(!auth.currentUser)throw new Error('Inicie sesión antes de importar.'); const chunks=layerChunks(preview,tenantId,name,auth.currentUser.uid); const batch=writeBatch(db);
           chunks.forEach(chunk=>batch.set(doc(db,'capas_geograficas',chunk.id),chunk)); const audit=doc(collection(db,'auditoria')); batch.set(audit,{id:audit.id,tenantId,actorId:auth.currentUser.uid,entity:'capas_geograficas',entityId:chunks[0].importId,action:'import',createdAt:new Date().toISOString()});
           await batch.commit(); setPreview(null); onViewLayer(chunks); setMessage('Capa importada y guardada.');

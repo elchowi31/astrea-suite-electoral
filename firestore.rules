@@ -202,6 +202,51 @@ service cloud.firestore {
       allow delete: if platformAdmin() || (sameTenant(resource.data.tenantId) && financialManager());
     }
 
+    function validRewardPlan(data,id) {
+      return data.keys().hasOnly(['id','tenantId','ownerId','name','revision','updatedAt','targetHours','farmCount','teamCount','farms'])
+        && data.id == id && data.ownerId is string && data.ownerId.size() > 0
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 160
+        && data.revision is int && data.revision > 0 && data.updatedAt is string
+        && data.targetHours is number && data.targetHours > 0 && data.targetHours <= 1000000
+        && data.farmCount is int && data.farmCount >= 1 && data.farmCount <= 100
+        && data.teamCount is int && data.teamCount >= 1 && data.teamCount <= 10
+        && data.farms is list && data.farms.size() >= data.farmCount && data.farms.size() <= 100;
+    }
+    match /planes_recompensas/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow get: if !exists(/databases/$(database)/documents/planes_recompensas/$(id)) && signedIn();
+      allow create: if canOperateTenant(request.resource.data.tenantId)
+        && request.resource.data.ownerId == request.auth.uid && request.resource.data.revision == 1
+        && validRewardPlan(request.resource.data,id);
+      allow update: if canOperateTenant(resource.data.tenantId) && immutableTenant()
+        && (trackingAdministrator(resource.data.tenantId) || resource.data.ownerId == request.auth.uid)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.revision == resource.data.revision + 1 && validRewardPlan(request.resource.data,id);
+      allow delete: if false;
+    }
+    match /validaciones_recompensas/{id} {
+      allow read: if canReadTenant(resource.data.tenantId);
+      allow create, update: if trackingAdministrator(request.resource.data.tenantId)
+        && request.resource.data.keys().hasOnly(['id','tenantId','revision','hours','approvedBy','updatedAt'])
+        && request.resource.data.id == id && request.resource.data.approvedBy == request.auth.uid
+        && request.resource.data.hours is map && request.resource.data.hours.size() <= 100
+        && request.resource.data.updatedAt is string
+        && getAfter(/databases/$(database)/documents/planes_recompensas/$(id)).data.tenantId == request.resource.data.tenantId
+        && getAfter(/databases/$(database)/documents/planes_recompensas/$(id)).data.revision == request.resource.data.revision;
+      allow delete: if false;
+    }
+    match /bases_datos/{id} {
+      allow read: if canReadTenant(resource.data.tenantId)
+        && (trackingAdministrator(resource.data.tenantId) || resource.data.ownerId == request.auth.uid);
+      allow create: if canOperateTenant(request.resource.data.tenantId)
+        && request.resource.data.ownerId == request.auth.uid && request.resource.data.id == id
+        && request.resource.data.keys().hasOnly(['id','tenantId','ownerId','importId','filename','name','sheet','columns','rows','part','createdAt'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 160
+        && request.resource.data.rows is list && request.resource.data.rows.size() > 0 && request.resource.data.rows.size() <= 200
+        && request.resource.data.columns is list && request.resource.data.columns.size() > 0 && request.resource.data.columns.size() <= 100;
+      allow update, delete: if false;
+    }
+
     match /capas_geograficas/{id} {
       allow read: if canReadTenant(resource.data.tenantId);
       allow create: if canOperateTenant(request.resource.data.tenantId)
@@ -312,7 +357,11 @@ service cloud.firestore {
         && (get(/databases/$(database)/documents/recorridos/$(request.resource.data.routeId)).data.get('finishedAtMillis', 0) == 0
           || request.resource.data.capturedAtMillis <= get(/databases/$(database)/documents/recorridos/$(request.resource.data.routeId)).data.finishedAtMillis + 30000)
         && request.resource.data.receivedAt == request.time;
-      allow update, delete: if false;
+      // Retried offline samples may refresh only receipt time, never coordinates or ownership.
+      allow update: if sameTenant(resource.data.tenantId) && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['receivedAt'])
+        && request.resource.data.receivedAt == request.time;
+      allow delete: if false;
     }
 
     // Posición en vivo: un documento por integrante que se sobrescribe con cada posición.

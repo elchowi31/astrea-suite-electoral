@@ -22,6 +22,7 @@ export interface DeviceSeed {
   automaticTracking?: boolean; automaticPaused?: boolean;
   notificationAskedAt?: string;
   trackingSetupCompleted?: boolean;
+  trackingConsentAt?: string; trackingConsentVersion?: number;
   automaticSession?: { userId: string; tenantId: string; movement: MovementState; route?: AssignedRoute; lastRoute?: AssignedRoute; lastPosition?: Fix };
 }
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
@@ -148,3 +149,6 @@ export function deviceLabel(userAgent: string): string {
 export function isInstalledApp(): boolean {
   return safe(() => globalThis.matchMedia?.('(display-mode: standalone)').matches || (globalThis.navigator as Navigator & { standalone?: boolean }).standalone === true) ?? false;
 }
+
+/** Installing the tracking configuration requires affirmative consent; old grants alone are not consent. */
+export function trackingConsentNeeded(seed:DeviceSeed|null):boolean{return seed?.trackingConsentVersion!==1||!seed.trackingConsentAt;}

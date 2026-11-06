@@ -1,3 +1,4 @@
+import {fetchGoogleMapKml} from '../src/server/googleMapImport.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Buffer } from 'node:buffer';
 import { verifyFirebaseToken, type TokenPayload } from '../src/server/firebaseToken.js';
@@ -145,7 +146,7 @@ export default async function handler(req: ApiRequest, res: ServerResponse) {
     return json(res, 200, { status: 'ok', service: 'Astrea Suite Electoral API', timestamp: new Date().toISOString() });
   }
   if (!pathname.startsWith('/api/')) return json(res, 404, { success: false, error: 'Ruta no encontrada.' });
-  const routes = ['/api/ai/analyze-document', '/api/ai/generate-speech', '/api/ai/electoral-strategy', '/api/agent/turn'];
+  const routes = ['/api/ai/analyze-document', '/api/ai/generate-speech', '/api/ai/electoral-strategy', '/api/agent/turn', '/api/maps/import-link'];
   if (!routes.includes(pathname)) return json(res, 404, { success: false, error: 'Ruta no encontrada.' });
   const user = await authorize(req, res);
   if (!user) return;
@@ -161,6 +162,16 @@ export default async function handler(req: ApiRequest, res: ServerResponse) {
   try {
     const body = await parseBody(req);
     const token = req.headers.authorization!.slice(7);
+    if(pathname==='/api/maps/import-link'){
+      const profile=await readAuthorizedDocument(`usuarios/${encodeURIComponent(user.sub)}`,token);
+      const tenantId=typeof body.tenantId==='string'?body.tenantId:'';
+      const admin=isPlatformAdminClaims(user as unknown as Record<string,unknown>);
+      if(!/^[a-zA-Z0-9_-]{1,120}$/.test(tenantId)||(!admin&&(!profile||profile.active!==true||profile.accessVersion!==2||profile.tenantId!==tenantId)))return json(res,403,{success:false,error:'Su perfil no puede importar en esta organización.'});
+      const organization=await readAuthorizedDocument(`organizaciones/${tenantId}`,token);
+      if(organization?.active!==true)return json(res,403,{success:false,error:'La organización no está activa.'});
+      try{return json(res,200,{success:true,kml:await fetchGoogleMapKml(String(body.link||''))});}
+      catch(error){return json(res,422,{success:false,error:(error as Error).message});}
+    }
     if(pathname==='/api/agent/turn'){
       const profile=await readAuthorizedDocument(`usuarios/${encodeURIComponent(user.sub)}`,token);
       const admin=isPlatformAdminClaims(user as unknown as Record<string,unknown>);

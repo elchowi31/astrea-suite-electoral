@@ -8,9 +8,11 @@ import { OperationsProvider } from './components/operations/OperationsContext';
 import {WhatsappConnectionProvider,WhatsappConnectionStatus} from './components/operations/WhatsappConnectionContext';
 const OperationsOverview = lazy(()=>import('./components/operations/OperationsOverview').then(m=>({default:m.OperationsOverview})));
 const PassengerEventsView = lazy(()=>import('./components/PassengerEventsView').then(m=>({default:m.PassengerEventsView})));
+const RewardsView = lazy(()=>import('./components/RewardsView').then(m=>({default:m.RewardsView})));
+const DataImportsView = lazy(()=>import('./components/DataImportsView').then(m=>({default:m.DataImportsView})));
 const ResourcesView = lazy(()=>import('./components/operations/ResourcesView').then(m=>({default:m.ResourcesView})));
 import { DevicePersistencePanel } from './components/DevicePersistence';
-import { RouteTrackingProvider } from './components/RouteTrackingProvider';
+import { RouteTrackingProvider,TrackingStatusBanner } from './components/RouteTrackingProvider';
 import {isTrackingAdministrator} from './lib/trackingPermissions';
 import {keepViewedTenant, type ViewerScope} from './lib/tenantSelection';
 const RouteOperationsView = lazy(()=>import('./components/RouteOperationsView').then(module=>({default:module.RouteOperationsView})));
@@ -615,13 +617,14 @@ export default function App() {
         onSelectRole={() => {}}
       />
 
+      <TrackingStatusBanner/>
       {/* Main Body Layout */}
       <div className="min-w-0 flex-1 flex flex-col md:flex-row">
 
         {/* Sidebar */}
         <Sidebar
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={tab=>{if(tab==='rewards'||tab==='data_imports')setDemoEnabled(false);setActiveTab(tab);}}
           driveFileCount={visibleDriveFiles.length}
           candidateCount={visibleCandidates.filter((c) => c.tenantId === currentTenant.tenantId).length}
           leaderCount={visibleLeaders.filter((l) => l.tenantId === currentTenant.tenantId).length}
@@ -638,6 +641,8 @@ export default function App() {
           <WhatsappConnectionProvider><WhatsappConnectionStatus/>
           <DemoEditing.Provider value={demoActive&&demoBundle?{bundle:demoBundle,realReferences:{candidatos:candidates.map(c=>({id:c.id,name:c.fullName})),lideres:leaders.map(l=>({id:l.id,name:l.fullName})),aportes:donorContributions.map(c=>({id:c.id,name:c.donorName})),vehiculos:vehicles.map(v=>({id:v.id,name:v.licensePlate}))},onPromoted:()=>{setDemoEnabled(false);notifyFirestoreSave('Ficha guardada en datos reales.');}}:null}>
           <OperationsEditingReferences>
+          {activeTab === 'rewards' && <RewardsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId}/>}
+          {activeTab === 'data_imports' && <DataImportsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId} onMap={()=>{setDemoEnabled(false);setActiveTab('map');}}/>}
           {activeTab === 'device' && isTrackingAdministrator(currentUser) && <><DevicePersistencePanel /><div className="flex flex-wrap gap-3"><EditRecordButton collection="usuarios" record={currentUser} label="Editar mi perfil" />{['AdminTenant','AdminGlobal'].includes(currentUser.role)&&<EditRecordButton collection="organizaciones" record={currentTenant} label="Editar organización" />}</div></>}
 
           {/* Personalized User Recognition & Salutation Banner */}

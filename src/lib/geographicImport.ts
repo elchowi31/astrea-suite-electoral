@@ -5,7 +5,7 @@ import { validLocation } from './territorialMaps';
 export interface GeoGeometry { type: 'Point' | 'LineString' | 'Polygon'; coordinates: Coordinate[]; holes?: { coordinates: Coordinate[] }[] }
 export interface GeoFeature { id: string; name: string; description: string; geometries: GeoGeometry[]; properties: Record<string, string> }
 export interface GeographicLayer { id: string; tenantId: string; importId: string; name: string; filename: string; features: GeoFeature[]; createdBy: string; importedAt: string }
-export interface ImportResult { filename: string; features: GeoFeature[]; warnings: string[] }
+export interface ImportResult { filename: string; features: GeoFeature[]; warnings: string[]; networkLinks?: string[] }
 /** Todas las geometrías y partes de la importación, no solamente su primer punto. */
 export function layerCoordinates(layers: GeographicLayer[]): Coordinate[] {
   return layers.flatMap(layer=>layer.features.flatMap(feature=>feature.geometries.flatMap(geometry=>[...geometry.coordinates,...(geometry.holes||[]).flatMap(hole=>hole.coordinates)]))).filter(validLocation);
@@ -63,8 +63,10 @@ export function parseKml(xml: string, parser: Pick<DOMParser, 'parseFromString'>
     for (const data of descendants(placemark, 'Data')) { const key = data.getAttribute('name'); if (key && !['__proto__','constructor','prototype'].includes(key)) properties[key.slice(0,100)] = text(data, 'value').slice(0,2000); }
     features.push({ id: `feature-${features.length + 1}`, name: text(placemark, 'name').slice(0,160) || `Elemento ${features.length + 1}`, description: text(placemark, 'description').slice(0,2000), geometries, properties });
   }
-  const warnings = descendants(document, 'NetworkLink').length ? ['Los enlaces externos del KML no se importan. Incluya las geometrías dentro del archivo.'] : [];
-  return { filename: '', features: validate(features), warnings };
+  const networkLinks=descendants(document,'NetworkLink').map(node=>descendants(node,'href')[0]?.textContent?.trim()||'').filter(Boolean);
+  if(networkLinks.length>5)throw new Error('Máximo cinco enlaces externos por archivo.');
+  const warnings=networkLinks.length?['Este archivo enlaza datos externos. Recupere las ubicaciones de My Maps o exporte un KML con las geometrías incluidas.']:[];
+  return {filename:'',features:features.length||!networkLinks.length?validate(features):[],warnings,networkLinks};
 }
 export function parseCoordinateRows(rows: Record<string, unknown>[], sheet = ''): ImportResult {
   const features: GeoFeature[] = []; const groups = new Map<string, { name: string; type: string; rows: { point: Coordinate; order: number; index: number }[] }>();
@@ -135,7 +137,9 @@ export async function importGeographicFile(file: Pick<File, 'name' | 'size' | 'a
     const names = Object.keys(archive).sort((a,b) => Number(/(^|\/)doc.kml$/i.test(b)) - Number(/(^|\/)doc.kml$/i.test(a)) || a.localeCompare(b));
     if (!names.length) throw new Error('El KMZ no contiene un archivo KML.');
     const parsed = names.map(name => parseKml(strFromU8(archive[name])));
-    result = { filename: '', features: validate(parsed.flatMap(part => part.features).map((feature,index) => ({ ...feature, id: `feature-${index + 1}` }))), warnings: [...new Set(parsed.flatMap(part => part.warnings))] };
+    const features=parsed.flatMap(part=>part.features).map((feature,index)=>({...feature,id:`feature-${index+1}`}));
+    const networkLinks=[...new Set(parsed.flatMap(part=>part.networkLinks||[]))];if(networkLinks.length>5)throw new Error('Máximo cinco enlaces externos por archivo.');
+    result={filename:'',features:features.length||!networkLinks.length?validate(features):[],warnings:[...new Set(parsed.flatMap(part=>part.warnings))],networkLinks};
   } else if (extension === 'csv') {
     const rows = parseCsvRows(decodeCsvText(bytes));
     if (!rows.length) throw new Error('El archivo no contiene puntos, rutas o polígonos con coordenadas.');
@@ -168,6 +172,7 @@ export function distanceBetween(a: Coordinate, b: Coordinate): number {
 }
 /** Split into documents safely below Firestore's 1 MiB document limit. */
 export function layerChunks(result: ImportResult, tenantId: string, name: string, actor: string): GeographicLayer[] {
+  validate(result.features);
   const importId = crypto.randomUUID(); const chunks: GeoFeature[][] = [[]];
   for (const feature of result.features) {
     if (new TextEncoder().encode(JSON.stringify(feature)).length > 600000) throw new Error(`El elemento «${feature.name}» es demasiado grande. Simplifique su geometría.`);
