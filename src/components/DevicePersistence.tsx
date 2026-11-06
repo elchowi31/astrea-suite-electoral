@@ -3,7 +3,7 @@ import { browserLocalPersistence, browserSessionPersistence, indexedDBLocalPersi
 import { clearIndexedDbPersistence, terminate } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { chooseDeviceStorage, clearDeviceData, deviceChoice, localDataEnabled, registerOfflineApp, queuedLocations, queuedAutomaticRoutes } from '../lib/deviceStorage';
-import { ensureSeed, gpsOnboardingNeeded, nativeTrackingOnboardingNeeded, gpsPermission, readSeed, requestGps, prepareNativeTracking, updateSeed } from '../lib/deviceSeed';
+import { ensureSeed, trackingConsentNeeded, gpsOnboardingNeeded, nativeTrackingOnboardingNeeded, gpsPermission, readSeed, requestGps, prepareNativeTracking, updateSeed } from '../lib/deviceSeed';
 import { isNativeApp, openAppSettings } from '../lib/nativeTracking';
 
 const button = 'rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-white disabled:opacity-50';
@@ -18,29 +18,29 @@ const deniedHelp = native ? 'Permita la ubicación precisa en Ajustes › Apps �
  */
 export function DevicePersistenceBoundary({ children }: { children: React.ReactNode }) {
   const [choice,setChoice] = useState(deviceChoice); const [busy,setBusy] = useState(false); const [error,setError] = useState('');
-  const [gpsStep,setGpsStep] = useState(false); const [reloadAfter,setReloadAfter] = useState(false); const [gpsNote,setGpsNote] = useState('');
+  const [gpsStep,setGpsStep] = useState(()=>!!deviceChoice()&&trackingConsentNeeded(readSeed())); const [reloadAfter,setReloadAfter] = useState(false); const [gpsNote,setGpsNote] = useState('');
   useEffect(() => { if (choice) void setPersistence(auth,choice.enabled ? savedSession : browserSessionPersistence).catch(() => {}); void registerOfflineApp().catch(() => {}); },[choice]);
   useEffect(() => { if (!deviceChoice()) return; ensureSeed(); void gpsPermission().then(state => {
     if (state !== 'unknown' && state !== 'prompt') updateSeed({ gps:state,gpsCheckedAt:new Date().toISOString() });
-    if (gpsOnboardingNeeded(readSeed(),state) || (native && nativeTrackingOnboardingNeeded(readSeed()))) setGpsStep(true);
+    if (trackingConsentNeeded(readSeed()) || gpsOnboardingNeeded(readSeed(),state) || (native && nativeTrackingOnboardingNeeded(readSeed()))) setGpsStep(true);
   }).catch(() => {}); },[]);
   useEffect(() => onAuthStateChanged(auth,user => {
     if (localDataEnabled() && user) localStorage.setItem('astrea-device-user',JSON.stringify({ uid:user.uid,email:user.email,displayName:user.displayName }));
     else localStorage.removeItem('astrea-device-user');
   }),[]);
   const finish = () => { setGpsStep(false); if (reloadAfter) window.location.reload(); };
-  return <>{children}{!choice && <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/90 p-4" role="dialog" aria-modal="true" aria-labelledby="device-consent-title">
+  return <>{choice&&!gpsStep&&children}{!choice && <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/90 p-4" role="dialog" aria-modal="true" aria-labelledby="device-consent-title">
     <section className="w-full max-w-lg space-y-4 rounded-2xl border border-cyan-700 bg-slate-900 p-6 text-slate-200">
       <p className="text-xs font-semibold uppercase tracking-wider text-cyan-300">Configurar este dispositivo · paso 1 de 2</p>
       <h2 id="device-consent-title" className="text-xl font-bold text-white">Guardar Astrea en este dispositivo</h2>
       <p className="text-sm">Permita conservar su sesión, los datos consultados y las posiciones GPS pendientes para continuar después y sincronizar cuando vuelva la conexión. Elija esta opción en su propio celular.</p>
-      <p className="text-xs text-slate-400">Esta configuración se hace una sola vez por dispositivo. Al guardar, Astrea recuerda sus permisos y no vuelve a preguntar. Puede retirar los datos desde «Mi dispositivo».</p>
+      <p className="text-xs text-slate-400">Esta configuración se hace una sola vez por dispositivo. Al guardar, Astrea recuerda sus permisos y no vuelve a preguntar. Puede retirar la autorización y borrar los datos desde los ajustes del dispositivo.</p>
       {error && <p role="alert" className="text-amber-300">{error}</p>}
       <div className="flex flex-wrap gap-2">{([[true,'Permitir y guardar'],[false,'Continuar sin guardar']] as const).map(([enabled,label]) => <button key={String(enabled)} className={enabled ? primary : button} disabled={busy} onClick={async () => {
         setBusy(true); setError(''); try {
           const next = await chooseDeviceStorage(enabled); await setPersistence(auth,next.enabled ? savedSession : browserSessionPersistence); ensureSeed();
           const state = await gpsPermission(); if (state !== 'unknown' && state !== 'prompt') updateSeed({ gps:state,gpsCheckedAt:new Date().toISOString() });
-          if (gpsOnboardingNeeded(readSeed(),state) || (native && nativeTrackingOnboardingNeeded(readSeed()))) { setReloadAfter(true); setChoice(next); setGpsStep(true); setBusy(false); } else window.location.reload();
+          if (trackingConsentNeeded(readSeed()) || gpsOnboardingNeeded(readSeed(),state) || (native && nativeTrackingOnboardingNeeded(readSeed()))) { setReloadAfter(true); setChoice(next); setGpsStep(true); setBusy(false); } else window.location.reload();
         } catch { setError('No se pudo guardar la elección. Revise si el navegador bloquea el almacenamiento.'); setBusy(false); }
       }}>{label}</button>)}</div>
     </section>
@@ -48,15 +48,15 @@ export function DevicePersistenceBoundary({ children }: { children: React.ReactN
     <section className="w-full max-w-lg space-y-4 rounded-2xl border border-cyan-700 bg-slate-900 p-6 text-slate-200">
       <p className="text-xs font-semibold uppercase tracking-wider text-cyan-300">Configurar este dispositivo · paso 2 de 2</p>
       <h2 id="device-gps-title" className="text-xl font-bold text-white">{native?'Preparar seguimiento automático':'Activar la ubicación GPS'}</h2>
-      <p className="text-sm">{native?'Al aceptar, autoriza a Astrea a detectar y registrar sus desplazamientos con GPS y el sensor de movimiento, también con la pantalla apagada y después de iniciar sesión. Solo se guarda el historial cuando hay traslado real. Únicamente los administradores autorizados pueden ver y gestionar el seguimiento.':'Astrea usa el GPS para registrar los recorridos que usted inicia y para ubicar líderes y vehículos. Solo captura posiciones mientras un recorrido está en curso.'}</p>
-      <p className="text-xs text-slate-400">{native?'Los permisos se solicitan una sola vez. Autorice la ubicación precisa («Mientras se usa la app»); puede bloquear las notificaciones y continuar. Android conserva sus indicadores del servicio activo. El seguimiento no genera sonidos, vibraciones ni avisos emergentes. Mantenga activada la ubicación del teléfono y configure la batería de Astrea sin restricciones.':'El navegador solicitará el permiso de ubicación. Astrea recuerda su elección y puede reanudar los recorridos en curso al abrirse mientras conserve el permiso.'}</p>
+      <p className="text-sm">{native?'Al aceptar, autoriza a Astrea a detectar y registrar sus desplazamientos con GPS y el sensor de movimiento, también con la pantalla apagada y después de iniciar sesión. Solo se guarda el historial cuando hay traslado real. Únicamente los administradores autorizados pueden ver y gestionar el seguimiento.':'Al aceptar, autoriza a Astrea a compartir su ubicación y registrar sus desplazamientos mientras esta aplicación esté abierta, para coordinar el trabajo y los vehículos. Solo los administradores autorizados pueden consultar y gestionar el seguimiento.'}</p>
+      <p className="text-xs text-slate-400">{native?'Los permisos se solicitan una sola vez. Autorice la ubicación precisa («Mientras se usa la app»); puede bloquear las notificaciones y continuar. Android conserva sus indicadores del servicio activo. El seguimiento no genera sonidos, vibraciones ni avisos emergentes. Mantenga activada la ubicación del teléfono y configure la batería de Astrea sin restricciones.':'El navegador solicitará ubicación. El seguimiento comienza después de iniciar sesión y necesita mantener Astrea abierta. Puede pausarlo o retirar el permiso. Sin autorización no se completa esta configuración.'}</p>
       {gpsNote && <p role="status" className="text-sm text-amber-300">{gpsNote}</p>}
       <div className="flex flex-wrap gap-2">
-        <button className={primary} disabled={busy} onClick={async () => { setBusy(true); setGpsNote(''); try { if(native&&!localDataEnabled())throw new Error('Primero active la conservación de datos en «Mi dispositivo».');const result = native?await prepareNativeTracking():await requestGps();
-          if (result.state === 'granted') { if(native){updateSeed({automaticTracking:true,automaticPaused:false,trackingSetupCompleted:true});setReloadAfter(true);window.location.reload();}else finish(); } else setGpsNote(result.state === 'unsupported' ? 'Este dispositivo no ofrece GPS.' : deniedHelp); } catch (error) { setGpsNote((error as Error).message); } finally { setBusy(false); } }}>{busy ? 'Preparando…' : native?'Activar seguimiento automático':'Permitir ubicación'}</button>
+        <button className={primary} disabled={busy} onClick={async () => { setBusy(true); setGpsNote(''); try { if(!localDataEnabled()){await chooseDeviceStorage(true);await setPersistence(auth,savedSession);}const result = native?await prepareNativeTracking():await requestGps();
+          if (result.state === 'granted') { updateSeed({automaticTracking:true,automaticPaused:false,trackingSetupCompleted:true,trackingConsentVersion:1,trackingConsentAt:new Date().toISOString()});window.location.reload(); } else setGpsNote(result.state === 'unsupported' ? 'Este dispositivo no ofrece GPS.' : deniedHelp); } catch (error) { setGpsNote((error as Error).message); } finally { setBusy(false); } }}>{busy ? 'Preparando…' : 'Acepto y autorizo el seguimiento'}</button>
         {native&&gpsNote&&<button className={button} onClick={()=>void openAppSettings().catch(error=>setGpsNote(error.message))}>Abrir permisos de Astrea</button>}
         {native&&!gpsNote&&<button className={button} onClick={()=>void openAppSettings().catch(error=>setGpsNote(error.message))}>Configurar batería sin restricciones</button>}
-        <button className={button} disabled={busy} onClick={() => { updateSeed({ gpsAskedAt:new Date().toISOString(),...(native?{automaticTracking:false,trackingSetupCompleted:true}:{}) }); finish(); }}>Ahora no</button>
+        <button className={button} disabled={busy} onClick={()=>{updateSeed({automaticTracking:false,automaticPaused:true,trackingSetupCompleted:false,trackingConsentAt:undefined,trackingConsentVersion:undefined});void signOut(auth);setGpsNote('Configuración cancelada. No se activó el seguimiento. Puede cerrar la aplicación o aceptar para completar la configuración.');}}>No acepto · cancelar configuración</button>
       </div>
     </section>
   </div>}</>;

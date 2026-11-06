@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { UserProfile } from '../types';
 import { auth } from '../lib/firebase';
-import { readSeed, updateSeed, gpsPermission, prepareNativeTracking } from '../lib/deviceSeed';
+import { readSeed, trackingConsentNeeded, updateSeed, gpsPermission, prepareNativeTracking } from '../lib/deviceSeed';
 import { localDataEnabled, queueAutomaticRoute, queueLocation, type QueuedLocation } from '../lib/deviceStorage';
 import { automaticRoute, emptyMovement, observeMovement, type MovementState } from '../lib/movementTracking';
 import { watchFixes, type Fix, type FixWatcher } from '../lib/nativeTracking';
@@ -15,7 +15,7 @@ interface Props {
 }
 export function useAutomaticTracking(props: Props) {
   const current=useRef(props);current.current=props;
-  const [enabled,setEnabled]=useState(()=>!!readSeed()?.automaticTracking&&!readSeed()?.automaticPaused);
+  const [enabled,setEnabled]=useState(()=>!trackingConsentNeeded(readSeed())&&!!readSeed()?.automaticTracking&&!readSeed()?.automaticPaused);
   const [attempt,setAttempt]=useState(0);
   const [ready,setReady]=useState(false);const [moving,setMoving]=useState(false);
   const [route,setRoute]=useState<AssignedRoute>();const [lastFixAt,setLastFixAt]=useState('');const [message,setMessage]=useState('');
@@ -48,7 +48,7 @@ export function useAutomaticTracking(props: Props) {
       if(active.current&&fixes.length){
         for(const position of fixes)await queueLocation(sample(active.current,position));
         const latest=fixes.at(-1)!;lastPosition.current=latest;setLastFixAt(new Date(latest.timestamp).toISOString());
-        current.current.live(active.current,latest,sample(active.current,latest),'moving',fix.timestamp);lastLive.current=fix.timestamp;
+        await current.current.flush();current.current.live(active.current,latest,sample(active.current,latest),'moving',fix.timestamp);lastLive.current=fix.timestamp;
       }else{
         const item=active.current||lastRoute.current;const position=lastPosition.current;
         // Latido de estado, sin añadir puntos estacionarios al historial ni mover el marcador por ruido.
@@ -62,7 +62,7 @@ export function useAutomaticTracking(props: Props) {
     finally{busy.current=false;}
   };
   useEffect(()=>{
-    if(!props.native||!enabled||props.manualActive||!localDataEnabled()||auth.currentUser?.uid!==props.user.uid||props.user.tenantId!==props.tenantId)return;
+    if(!enabled||trackingConsentNeeded(readSeed())||props.manualActive||!localDataEnabled()||auth.currentUser?.uid!==props.user.uid||props.user.tenantId!==props.tenantId)return;
     const session=readSeed()?.automaticSession;
     if(session?.userId===props.user.uid&&session.tenantId===props.tenantId){movement.current=session.movement;active.current=session.route;lastRoute.current=session.lastRoute;lastPosition.current=session.lastPosition;setRoute(session.route||session.lastRoute);setMoving(session.movement.moving&&Date.now()-session.movement.lastMovementAt<30_000);}
     else{movement.current=emptyMovement();active.current=undefined;lastRoute.current=undefined;lastPosition.current=undefined;}
@@ -85,7 +85,7 @@ export function useAutomaticTracking(props: Props) {
     if(active.current)await finish(movement.current.lastMovementAt);movement.current=emptyMovement();save();
     updateSeed({automaticPaused:true});setEnabled(false);setMoving(false);setMessage('Seguimiento automático pausado.');void props.flush();
   };
-  const enable=async()=>{if(!localDataEnabled())throw new Error('Active la conservación de datos en «Mi dispositivo».');
+  const enable=async()=>{if(trackingConsentNeeded(readSeed()))throw new Error('Complete la autorización inicial en este dispositivo.');if(!localDataEnabled())throw new Error('Active la conservación de datos en «Mi dispositivo».');
     const result=await prepareNativeTracking();if(result.state!=='granted')throw new Error('Permita la ubicación precisa en los ajustes de Astrea.');
     updateSeed({automaticTracking:true,automaticPaused:false,trackingSetupCompleted:true});setEnabled(true);setAttempt(value=>value+1);
   };
