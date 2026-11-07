@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BarChart3, Bot, Building2, Calculator, ChevronRight, CircleDollarSign, ClipboardList, FileSpreadsheet, FileText, FolderSync, LayoutDashboard, Layers, LogOut, Map, MapPin, Menu, ShieldCheck, Target, Truck, Users, X } from 'lucide-react';
+import { BarChart3, Bot, Building2, Calculator, ChevronRight, CircleDollarSign, ClipboardList, FileSpreadsheet, FileText, FolderSync, Gift, LayoutDashboard, Layers, LogOut, Map, MapPin, Menu, ShieldCheck, Target, Truck, Users, X } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { getRoleHierarchyLevel, getTerritorialScope } from '../lib/permissions';
 import {isTrackingAdministrator} from '../lib/trackingPermissions';
 
-export type ActiveTab = 'rewards' | 'data_imports' | 'passengers' | 'resources' | 'device' | 'routes' | 'users' | 'dashboard' | 'campaign_structure' | 'hierarchy_pyramid' | 'login' | 'simulator' | 'costs_report' | 'zone_projections' | 'workspace' | 'map' | 'finances' | 'leaders' | 'transport' | 'candidates' | 'districts' | 'proposals' | 'drive' | 'ai' | 'tenants';
+export type ActiveTab = 'rewards' | 'reward_draws' | 'data_imports' | 'passengers' | 'resources' | 'device' | 'routes' | 'users' | 'dashboard' | 'campaign_structure' | 'hierarchy_pyramid' | 'login' | 'simulator' | 'costs_report' | 'zone_projections' | 'workspace' | 'map' | 'finances' | 'leaders' | 'transport' | 'candidates' | 'districts' | 'proposals' | 'drive' | 'ai' | 'tenants';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -67,6 +67,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, driveF
       { id: 'data_imports', label: 'Bases de datos', icon: FileSpreadsheet, minLevel: 10 },
       { id: 'resources', label: 'Solicitudes y jornadas', icon: ClipboardList, minLevel: 10 },
       { id: 'passengers', label: 'Pasajeros y eventos', icon: Users, minLevel: 10 },
+    ] },
+    { label: 'Bienestar', tone: 'text-violet-300', items: [
+      { id: 'reward_draws', label: 'Sorteos gratuitos', icon: Gift, globalOnly: true },
     ] },
     { label: 'Administración', tone: 'text-amber-300', items: [
       { id: 'users', label: 'Usuarios y accesos', icon: Users, minLevel: 35 },

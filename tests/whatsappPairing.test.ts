@@ -19,7 +19,7 @@ async function exercise(options:{creds?:ReturnType<typeof initAuthCreds>;setup?:
  const state={version:1,startedAt:Date.now(),creds,keys:{},conversations:{},inbox:[],handled:[]};
  const res=Object.assign(new EventEmitter(),{destroyed:false,writableEnded:false,statusCode:0,setHeader(){},flushHeaders(){},write(line:string){events.push(JSON.parse(line));},end(){this.writableEnded=true;}});
  await runWhatsappPilot({projectId:'test',databaseId:'test',token:'test',uid:'admin',config,session,res:res as any,checkActive:async()=>{}},{
-  segmentMs:options.segmentMs||30,
+  segmentMs:options.segmentMs||250,
   makeSocket:(()=>{
    const index=++sockets;order.push('socket-'+index);
    const socket={ev:new EventEmitter(),user:{id:config.phone+':1@s.whatsapp.net'},end(){order.push('end-'+index);},requestPairingCode:async()=>{
@@ -57,7 +57,7 @@ test('a restored partial pairing cannot open a login socket or create a second 4
  assert.match(result.events.at(-1).message,/incompleto/);
 });
 test('segment expiration before phone confirmation requires a new identity, never automatic renewal',async()=>{
- const result=await exercise({setup(socket){socket.ev.emit('connection.update',{qr:'challenge'});}});
+ const result=await exercise({segmentMs:30,setup(socket){socket.ev.emit('connection.update',{qr:'challenge'});}});
  assert.equal(result.events.at(-1).type,'fatal');assert.equal(result.events.at(-1).resetSession,true);
  assert.match(result.events.at(-1).message,/tiempo/);
 });

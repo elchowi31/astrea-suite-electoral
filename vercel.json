@@ -3,9 +3,11 @@
   "buildCommand": "npm run build:frontend",
   "installCommand": "npm ci --no-audit --no-fund --fetch-timeout=60000 --fetch-retries=1",
   "outputDirectory": "dist",
-  "functions": {"api/whatsapp-pilot.ts": {"maxDuration": 300}},
+  "functions": {"api/whatsapp-pilot.ts": {"maxDuration": 300}, "api/whatsapp-cloud.ts": {"maxDuration": 300}, "api/sorteapp-rewards.ts": {"maxDuration": 60}},
   "rewrites": [
     {"source":"/api/whatsapp/pilot","destination":"/api/whatsapp-pilot"},
+    {"source":"/api/whatsapp/cloud","destination":"/api/whatsapp-cloud"},
+    {"source":"/api/integrations/sorteapp/reward-entries","destination":"/api/sorteapp-rewards"},
     {
       "source": "/api/:path*",
       "destination": "/api/index"
