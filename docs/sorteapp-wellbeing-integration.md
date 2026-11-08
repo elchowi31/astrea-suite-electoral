@@ -23,10 +23,20 @@ Variables server-only de Vercel Production:
 - `SORTEAPP_REWARDS_ENABLED=true`
 - `SORTEAPP_WEBHOOK_SECRET`: secreto aleatorio de al menos 32 caracteres, compartido de forma segura entre los dos servidores.
 - `SORTEAPP_REWARDS_TENANT_IDS`: lista separada por comas de los identificadores de organizaciones Astrea autorizadas a recibir estos sorteos.
-- `FIREBASE_SERVICE_ACCOUNT_BASE64`: cuenta de servicio del proyecto Firebase de Astrea, solo para el servidor. No reutilice credenciales de Sorteapp.
+- `GOOGLE_CLOUD_PROJECT_NUMBER`, `GOOGLE_WORKLOAD_IDENTITY_POOL_ID`, `GOOGLE_WORKLOAD_IDENTITY_PROVIDER_ID` y `GOOGLE_SERVICE_ACCOUNT_EMAIL`: identificadores de la federación descrita abajo; no contienen claves privadas.
 - `FIREBASE_PROJECT_ID` y `FIRESTORE_DATABASE_ID` pueden usar los valores existentes del proyecto Astrea.
 
 Mantenga `SORTEAPP_REWARDS_ENABLED=false` hasta desplegar ambas partes y verificar una prueba. Incluya únicamente organizaciones activas que participarán. Nunca incluya el secreto en el navegador, repositorio, cuerpo del evento ni chat.
+
+### Acceso de Vercel a Firestore sin claves
+
+Google Cloud bloquea las claves privadas de cuentas de servicio en este proyecto. Configure Workload Identity Federation con la identidad OIDC de Vercel en lugar de crear o copiar una clave:
+
+La federación ya está creada en el proyecto Google Cloud `gen-lang-client-0498782352` (número `243559457978`): pool `astrea-vercel`, proveedor `vercel-production`, emisor `https://oidc.vercel.com/wilson-joses-projects` y audiencia `https://vercel.com/wilson-joses-projects`. El proveedor mapea `google.subject=assertion.sub`, `attribute.project=assertion.project_id` y `attribute.environment=assertion.environment`; solo acepta el proyecto Vercel `prj_gp0Vx6QrpUG25MzMFpeDBZCYCNfX` en `production`.
+
+La cuenta de servicio dedicada es `astrea-firestore@gen-lang-client-0498782352.iam.gserviceaccount.com`. Tiene `roles/datastore.user` en el proyecto Astrea y permite `roles/iam.workloadIdentityUser` únicamente al asunto `owner:wilson-joses-projects:project:astrea-suite-electoral:environment:production` del pool. No se creó ninguna clave privada. En Vercel, el proyecto `astrea-suite-electoral` tiene OIDC de equipo habilitado y las variables de federación configuradas solo para Production.
+
+El endpoint usa el token OIDC de la solicitud de Vercel para obtener un token de Firestore de corta duración. No almacena una clave privada ni conserva el token del usuario que envía el webhook. La aplicación valida además el HMAC del webhook antes de usar la federación.
 
 ## Contrato versión 1
 
@@ -94,4 +104,4 @@ Cada aviso debe tener un `eventId` nuevo. En reintentos, Sorteapp conserva el mi
 
 ## Estado de preparación
 
-Astrea tiene receptor y vista administrativa preparados localmente. La integración productiva queda apagada hasta cargar el secreto compartido, la cuenta de servicio de Astrea, desplegar esta versión y hacer una prueba real con Sorteapp. Sorteapp debe usar este contrato en su servidor y permitir acceso público a su formulario sin exponer el panel administrativo.
+Astrea tiene el receptor y la vista administrativa preparados en el código local. El proyecto Google Cloud, la cuenta de servicio sin clave y la federación OIDC de producción están configurados; `SORTEAPP_REWARDS_ENABLED` continúa en `false`. Falta desplegar esta versión de Astrea y la contraparte de Sorteapp, comprobar el secreto HMAC compartido y realizar un evento de prueba firmado antes de activar la recepción. Sorteapp debe usar este contrato en su servidor y permitir acceso público a su formulario sin exponer el panel administrativo.

@@ -12,9 +12,9 @@ Configure estas variables como secretos de Production:
 - WHATSAPP_CLOUD_ACCESS_TOKEN: token de sistema con permiso de mensajería para la cuenta de WhatsApp.
 - WHATSAPP_CLOUD_PHONE_NUMBER_ID: identificador del número registrado en la plataforma.
 - WHATSAPP_CLOUD_GRAPH_VERSION: versión Graph vigente que use la cuenta Meta.
-- FIREBASE_SERVICE_ACCOUNT_BASE64: JSON de una cuenta de servicio del mismo proyecto Firebase de Astrea, codificado en Base64 y con permisos de lectura y escritura de Firestore.
+- WHATSAPP_CLOUD_CONVERSATION_SECRET: secreto aleatorio de al menos 32 caracteres para proteger los identificadores de conversación guardados.
 
-No incluya estos valores en el repositorio, en variables VITE_* ni en el chat. El receptor solo usa la credencial de Firebase en el servidor.
+Además, configure `GOOGLE_CLOUD_PROJECT_NUMBER`, `GOOGLE_WORKLOAD_IDENTITY_POOL_ID`, `GOOGLE_WORKLOAD_IDENTITY_PROVIDER_ID` y `GOOGLE_SERVICE_ACCOUNT_EMAIL` con la federación OIDC de Vercel descrita en `sorteapp-wellbeing-integration.md`. Vercel obtiene credenciales cortas para Firestore; no se guarda una clave privada. Mantenga estas variables y los secretos anteriores solo en el servidor: nunca en el repositorio, en variables `VITE_*` ni en el chat.
 
 ## Activación en Meta
 

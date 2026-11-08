@@ -1,7 +1,7 @@
 import {Buffer} from 'node:buffer';
 import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
-import {GoogleAuth} from 'google-auth-library';
 import {AgentError} from '../lib/requestAgent.js';
+import {googleFederatedFirestoreToken,readGoogleFederationEnvironment,type GoogleFederationEnvironment} from './googleFederation.js';
 import {createWhatsappDiagnostics} from './whatsappDiagnostics.js';
 import {pilotIntake,pilotLease,type PilotConfig} from './whatsappPilotCore.js';
 import {decodeFields,encodeFields} from './requestAgent.js';
@@ -9,19 +9,19 @@ import {writeCheckpoint} from './firestoreCheckpoint.js';
 
 type CloudEnvironment={
  enabled:boolean;verifyToken:string;appSecret:string;accessToken:string;phoneNumberId:string;
- graphVersion:string;serviceAccountBase64:string;
+ graphVersion:string;conversationSecret:string;federation:GoogleFederationEnvironment;
 };
 export type CloudMessage={phoneNumberId:string;displayPhone:string;id:string;from:string;text:string|null};
 type FirestoreValue={stringValue?:string;booleanValue?:boolean;integerValue?:string;doubleValue?:number;mapValue?:{fields:Record<string,FirestoreValue>};arrayValue?:{values?:FirestoreValue[]};nullValue?:null};
 type FirestoreDocument={name:string;updateTime?:string;fields?:Record<string,FirestoreValue>};
 
 export function readCloudEnvironment(env:Record<string,string|undefined>):CloudEnvironment{
- const required=['WHATSAPP_CLOUD_VERIFY_TOKEN','WHATSAPP_CLOUD_APP_SECRET','WHATSAPP_CLOUD_ACCESS_TOKEN','WHATSAPP_CLOUD_PHONE_NUMBER_ID','WHATSAPP_CLOUD_GRAPH_VERSION','FIREBASE_SERVICE_ACCOUNT_BASE64'] as const;
+ const required=['WHATSAPP_CLOUD_VERIFY_TOKEN','WHATSAPP_CLOUD_APP_SECRET','WHATSAPP_CLOUD_ACCESS_TOKEN','WHATSAPP_CLOUD_PHONE_NUMBER_ID','WHATSAPP_CLOUD_GRAPH_VERSION','WHATSAPP_CLOUD_CONVERSATION_SECRET'] as const;
  if(env.WHATSAPP_CLOUD_ENABLED!=='true')throw new AgentError('La conexión oficial de WhatsApp todavía no está activada.',503);
  if(required.some(name=>!env[name]?.trim()))throw new AgentError('Falta completar la configuración segura de WhatsApp oficial.',503);
- const value={verifyToken:env.WHATSAPP_CLOUD_VERIFY_TOKEN!.trim(),appSecret:env.WHATSAPP_CLOUD_APP_SECRET!.trim(),accessToken:env.WHATSAPP_CLOUD_ACCESS_TOKEN!.trim(),phoneNumberId:env.WHATSAPP_CLOUD_PHONE_NUMBER_ID!.trim(),graphVersion:env.WHATSAPP_CLOUD_GRAPH_VERSION!.trim(),serviceAccountBase64:env.FIREBASE_SERVICE_ACCOUNT_BASE64!.trim()};
- if(value.verifyToken.length<16||value.appSecret.length<16||value.accessToken.length<20||!/^\d{8,40}$/.test(value.phoneNumberId)||!/^v\d+\.\d+$/.test(value.graphVersion))throw new AgentError('Revise los datos de activación de WhatsApp oficial.',503);
- return {enabled:true,...value};
+ const value={verifyToken:env.WHATSAPP_CLOUD_VERIFY_TOKEN!.trim(),appSecret:env.WHATSAPP_CLOUD_APP_SECRET!.trim(),accessToken:env.WHATSAPP_CLOUD_ACCESS_TOKEN!.trim(),phoneNumberId:env.WHATSAPP_CLOUD_PHONE_NUMBER_ID!.trim(),graphVersion:env.WHATSAPP_CLOUD_GRAPH_VERSION!.trim(),conversationSecret:env.WHATSAPP_CLOUD_CONVERSATION_SECRET!.trim()};
+ if(value.verifyToken.length<16||value.appSecret.length<16||value.accessToken.length<20||value.conversationSecret.length<32||!/^\d{8,40}$/.test(value.phoneNumberId)||!/^v\d+\.\d+$/.test(value.graphVersion))throw new AgentError('Revise los datos de activación de WhatsApp oficial.',503);
+ return {enabled:true,...value,federation:readGoogleFederationEnvironment(env)};
 }
 
 export function validCloudSignature(rawBody:Uint8Array,signature:string|undefined,appSecret:string){
@@ -64,20 +64,6 @@ function privateConversationMap(source:Record<string,string>,secret:string){
  });
 }
 
-let googleAuth:GoogleAuth|undefined;
-let googleAuthSource='';
-async function firestoreBearer(serviceAccountBase64:string,projectId:string){
- if(!googleAuth||googleAuthSource!==serviceAccountBase64){
-  let credentials:any;
-  try{credentials=JSON.parse(Buffer.from(serviceAccountBase64,'base64').toString('utf8'));}catch{throw new AgentError('La credencial privada de Firestore no se puede leer.',503);}
-  if(credentials.project_id!==projectId||typeof credentials.client_email!=='string'||typeof credentials.private_key!=='string')throw new AgentError('La credencial de Firestore no corresponde al proyecto de Astrea.',503);
-  googleAuth=new GoogleAuth({credentials,scopes:['https://www.googleapis.com/auth/datastore']});googleAuthSource=serviceAccountBase64;
- }
- const token=await googleAuth.getAccessToken();
- if(!token)throw new AgentError('Firestore no entregó una credencial al receptor.',503);
- return token;
-}
-
 const safeId=(value:string)=>/^[\w-]{1,120}$/.test(value);
 export function cloudConversationKey(phone:string,secret:string){return createHmac('sha256',secret).update(phone).digest('hex');}
 const documentPath=(response:FirestoreDocument|null)=>response?.name?.split('/documents/')[1]||'';
@@ -111,8 +97,8 @@ async function sendCloudText(options:{config:CloudEnvironment;to:string;text:str
  if(!response.ok)throw new AgentError('Meta no confirmó la respuesta de WhatsApp. El mensaje se volverá a intentar.',503);
 }
 
-export async function processCloudMessages(options:{projectId:string;databaseId:string;cloud:CloudEnvironment;messages:CloudMessage[];fetcher?:typeof fetch}){
- const request=options.fetcher||fetch,token=await firestoreBearer(options.cloud.serviceAccountBase64,options.projectId);
+export async function processCloudMessages(options:{projectId:string;databaseId:string;cloud:CloudEnvironment;messages:CloudMessage[];fetcher?:typeof fetch;vercelOidcToken?:string;bearerToken?:string}){
+ const request=options.fetcher||fetch,token=options.bearerToken||await googleFederatedFirestoreToken({environment:options.cloud.federation,projectId:options.projectId,vercelOidcToken:options.vercelOidcToken||''});
  const base='https://firestore.googleapis.com/v1/projects/'+options.projectId+'/databases/'+encodeURIComponent(options.databaseId)+'/documents';
  const headers={Authorization:'Bearer '+token,'Content-Type':'application/json'};
  const displayPhone=options.messages.find(message=>message.phoneNumberId===options.cloud.phoneNumberId)?.displayPhone||'';
@@ -129,7 +115,7 @@ export async function processCloudMessages(options:{projectId:string;databaseId:
   if(saved.ownerUid!==located.uid||saved.tenantId!==located.tenantId||saved.phoneNumberId!==options.cloud.phoneNumberId||!saved.conversations||typeof saved.conversations!=='object'||Array.isArray(saved.conversations))throw new AgentError('La sesión oficial de WhatsApp no corresponde a esta organización.',403);
   conversations=saved.conversations as Record<string,string>;
  }
- conversations=privateConversationMap(conversations,options.cloud.serviceAccountBase64);
+ conversations=privateConversationMap(conversations,options.cloud.conversationSecret);
  const saveState=async()=>{
   const saved=await writeCheckpoint({base,path:sessionPath,headers,request,revision,fields:encodeFields({ownerUid:located.uid,tenantId:located.tenantId,phoneNumberId:options.cloud.phoneNumberId,conversations:{...conversations},updatedAt:new Date().toISOString()})});
   if(!saved.ok||!saved.updateTime)throw new AgentError('No se pudo guardar el estado de recepción en Firestore.',503);

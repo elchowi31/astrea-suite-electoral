@@ -38,7 +38,7 @@ export default async function handler(req:RawRequest,res:ServerResponse){
   if(!validCloudSignature(raw,signature,cloud.appSecret))return reply(res,401,JSON.stringify({success:false,error:'Firma de WhatsApp no válida.'}));
   let payload:unknown;try{payload=JSON.parse(raw.toString('utf8'));}catch{return reply(res,400,JSON.stringify({success:false,error:'Aviso de WhatsApp no válido.'}));}
   const messages=parseCloudMessages(payload,cloud.phoneNumberId);
-  if(messages.length)await processCloudMessages({projectId:process.env.FIREBASE_PROJECT_ID||firebaseConfig.projectId,databaseId:process.env.FIRESTORE_DATABASE_ID||firebaseConfig.firestoreDatabaseId||'(default)',cloud,messages});
+  if(messages.length)await processCloudMessages({projectId:process.env.FIREBASE_PROJECT_ID||firebaseConfig.projectId,databaseId:process.env.FIRESTORE_DATABASE_ID||firebaseConfig.firestoreDatabaseId||'(default)',cloud,messages,vercelOidcToken:String(req.headers['x-vercel-oidc-token']||'')});
   return reply(res,200,'OK','text/plain; charset=utf-8');
  }catch(error){
   const status=error instanceof AgentError?error.status:503;

@@ -1,7 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac} from 'node:crypto';
-import {cloudConversationKey,parseCloudMessages,validCloudSignature} from '../src/server/whatsappCloud.ts';
+import {cloudConversationKey,parseCloudMessages,readCloudEnvironment,validCloudSignature} from '../src/server/whatsappCloud.ts';
+
+const federationEnvironment={GOOGLE_CLOUD_PROJECT_NUMBER:'123456789012',GOOGLE_WORKLOAD_IDENTITY_POOL_ID:'astrea-vercel',GOOGLE_WORKLOAD_IDENTITY_PROVIDER_ID:'vercel-production',GOOGLE_SERVICE_ACCOUNT_EMAIL:'astrea-firestore@demo.iam.gserviceaccount.com'};
 
 test('Meta webhook signature matches the exact request bytes',()=>{
  const raw=Buffer.from('{"entry":[{"id":"waba"}]}'),secret='test-meta-app-secret';
@@ -17,6 +19,14 @@ test('persisted conversation keys are keyed digests rather than enumerable phone
  assert.equal(key,cloudConversationKey('573001234567','service-account-secret'));
  assert.notEqual(key,cloudConversationKey('573001234567','rotated-secret'));
  assert.notEqual(key,'573001234567');
+});
+
+test('official WhatsApp remains off until Meta, conversation and federated Firestore settings exist',()=>{
+ assert.throws(()=>readCloudEnvironment({}),/todavía no está activada/);
+ assert.throws(()=>readCloudEnvironment({WHATSAPP_CLOUD_ENABLED:'true'}),/configuración segura/);
+ const cloud=readCloudEnvironment({WHATSAPP_CLOUD_ENABLED:'true',WHATSAPP_CLOUD_VERIFY_TOKEN:'verify-token-with-20-chars',WHATSAPP_CLOUD_APP_SECRET:'meta-app-secret-with-20-chars',WHATSAPP_CLOUD_ACCESS_TOKEN:'meta-access-token-at-least-20-chars',WHATSAPP_CLOUD_PHONE_NUMBER_ID:'123456789',WHATSAPP_CLOUD_GRAPH_VERSION:'v23.0',WHATSAPP_CLOUD_CONVERSATION_SECRET:'stable-conversation-secret-with-at-least-32-chars',...federationEnvironment});
+ assert.equal(cloud.federation.providerId,'vercel-production');
+ assert.equal(cloud.conversationSecret,'stable-conversation-secret-with-at-least-32-chars');
 });
 
 test('only private messages for the configured WhatsApp number are accepted',()=>{

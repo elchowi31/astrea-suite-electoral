@@ -5,6 +5,8 @@ import {parseSorteappRewardsEvent,processSorteappRewardsEvent,readSorteappReward
 import {decodeFields,encodeFields} from '../src/server/requestAgent.ts';
 
 const now=Date.now();
+const federationEnvironment={GOOGLE_CLOUD_PROJECT_NUMBER:'123456789012',GOOGLE_WORKLOAD_IDENTITY_POOL_ID:'astrea-vercel',GOOGLE_WORKLOAD_IDENTITY_PROVIDER_ID:'vercel-production',GOOGLE_SERVICE_ACCOUNT_EMAIL:'astrea-firestore@demo.iam.gserviceaccount.com'};
+const rewardsEnvironment=(extra:Record<string,string|undefined>={})=>readSorteappRewardsEnvironment({SORTEAPP_REWARDS_ENABLED:'true',SORTEAPP_WEBHOOK_SECRET:'sorteapp-webhook-secret-with-at-least-32-characters',SORTEAPP_REWARDS_TENANT_IDS:'tenant-astrea-2026',...federationEnvironment,...extra});
 const created=()=>({schemaVersion:1,eventId:'event-001',eventType:'draw.entry.created',occurredAt:new Date(now).toISOString(),draw:{id:'draw-001',tenantId:'tenant-astrea-2026',title:'Sorteo de bienestar',prize:'Licuadora',kind:'employee_wellbeing_free',paid:false,entryPrice:0,currency:'COP',startsAt:new Date(now-86400000).toISOString(),endsAt:new Date(now+86400000).toISOString()},entry:{id:'entry-001',name:'Participante de prueba',email:'persona@example.com',phone:'+57 300 123 4567',registeredAt:new Date(now).toISOString()},consent:{accepted:true,purpose:'employee_reward_draw',policyVersion:'2026-01',acceptedAt:new Date(now-60000).toISOString()}});
 
 test('Sorteapp signature authenticates the exact request bytes',()=>{
@@ -53,8 +55,9 @@ test('participant withdrawal accepts identifiers only and cannot include persona
 test('integration remains off until server-side secrets are configured',()=>{
  assert.throws(()=>readSorteappRewardsEnvironment({}),/no está activada/);
  assert.throws(()=>readSorteappRewardsEnvironment({SORTEAPP_REWARDS_ENABLED:'true'}),/configuración segura/);
- const env=readSorteappRewardsEnvironment({SORTEAPP_REWARDS_ENABLED:'true',SORTEAPP_WEBHOOK_SECRET:'sorteapp-webhook-secret-with-at-least-32-characters',FIREBASE_SERVICE_ACCOUNT_BASE64:'eyJwcm9qZWN0X2lkIjoiZGVtbyJ9',SORTEAPP_REWARDS_TENANT_IDS:'tenant-astrea-2026'});
+ const env=rewardsEnvironment();
  assert.equal(env.enabled,true);
+ assert.equal(env.federation.poolId,'astrea-vercel');
 });
 
 function firestoreMock(){
@@ -75,7 +78,7 @@ function firestoreMock(){
 }
 
 test('server-to-server persistence is idempotent and withdrawal removes participant details atomically',async()=>{
- const mock=firestoreMock(),environment=readSorteappRewardsEnvironment({SORTEAPP_REWARDS_ENABLED:'true',SORTEAPP_WEBHOOK_SECRET:'sorteapp-webhook-secret-with-at-least-32-characters',FIREBASE_SERVICE_ACCOUNT_BASE64:'not-used-in-this-test',SORTEAPP_REWARDS_TENANT_IDS:'tenant-astrea-2026'}),event=parseSorteappRewardsEvent(created());
+ const mock=firestoreMock(),environment=rewardsEnvironment(),event=parseSorteappRewardsEvent(created());
  const process=(current:SorteappRewardsEvent)=>processSorteappRewardsEvent({projectId:'demo',databaseId:'(default)',environment,event:current,fetcher:mock.fetcher,bearerToken:'test-only-token'});
  const first=await process(event);assert.deepEqual(first,{accepted:true,duplicate:false});const afterFirst=mock.commits;
  assert.deepEqual(await process(event),{accepted:true,duplicate:true});assert.equal(mock.commits,afterFirst);
@@ -88,6 +91,6 @@ test('server-to-server persistence is idempotent and withdrawal removes particip
 });
 
 test('the receiver rejects organizations outside the server-side allowlist before accessing Firestore',async()=>{
- const event=parseSorteappRewardsEvent(created()),environment=readSorteappRewardsEnvironment({SORTEAPP_REWARDS_ENABLED:'true',SORTEAPP_WEBHOOK_SECRET:'sorteapp-webhook-secret-with-at-least-32-characters',FIREBASE_SERVICE_ACCOUNT_BASE64:'not-used-in-this-test',SORTEAPP_REWARDS_TENANT_IDS:'another-tenant'});
+ const event=parseSorteappRewardsEvent(created()),environment=rewardsEnvironment({SORTEAPP_REWARDS_TENANT_IDS:'another-tenant'});
  await assert.rejects(processSorteappRewardsEvent({projectId:'demo',databaseId:'(default)',environment,event,fetcher:async()=>{throw new Error('Firestore should not be called');},bearerToken:'test-only-token'}),(error:any)=>error.status===403);
 });

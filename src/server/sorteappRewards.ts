@@ -1,10 +1,10 @@
 import {Buffer} from 'node:buffer';
 import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
-import {GoogleAuth} from 'google-auth-library';
 import {AgentError} from '../lib/requestAgent.js';
+import {googleFederatedFirestoreToken,readGoogleFederationEnvironment,type GoogleFederationEnvironment} from './googleFederation.js';
 import {decodeFields,encodeFields} from './requestAgent.js';
 
-type IntegrationEnvironment={enabled:true;secret:string;serviceAccountBase64:string;tenantIds:Set<string>};
+type IntegrationEnvironment={enabled:true;secret:string;federation:GoogleFederationEnvironment;tenantIds:Set<string>};
 type EntryCreatedEvent={schemaVersion:1;eventId:string;eventType:'draw.entry.created';occurredAt:string;draw:{id:string;tenantId:string;title:string;prize:string;kind:'employee_wellbeing_free';paid:false;entryPrice:0;currency:'COP';startsAt?:string;endsAt?:string};entry:{id:string;name:string;email?:string;phone?:string;registeredAt:string};consent:{accepted:true;purpose:'employee_reward_draw';policyVersion:string;acceptedAt:string}};
 type EntryDeletedEvent={schemaVersion:1;eventId:string;eventType:'draw.entry.deleted';occurredAt:string;draw:{id:string;tenantId:string};entry:{id:string}};
 export type SorteappRewardsEvent=EntryCreatedEvent|EntryDeletedEvent;
@@ -13,14 +13,12 @@ type FirestoreDocument={name:string;updateTime?:string;fields?:Record<string,Fir
 const idPattern=/^[A-Za-z0-9_-]{1,120}$/;
 const emailPattern=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const allowedRoot=['schemaVersion','eventId','eventType','occurredAt','draw','entry','consent'];
-let googleAuth:GoogleAuth|undefined,googleAuthSource='';
-
 export function readSorteappRewardsEnvironment(env:Record<string,string|undefined>):IntegrationEnvironment{
  if(env.SORTEAPP_REWARDS_ENABLED!=='true')throw new AgentError('La recepción de Sorteapp todavía no está activada.',503);
- const secret=env.SORTEAPP_WEBHOOK_SECRET?.trim()||'',serviceAccountBase64=env.FIREBASE_SERVICE_ACCOUNT_BASE64?.trim()||'';
+ const secret=env.SORTEAPP_WEBHOOK_SECRET?.trim()||'';
  const tenantIds=new Set((env.SORTEAPP_REWARDS_TENANT_IDS||'').split(',').map(value=>value.trim()).filter(Boolean));
- if(secret.length<32||!serviceAccountBase64||!tenantIds.size||[...tenantIds].some(value=>!idPattern.test(value)))throw new AgentError('Falta completar la configuración segura de Sorteapp.',503);
- return {enabled:true,secret,serviceAccountBase64,tenantIds};
+ if(secret.length<32||!tenantIds.size||[...tenantIds].some(value=>!idPattern.test(value)))throw new AgentError('Falta completar la configuración segura de Sorteapp.',503);
+ return {enabled:true,secret,federation:readGoogleFederationEnvironment(env),tenantIds};
 }
 
 export function validSorteappSignature(rawBody:Uint8Array,signature:string|undefined,secret:string){
@@ -70,14 +68,6 @@ export function parseSorteappRewardsEvent(value:unknown):SorteappRewardsEvent{
 
 const hashId=(value:string)=>createHash('sha256').update(value).digest('hex');
 const firestoreName=(base:string,path:string)=>`${new URL(base).pathname.replace(/^\/v1\//,'').replace(/^\//,'')}/${path}`;
-async function firestoreToken(serviceAccountBase64:string,projectId:string){
- if(!googleAuth||googleAuthSource!==serviceAccountBase64){
-  let credentials:any;try{credentials=JSON.parse(Buffer.from(serviceAccountBase64,'base64').toString('utf8'));}catch{throw new AgentError('La credencial privada de Firestore no se puede leer.',503);}
-  if(credentials.project_id!==projectId||typeof credentials.client_email!=='string'||typeof credentials.private_key!=='string')throw new AgentError('La credencial de Firestore no corresponde al proyecto de Astrea.',503);
-  googleAuth=new GoogleAuth({credentials,scopes:['https://www.googleapis.com/auth/datastore']});googleAuthSource=serviceAccountBase64;
- }
- const token=await googleAuth.getAccessToken();if(!token)throw new AgentError('Firestore no entregó credenciales al receptor de Sorteapp.',503);return token;
-}
 async function getDocument(base:string,path:string,headers:Record<string,string>,request:typeof fetch){
  const response=await request(`${base}/${path}`,{headers,signal:AbortSignal.timeout(12000)});
  if(response.status===404)return null;if(!response.ok)throw new AgentError('Firestore no pudo comprobar el estado de la inscripción.',503);
@@ -99,9 +89,9 @@ async function createReceipt(base:string,path:string,fields:Record<string,unknow
  if(!saved&&!await getDocument(base,path,headers,request))throw new AgentError('No se pudo conservar el recibo del aviso de Sorteapp.',503);
 }
 
-export async function processSorteappRewardsEvent(options:{projectId:string;databaseId:string;environment:IntegrationEnvironment;event:SorteappRewardsEvent;fetcher?:typeof fetch;bearerToken?:string}){
+export async function processSorteappRewardsEvent(options:{projectId:string;databaseId:string;environment:IntegrationEnvironment;event:SorteappRewardsEvent;fetcher?:typeof fetch;bearerToken?:string;vercelOidcToken?:string}){
  if(!options.environment.tenantIds.has(options.event.draw.tenantId))throw new AgentError('La organización destino no está habilitada para Sorteapp.',403);
- const request=options.fetcher||fetch,token=options.bearerToken||await firestoreToken(options.environment.serviceAccountBase64,options.projectId);
+ const request=options.fetcher||fetch,token=options.bearerToken||await googleFederatedFirestoreToken({environment:options.environment.federation,projectId:options.projectId,vercelOidcToken:options.vercelOidcToken||''});
  const base=`https://firestore.googleapis.com/v1/projects/${options.projectId}/databases/${encodeURIComponent(options.databaseId)}/documents`,headers={Authorization:`Bearer ${token}`,'Content-Type':'application/json'};
  const event=options.event,eventKey=hashId(event.eventId),receiptPath=`integraciones_sorteapp_eventos/${eventKey}`;
  if(await getDocument(base,receiptPath,headers,request))return {accepted:true,duplicate:true};

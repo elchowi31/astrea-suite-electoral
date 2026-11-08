@@ -21,7 +21,7 @@ export default async function handler(req:RawRequest,res:ServerResponse){
   const raw=await readRawBody(req),signature=String(req.headers['x-sorteapp-signature']||'');
   if(!validSorteappSignature(raw,signature,environment.secret))return reply(res,401,{success:false,error:'Firma de Sorteapp no válida.'});
   let payload:unknown;try{payload=JSON.parse(raw.toString('utf8'));}catch{return reply(res,400,{success:false,error:'Aviso de Sorteapp no válido.'});}
-  const event=parseSorteappRewardsEvent(payload),result=await processSorteappRewardsEvent({projectId:process.env.FIREBASE_PROJECT_ID||firebaseConfig.projectId,databaseId:process.env.FIRESTORE_DATABASE_ID||firebaseConfig.firestoreDatabaseId||'(default)',environment,event});
+  const event=parseSorteappRewardsEvent(payload),result=await processSorteappRewardsEvent({projectId:process.env.FIREBASE_PROJECT_ID||firebaseConfig.projectId,databaseId:process.env.FIRESTORE_DATABASE_ID||firebaseConfig.firestoreDatabaseId||'(default)',environment,event,vercelOidcToken:String(req.headers['x-vercel-oidc-token']||'')});
   return reply(res,200,{success:true,...result});
  }catch(error){
   const status=error instanceof AgentError?error.status:503;
