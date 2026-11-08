@@ -483,6 +483,20 @@ async function persistAdministrativeEntity<T extends { tenantId: string }>(colle
   await verifySavedRecord(reference, stored);
 }
 
+async function removeAdministrativeEntity(collectionName: string, id: string, tenantId?: string): Promise<void> {
+  requireOnlineMutation('Conéctese para retirar organizaciones y accesos.');
+  const actor = auth.currentUser;
+  if (!actor) throw new Error('Inicie sesión para administrar la organización.');
+  const reference = doc(db, collectionName, id);
+  if (!tenantId) tenantId = (await getDocFromServer(reference)).data()?.tenantId;
+  if (!tenantId) throw new Error('No se encontró el registro de esta organización.');
+  const batch = writeBatch(db);
+  const auditId = crypto.randomUUID();
+  batch.delete(reference);
+  batch.set(doc(db, 'auditoria', auditId), { id: auditId, tenantId, actorId: actor.uid, entity: collectionName, entityId: id, action: 'delete', createdAt: new Date().toISOString() });
+  await batch.commit();
+}
+
 // Organizaciones / Tenants
 export async function saveTenantToFirestore(tenant: Tenant): Promise<void> {
   try {
@@ -495,8 +509,7 @@ export async function saveTenantToFirestore(tenant: Tenant): Promise<void> {
 
 export async function deleteTenantFromFirestore(tenantId: string): Promise<void> {
   try {
-    requireOnlineMutation('Conéctese para retirar una organización y comprobar los permisos actuales.');
-    await deleteDoc(doc(db, 'organizaciones', tenantId));
+    await removeAdministrativeEntity('organizaciones', tenantId, tenantId);
   } catch (e) {
     handleFirestoreError(e, OperationType.DELETE, `organizaciones/${tenantId}`);
     throw e;
@@ -542,8 +555,7 @@ export async function saveUserToFirestore(user: UserProfile): Promise<void> {
 
 export async function deleteUserFromFirestore(uid: string): Promise<void> {
   try {
-    requireOnlineMutation('Conéctese para retirar un acceso y comprobar los permisos actuales.');
-    await deleteDoc(doc(db, 'usuarios', uid));
+    await removeAdministrativeEntity('usuarios', uid);
   } catch (e) {
     handleFirestoreError(e, OperationType.DELETE, `usuarios/${uid}`);
     throw e;
