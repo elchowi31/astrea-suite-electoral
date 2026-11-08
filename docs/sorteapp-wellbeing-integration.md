@@ -104,4 +104,6 @@ Cada aviso debe tener un `eventId` nuevo. En reintentos, Sorteapp conserva el mi
 
 ## Estado de preparación
 
-Astrea tiene el receptor y la vista administrativa preparados en el código local. El proyecto Google Cloud, la cuenta de servicio sin clave y la federación OIDC de producción están configurados; `SORTEAPP_REWARDS_ENABLED` continúa en `false`. Falta desplegar esta versión de Astrea y la contraparte de Sorteapp, comprobar el secreto HMAC compartido y realizar un evento de prueba firmado antes de activar la recepción. Sorteapp debe usar este contrato en su servidor y permitir acceso público a su formulario sin exponer el panel administrativo.
+El receptor y la vista administrativa están desplegados en Astrea. El proyecto Google Cloud, la cuenta de servicio sin clave y la federación OIDC de producción están configurados. `SORTEAPP_REWARDS_ENABLED=true` en Vercel Production y la lista de organizaciones limita la recepción a Coalición 2026. Astrea está lista para recibir el evento de prueba firmado del servidor de Sorteapp; después se debe verificar el recibo técnico y la participación en Firestore. Sorteapp debe usar este contrato en su servidor y permitir acceso público a su formulario sin exponer el panel administrativo.
+
+WhatsApp Cloud comparte la federación segura de Firestore y tiene preparado el secreto de conversación, pero aún requiere la configuración de la app Meta, el token de acceso y el identificador del número antes de poder activar su webhook.
