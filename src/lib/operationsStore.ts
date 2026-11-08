@@ -1,9 +1,11 @@
-import { doc, runTransaction, type DocumentReference } from 'firebase/firestore';
+import { doc, getDoc, getDocFromCache, runTransaction, type DocumentReference } from 'firebase/firestore';
 import {verifySavedRecord} from './saveVerification';
 import { auth, db } from './firebase';
 import { canCoordinate, overlaps, passengerTotal, validateEvent, validateRequest, RESOURCE_CATALOG, TRANSPORT_RESOURCE, type OperationalEvent, type ResourceRequest, type TransportTrip, type LeaderProgressReport } from './operations';
 import type { TransportVehicle, UserProfile } from '../types';
 import { stockAvailable, stockMissing, releasableTrip, queueIsFresh } from './operations';
+import {canonicalStoredValue} from './serialization';
+import {durableMutation,registerOfflineMutation,requireOnlineMutation,isOfflineMutationScopeActive,type MutationScope} from './offlineMutations';
 
 export interface OperationTransaction<R> {
   get(ref:R):Promise<{data():any;exists():boolean;ref:R}>;
@@ -182,19 +184,46 @@ async function reassignTrip(trip:TransportTrip,target:ResourceRequest,passengers
 
 return {saveEvent,saveRequest,changeRequest,requestToExpense,saveProgressReport,saveTrip,confirmResourceCount,transferResource,reassignTrip};
 }
-const realStore=createOperationsStore<DocumentReference>({
+function createRealStore(command?:{id:string;scope:MutationScope;expected?:{collection:string;id:string;data:unknown}}){return createOperationsStore<DocumentReference>({
   reference:(collection,id)=>doc(db,collection,id),
   actorUid:()=>auth.currentUser?.uid,
   transaction:async callback=>{
     const writes=await runTransaction(db,async tx=>{
+      const receipt=command?doc(db,'usuarios',command.scope.userId,'mutaciones_offline',command.id):null;
+      if(command&&(auth.currentUser?.uid!==command.scope.userId||!isOfflineMutationScopeActive(command.scope)))throw new Error('La cuenta u organización cambió; se conserva la operación para su cuenta.');
+      if(receipt&&(await tx.get(receipt)).exists())return [];
+      if(command?.expected){const previous=(await tx.get(doc(db,command.expected.collection,command.expected.id))).data()??null;if(canonicalStoredValue(previous)!==canonicalStoredValue(command.expected.data))throw new Error('El registro cambió mientras no había conexión. Revise los datos actuales antes de aplicar la operación pendiente.');}
       const writes=new Map<string,{ref:DocumentReference;data:Record<string,any>}>();
       const remember=(ref:DocumentReference,data:Record<string,any>)=>{
         if(ref.parent.id!=='auditoria')writes.set(ref.path,{ref,data:{...writes.get(ref.path)?.data,...data}});
       };
       await callback({get:ref=>tx.get(ref),set:(ref,data)=>{remember(ref,data);tx.set(ref,data);},update:(ref,data)=>{remember(ref,data);tx.update(ref,data);}});
+      if(command&&(auth.currentUser?.uid!==command.scope.userId||!isOfflineMutationScopeActive(command.scope)))throw new Error('La cuenta u organización cambió; se conserva la operación para su cuenta.');
+      if(receipt)tx.set(receipt,{id:command!.id,tenantId:command!.scope.tenantId,actorId:command!.scope.userId,kind:'operations-command',createdAt:new Date().toISOString()});
       return [...writes.values()];
     });
     for(const {ref,data} of writes)await verifySavedRecord(ref,data);
   }
+});}
+const realStore=createRealStore();
+async function queueOperation(name:'saveEvent'|'saveRequest'|'saveProgressReport',data:OperationalEvent|ResourceRequest|LeaderProgressReport,user:UserProfile,onlyCreate=false){
+  if(auth.currentUser?.uid!==user.uid||(user.tenantId!==data.tenantId&&user.role!=='AdminGlobal'))throw new Error('Inicie sesión en esta organización.');
+  if(name==='saveEvent')validateEvent(data as OperationalEvent);else if(name==='saveRequest')validateRequest(data as ResourceRequest);
+  const collection=name==='saveEvent'?'jornadas_operativas':name==='saveRequest'?'solicitudes_recursos':'reportes_jornada';
+  let previous:unknown=null;
+  try{previous=(await getDocFromCache(doc(db,collection,data.id))).data()??null;}catch(error){if(typeof navigator==='undefined'||navigator.onLine!==false)previous=(await getDoc(doc(db,collection,data.id))).data()??null;}
+  await durableMutation('operations-command',{userId:user.uid,tenantId:data.tenantId},{name,data,user,onlyCreate,expected:{collection,id:data.id,data:previous}});
+}
+registerOfflineMutation('operations-command',async(payload,context)=>{
+  if(payload.user.uid!==context.scope.userId||payload.data.tenantId!==context.scope.tenantId||auth.currentUser?.uid!==context.scope.userId)throw new Error('La sesión cambió; la operación se conserva para su cuenta.');
+  const store=createRealStore({...context,expected:payload.expected});
+  if(payload.name==='saveEvent')await store.saveEvent(payload.data,payload.user);
+  else if(payload.name==='saveRequest')await store.saveRequest(payload.data,payload.user,payload.onlyCreate);
+  else if(payload.name==='saveProgressReport')await store.saveProgressReport(payload.data,payload.user);
+  else throw new Error('Operación pendiente desconocida.');
 });
-export const {saveEvent,saveRequest,changeRequest,requestToExpense,saveProgressReport,saveTrip,confirmResourceCount,transferResource,reassignTrip}=realStore;
+export const saveEvent=(event:OperationalEvent,user:UserProfile)=>queueOperation('saveEvent',event,user);
+export const saveRequest=(request:ResourceRequest,user:UserProfile,onlyCreate=false)=>queueOperation('saveRequest',request,user,onlyCreate);
+export const saveProgressReport=(report:LeaderProgressReport,user:UserProfile)=>queueOperation('saveProgressReport',report,user);
+function onlineOnly<T extends(...args:any[])=>Promise<any>>(action:T):T{return ((...args:Parameters<T>)=>{requireOnlineMutation('Conéctese para confirmar disponibilidad, aprobaciones y movimientos de recursos. El formulario conserva los datos.');return action(...args);}) as T;}
+export const changeRequest=onlineOnly(realStore.changeRequest),requestToExpense=onlineOnly(realStore.requestToExpense),saveTrip=onlineOnly(realStore.saveTrip),confirmResourceCount=onlineOnly(realStore.confirmResourceCount),transferResource=onlineOnly(realStore.transferResource),reassignTrip=onlineOnly(realStore.reassignTrip);

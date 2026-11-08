@@ -121,6 +121,7 @@ export function nativeTrackingOnboardingNeeded(seed: DeviceSeed | null): boolean
 
 /** El asistente de configuración pregunta por el GPS solo si el navegador aún no decidió y no se preguntó antes en este dispositivo. */
 export function gpsOnboardingNeeded(seed: DeviceSeed | null, state: GpsState): boolean {
+  if (seed?.trackingSetupCompleted) return false;
   return (state === 'prompt' || state === 'unknown') && !seed?.gpsAskedAt;
 }
 
@@ -151,4 +152,4 @@ export function isInstalledApp(): boolean {
 }
 
 /** Installing the tracking configuration requires affirmative consent; old grants alone are not consent. */
-export function trackingConsentNeeded(seed:DeviceSeed|null):boolean{return seed?.trackingConsentVersion!==1||!seed.trackingConsentAt;}
+export function trackingConsentNeeded(seed:DeviceSeed|null):boolean{return !(seed?.trackingSetupCompleted&&seed.automaticTracking===false)&&(seed?.trackingConsentVersion!==1||!seed.trackingConsentAt);}

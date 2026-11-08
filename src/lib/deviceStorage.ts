@@ -17,6 +17,23 @@ export async function registerOfflineApp(): Promise<void> {
   const native = (globalThis as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.() === true;
   if (!native && localDataEnabled() && 'serviceWorker' in navigator && !import.meta.env.DEV) await navigator.serviceWorker.register('/service-worker.js');
 }
+/** Ask the installed worker about its own release, not another release's cache. */
+export async function offlineAppReadiness(): Promise<string> {
+  const native = (globalThis as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.() === true;
+  if(native)return 'Los archivos de la aplicación están instalados en este dispositivo.';
+  if(!localDataEnabled())return 'Active la conservación de datos para preparar el uso sin internet.';
+  if(!('serviceWorker' in navigator))return 'Este navegador no permite preparar la aplicación sin internet.';
+  const registration=await navigator.serviceWorker.getRegistration('/');
+  const worker=registration?.active;
+  if(!worker||worker.state!=='activated')return 'Preparación pendiente. Mantenga la aplicación abierta con internet y vuelva a comprobar.';
+  return new Promise(resolve=>{
+    const channel=new MessageChannel();
+    const finish=(message:string)=>{clearTimeout(timer);channel.port1.close();channel.port2.close();resolve(message);};
+    const timer=setTimeout(()=>finish('No se pudo confirmar la preparación. Conéctese y vuelva a comprobar.'),4000);
+    channel.port1.onmessage=event=>finish(event.data?.ready===true?'Aplicación preparada para abrir sin internet. Solo estarán disponibles los datos que haya cargado con esta cuenta.':'La descarga de la aplicación está incompleta. Conéctese y vuelva a comprobar.');
+    worker.postMessage({type:'ASTREA_OFFLINE_STATUS'},[channel.port2]);
+  });
+}
 export interface QueuedLocation { id: string; tenantId: string; userId: string; routeId: string; latitude: number; longitude: number; accuracy: number; capturedAt: string; capturedAtMillis:number }
 const memoryQueue = new Map<string, QueuedLocation>();
 export interface QueuedRoute { id: string; route: AssignedRoute; finishedAtMillis?: number }
@@ -58,6 +75,7 @@ export async function clearDeviceData(): Promise<void> {
   if ('serviceWorker' in navigator) for (const registration of await navigator.serviceWorker.getRegistrations()) if (registration.active?.scriptURL.endsWith('/service-worker.js')) await registration.unregister();
   if ('caches' in window) for (const key of await caches.keys()) if (key.startsWith('astrea-app-')) await caches.delete(key);
   await new Promise<void>((resolve,reject) => { const request = indexedDB.deleteDatabase('astrea-route-queue'); request.onsuccess = () => resolve(); request.onerror = () => reject(request.error); request.onblocked = () => reject(new Error('Cierre las otras pestañas antes de retirar los datos.')); });
+  await new Promise<void>((resolve,reject) => { const request = indexedDB.deleteDatabase('astrea-offline-mutations'); request.onsuccess = () => resolve(); request.onerror = () => reject(request.error); request.onblocked = () => reject(new Error('Cierre las otras pestañas antes de retirar los datos.')); });
   localStorage.removeItem('astrea-device-user');
   localStorage.removeItem('astrea-device-seed-v1');
   sessionStorage.removeItem('astrea-device-seed-v1');

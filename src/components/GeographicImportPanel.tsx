@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { collection, doc, writeBatch } from 'firebase/firestore';
-import { auth, db, authenticatedFetch } from '../lib/firebase';
+import { collection, doc } from 'firebase/firestore';
+import { auth, db, authenticatedFetch, persistFirestoreBatch, type FirestoreBatchWrite } from '../lib/firebase';
 import { parseKml, importGeographicFile, layerChunks, type GeographicLayer, type ImportResult } from '../lib/geographicImport';
 import type { TerritorialRoute } from '../lib/territorialMaps';
 import {GeographicFeatureEditor} from './GeographicFeatureEditor';
@@ -15,10 +15,9 @@ export function GeographicImportPanel({ tenantId,layers,hidden,onToggle,onViewLa
     setBusy(true); setMessage(''); try {
       if(readOnly||!auth.currentUser)throw new Error('Inicie sesión con permiso de edición.');
       if(!parts.length||parts.some(part=>part.tenantId!==tenantId))throw new Error('La capa no pertenece a esta organización.');
-      const batch = writeBatch(db);
-      for (const part of parts) action==='delete' ? batch.delete(doc(db,'capas_geograficas',part.id)) : batch.update(doc(db,'capas_geograficas',part.id),{ name:nextName.trim().slice(0,160),updatedBy:auth.currentUser.uid,updatedAt:new Date().toISOString() });
-      const audit = doc(collection(db,'auditoria')); batch.set(audit,{ id:audit.id,tenantId,actorId:auth.currentUser?.uid,entity:'capas_geograficas',entityId:parts[0].importId,action,createdAt:new Date().toISOString() });
-      await batch.commit(); if(action==='delete')setMessage(`Capa «${parts[0].name}» retirada.`);
+      const writes:FirestoreBatchWrite[]=parts.map(part=>({collection:'capas_geograficas',id:part.id,type:action==='delete'?'delete':'update',...(action==='rename'?{data:{name:nextName.trim().slice(0,160),updatedBy:auth.currentUser!.uid,updatedAt:new Date().toISOString()}}:{})}));
+      const audit = doc(collection(db,'auditoria')); writes.push({collection:'auditoria',id:audit.id,type:'set',data:{id:audit.id,tenantId,actorId:auth.currentUser.uid,entity:'capas_geograficas',entityId:parts[0].importId,action,createdAt:new Date().toISOString()}});
+      await persistFirestoreBatch(tenantId,writes); if(action==='delete')setMessage(`Retiro de «${parts[0].name}» registrado. Consulte el estado de sincronización.`);
     } finally { setBusy(false); }
   };
   return <section className="space-y-3 rounded-2xl border border-slate-700 bg-slate-900 p-4 sm:p-5">
@@ -43,9 +42,9 @@ export function GeographicImportPanel({ tenantId,layers,hidden,onToggle,onViewLa
       <ul className="max-h-40 overflow-auto text-xs text-slate-300">{preview.features.slice(0,30).map(feature=><li key={feature.id}>{feature.name} · {feature.geometries.map(geometry=>geometry.type==='Point'?'punto':geometry.type==='Polygon'?'polígono':'ruta').join(', ')}</li>)}</ul>
       <label className="block text-xs text-slate-300">Nombre de capa<input aria-label="Nombre de capa" value={name} maxLength={160} className={`mt-1 ${input}`} onChange={event=>setName(event.target.value)} /></label>
       <div className="flex gap-2"><button className={button} disabled={busy || !name.trim() || readOnly || !preview.features.length} onClick={async()=> {
-        setBusy(true); setMessage(''); try { if(!auth.currentUser)throw new Error('Inicie sesión antes de importar.'); const chunks=layerChunks(preview,tenantId,name,auth.currentUser.uid); const batch=writeBatch(db);
-          chunks.forEach(chunk=>batch.set(doc(db,'capas_geograficas',chunk.id),chunk)); const audit=doc(collection(db,'auditoria')); batch.set(audit,{id:audit.id,tenantId,actorId:auth.currentUser.uid,entity:'capas_geograficas',entityId:chunks[0].importId,action:'import',createdAt:new Date().toISOString()});
-          await batch.commit(); setPreview(null); onViewLayer(chunks); setMessage('Capa importada y guardada.');
+        setBusy(true); setMessage(''); try { if(!auth.currentUser)throw new Error('Inicie sesión antes de importar.'); const chunks=layerChunks(preview,tenantId,name,auth.currentUser.uid);
+          const audit=doc(collection(db,'auditoria')); await persistFirestoreBatch(tenantId,[...chunks.map(chunk=>({collection:'capas_geograficas',id:chunk.id,type:'set' as const,data:chunk})),{collection:'auditoria',id:audit.id,type:'set',data:{id:audit.id,tenantId,actorId:auth.currentUser.uid,entity:'capas_geograficas',entityId:chunks[0].importId,action:'import',createdAt:new Date().toISOString()}}]);
+          setPreview(null); onViewLayer(chunks); setMessage('Importación registrada. Consulte el estado de sincronización para confirmar su envío.');
         } catch(error) { setMessage((error as Error).message); } finally { setBusy(false); }
       }}>Importar y guardar</button><button className={button} disabled={busy} onClick={()=>setPreview(null)}>Cancelar importación</button></div>
     </div>}

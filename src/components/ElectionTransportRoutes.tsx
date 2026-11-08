@@ -1,6 +1,6 @@
 import React,{useEffect,useState} from 'react';
 import {collection,deleteDoc,doc,onSnapshot,query,setDoc,where} from 'firebase/firestore';
-import {auth,db} from '../lib/firebase';
+import {auth,db,persistFirestoreBatch} from '../lib/firebase';
 import {isTrackingAdministrator} from '../lib/trackingPermissions';
 import {electionTransportRoute,type ElectionTransportRoute} from '../lib/electionTransport';
 import {googleDirectionsUrl} from '../lib/territorialMaps';
@@ -25,7 +25,7 @@ export function ElectionTransportRoutes({tenant,user,vehicles}:{tenant:Tenant;us
       <form className="mt-3 space-y-3" onSubmit={event=>{event.preventDefault();void perform(async()=>{
         const vehicle=available.find(item=>item.id===selected);if(!vehicle||!user||auth.currentUser?.uid!==user.uid)throw new Error('Seleccione un vehículo con ruta y mantenga su sesión activa.');
         const record=electionTransportRoute(vehicle,user,`${tenant.tenantId}--election-${crypto.randomUUID()}`,date,time,notes);
-        await setDoc(doc(db,'rutas_transporte_electoral',record.id),record);setSelected('');setTime('');setNotes('');
+        await persistFirestoreBatch(tenant.tenantId,[{collection:'rutas_transporte_electoral',id:record.id,type:'set',data:record}]);setSelected('');setTime('');setNotes('');
       });}}><div className="grid gap-3 sm:grid-cols-3"><label className="text-xs">Vehículo y ruta<select required className={input} value={selected} onChange={event=>setSelected(event.target.value)}><option value="">Seleccione una ruta guardada</option>{available.map(vehicle=><option key={vehicle.id} value={vehicle.id}>{vehicle.licensePlate} · {vehicle.plannedRoute!.name}</option>)}</select></label>
         <label className="text-xs">Fecha de elecciones<input required type="date" className={input} value={date} onChange={event=>setDate(event.target.value)}/></label><label className="text-xs">Hora de salida<input required type="time" className={input} value={time} onChange={event=>setTime(event.target.value)}/></label></div>
         <label className="block text-xs">Indicaciones para los pasajeros<textarea maxLength={1000} className={input} value={notes} onChange={event=>setNotes(event.target.value)}/></label>
@@ -39,7 +39,7 @@ export function ElectionTransportRoutes({tenant,user,vehicles}:{tenant:Tenant;us
       <ol className="list-decimal space-y-1 pl-5 text-sm">{item.route.stops.map((stop,index)=><li key={index}>{stop.name}</li>)}</ol>{item.notes&&<p className="whitespace-pre-wrap text-sm">{item.notes}</p>}
       <details><summary className="cursor-pointer text-sm text-cyan-300">Ver trazado y paradas</summary><div className="mt-3"><SatelliteRadarCanvas center={item.route.geometry[0]} route={item.route.geometry} points={item.route.stops.map((stop,index)=>({...stop,id:`${item.id}-${index}`,recordId:item.id,type:'import',subtitle:`Parada ${index+1}`,municipality:'',status:'Transporte electoral'}))}/></div></details>
       {item.route.stops.length<=5&&<a className="inline-block py-2 text-sm text-cyan-300 underline" href={googleDirectionsUrl(item.route.stops)} target="_blank" rel="noreferrer">Abrir ruta en Google Maps ↗</a>}
-      {admin&&<button className={`${button} block`} disabled={busy} onClick={()=>void perform(()=>deleteDoc(doc(db,'rutas_transporte_electoral',item.id)))}>Retirar publicación</button>}
+      {admin&&<button className={`${button} block`} disabled={busy} onClick={()=>void perform(()=>persistFirestoreBatch(tenant.tenantId,[{collection:'rutas_transporte_electoral',id:item.id,type:'delete'}]))}>Retirar publicación</button>}
     </article>)}</div>
   </section>;
 }

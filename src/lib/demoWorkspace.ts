@@ -9,6 +9,7 @@ import { canonicalStoredValue, omitUndefined } from './serialization';
 import { EDIT_FIELDS, validateEditablePatch } from './recordEditing';
 import { validateEvent, validateRequest } from './operations';
 import {mergeRegistration,registrationId,type RegistrationChannel} from './eventRegistration';
+import {requireOnlineMutation} from './offlineMutations';
 
 export const DEMO_COLLECTIONS = {
   candidatos:['candidates','Aspirantes'], lideres:['leaders','Líderes'], votantes_rasos:['voters','Personas registradas'],
@@ -79,6 +80,7 @@ export function patchDemoBundle(raw:DemoBundle,collection:string,id:string,patch
   assertBounded(bundle);return prepareDemoPresentation(bundle);
 }
 export async function mutateDemoWorkspace(tenantId:string,change:(bundle:DemoBundle)=>DemoBundle|Promise<DemoBundle>) {
+  requireOnlineMutation('Conéctese para modificar el entorno de demostración. Use datos reales para capturar registros sin conexión.');
   const uid=auth.currentUser?.uid;if(!uid)throw new Error('Inicie sesión para guardar.');
   const reference=doc(db,'demo',personalDemoId(tenantId,uid));
   const stored=await runTransaction(db,async tx=>{const ref=reference;const raw=(await tx.get(ref)).data() as DemoBundle|undefined;
@@ -144,6 +146,7 @@ export function realRecordFromDemo(collection:string,source:any,patch:Record<str
 }
 /** Creates one reviewed record and marks its template in the same atomic transaction. */
 export async function promoteDemoRecord(tenantId:string,collection:string,sourceId:string,patch:Record<string,unknown>,original:Record<string,unknown>,consent:boolean) {
+  requireOnlineMutation('Conéctese para convertir una ficha de demostración en un registro real. Se conserva la edición.');
   const uid=auth.currentUser?.uid;if(!uid)throw new Error('Inicie sesión para guardar.');
   const id=`${tenantId}--${crypto.randomUUID()}`,auditId=crypto.randomUUID(),now=new Date().toISOString();
   const saved=await runTransaction(db,async tx=>{const ref=doc(db,'demo',personalDemoId(tenantId,uid));const raw=(await tx.get(ref)).data() as DemoBundle|undefined;

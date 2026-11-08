@@ -20,6 +20,7 @@ export function offlineAppPlugin():Plugin{
     this.emitFile({type:'asset',fileName:'service-worker.js',source:`const CACHE=${JSON.stringify(`astrea-app-${version}`)};const FILES=${JSON.stringify([...new Set(files)])};
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES))));
 self.addEventListener('activate',event=>event.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('astrea-app-')&&key!==CACHE).map(key=>caches.delete(key)))),self.clients.claim()])));
+self.addEventListener('message',event=>{if(event.data?.type!=='ASTREA_OFFLINE_STATUS'||!event.ports?.[0])return;event.waitUntil(caches.open(CACHE).then(async cache=>{const results=await Promise.all(FILES.map(file=>cache.match(file)));event.ports[0].postMessage({ready:results.every(Boolean),files:results.filter(Boolean).length,total:FILES.length});}));});
 self.addEventListener('fetch',event=>{const request=event.request;const url=new URL(request.url);if(request.method!=='GET'||url.origin!==self.location.origin||url.pathname==='/api'||url.pathname.startsWith('/api/')||request.headers.has('authorization'))return;
 if(request.mode==='navigate'){event.respondWith(fetch(request).catch(()=>caches.open(CACHE).then(cache=>cache.match('/index.html'))));return;}
 if(FILES.includes(url.pathname)){event.respondWith(caches.open(CACHE).then(cache=>cache.match(request)).then(cached=>cached||fetch(request)));}});`});

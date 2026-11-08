@@ -13,8 +13,8 @@ test('Tracking is exclusive to verified administrators, regardless of political 
   assert.equal(isTrackingAdministrator({...profile('AdminTenant'),accessVersion:1}),false);
   assert.equal(isTrackingAdministrator(null),false);
 });
-test('A common member sees Transport but no tracking or device-settings entry in any navigation menu',()=>{
+test('Members can prepare their own device offline while tracking administration remains restricted',()=>{
   const html=(role:UserRole)=>renderToStaticMarkup(React.createElement(Sidebar,{activeTab:'dashboard',onTabChange:()=>{},driveFileCount:0,candidateCount:0,currentUser:profile(role)}));
-  for(const role of ['Alcalde','Gobernador','Operador','Consulta','Invitado'] as const){const markup=html(role);assert.equal(markup.includes('Recorridos y seguimiento'),false,role);assert.equal(markup.includes('Mi dispositivo'),false,role);assert.ok(markup.includes('Transporte'),role);}
+  for(const role of ['Alcalde','Gobernador','Operador','Consulta','Invitado'] as const){const markup=html(role);assert.equal(markup.includes('Recorridos y seguimiento'),false,role);assert.ok(markup.includes('Mi dispositivo'),role);assert.ok(markup.includes('Transporte'),role);}
   assert.ok(html('AdminTenant').includes('Recorridos y seguimiento'));
 });

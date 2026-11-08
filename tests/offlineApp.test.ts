@@ -79,3 +79,14 @@ test('activating a release removes old application caches while preserving unrel
   await completion;
   assert.deepEqual(removed, ['astrea-app-old']);
 });
+
+test('offline preparation is confirmed using every asset of the active worker release',async()=>{
+  const {handlers}=runtime(worker());
+  let completion:Promise<unknown>|undefined;let response:any;
+  handlers.message({data:{type:'ASTREA_OFFLINE_STATUS'},ports:[{postMessage(value:unknown){response=value;}}],waitUntil(value:Promise<unknown>){completion=value;}});
+  await completion;
+  assert.equal(response.ready,true);assert.ok(response.total>2);assert.equal(response.files,response.total);
+  let called=false;
+  handlers.message({data:{type:'UNKNOWN'},ports:[{postMessage(){called=true;}}],waitUntil(){called=true;}});
+  assert.equal(called,false);
+});

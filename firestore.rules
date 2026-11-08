@@ -86,6 +86,20 @@ service cloud.firestore {
       return request.resource.data.tenantId == resource.data.tenantId;
     }
 
+    // Transactions must check that a new scoped ID is absent before creating it.
+    // This grants no list access or access to existing documents.
+    match /{collectionName}/{recordId} {
+      allow get: if collectionName in ['candidatos', 'distritos', 'lideres', 'votantes_rasos',
+          'gastos', 'aportes', 'vehiculos', 'propuestas', 'archivos_drive',
+          'comites_coordinaciones', 'jornadas_operativas', 'solicitudes_recursos',
+          'viajes_operativos', 'reportes_jornada', 'registros_jornada', 'capas_geograficas', 'bases_datos',
+          'rutas_transporte_electoral', 'recorridos', 'eventos_workspace', 'simulaciones',
+          'analisis_ia', 'fuentes_estadisticas', 'equipo_campana']
+        && profileExists() && canOperateTenant(me().tenantId)
+        && recordId.split('--')[0] == me().tenantId
+        && !exists(/databases/$(database)/documents/$(collectionName)/$(recordId));
+    }
+
     match /usuarios/{userId} {
       allow create: if request.resource.data.uid == userId
         && request.resource.data.email is string
@@ -111,6 +125,23 @@ service cloud.firestore {
           && !(resource.data.role == 'AdminGlobal')
           && roleRank(resource.data.role) <= roleRank(me().role));
       allow delete: if platformAdmin();
+    }
+
+    // Atomic receipts prevent the same queued command from being applied twice.
+    // They contain synchronization metadata only, never the queued form payload.
+    match /usuarios/{userId}/mutaciones_offline/{mutationId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn() && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['id', 'tenantId', 'actorId', 'createdAt', 'kind'])
+        && request.resource.data.id == mutationId
+        && request.resource.data.actorId == userId
+        && request.resource.data.tenantId is string
+        && request.resource.data.createdAt is string
+        && request.resource.data.kind is string
+        && request.resource.data.kind.size() > 0
+        && request.resource.data.kind.size() <= 100
+        && canOperateTenant(request.resource.data.tenantId);
+      allow update, delete: if false;
     }
 
     match /sesiones_usuarios/{sessionId} {

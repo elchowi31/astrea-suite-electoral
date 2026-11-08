@@ -61,7 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, driveF
       { id: 'leaders', label: 'Líderes y metas', icon: Target, badge: leaderCount, minLevel: 10 },
       { id: 'map', label: 'Mapa territorial', icon: Map, minLevel: 10 },
       { id: 'routes', label: 'Recorridos y seguimiento', icon: MapPin, trackingAdminOnly: true },
-      { id: 'device', label: 'Mi dispositivo', icon: ShieldCheck, trackingAdminOnly: true },
+      { id: 'device', label: 'Mi dispositivo', icon: ShieldCheck },
       { id: 'transport', label: 'Transporte', icon: Truck, badge: vehicleCount, minLevel: 10 },
       { id: 'rewards', label: 'Recompensas', icon: Target, minLevel: 10 },
       { id: 'data_imports', label: 'Bases de datos', icon: FileSpreadsheet, minLevel: 10 },

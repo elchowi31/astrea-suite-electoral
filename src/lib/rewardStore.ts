@@ -1,7 +1,9 @@
 import {collection,doc,runTransaction} from 'firebase/firestore';
 import {auth,db} from './firebase';
 import {calculateRewards,type RewardPlan,type RewardApproval} from './rewards';
+import {requireOnlineMutation} from './offlineMutations';
 export async function saveRewardPlan(plan:RewardPlan,approvedHours?:Record<string,number[]>):Promise<{plan:RewardPlan;approval?:RewardApproval}>{
+  requireOnlineMutation('Conéctese para guardar o aprobar el plan de recompensas. Se conserva el formulario para volver a intentarlo.');
   const actor=auth.currentUser;if(!actor)throw new Error('Inicie sesión antes de guardar.');
   calculateRewards(plan,approvedHours);if(!plan.name.trim())throw new Error('Escriba un nombre para el plan.');
   const ref=doc(db,'planes_recompensas',plan.id),now=new Date().toISOString();

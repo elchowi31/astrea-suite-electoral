@@ -2,6 +2,7 @@ import {collection,doc,onSnapshot,query,runTransaction,setDoc,where,type Firesto
 import {verifySavedRecord} from './saveVerification';
 import {tripDays,validatePassengerEvent,vehicleKey,type PassengerEvent} from './passengerLogistics';
 import type {UserProfile} from '../types';
+import {requireOnlineMutation} from './offlineMutations';
 
 export const PASSENGER_EVENT_COLLECTION='eventos_workspace';
 export const canManagePassengers=(user:UserProfile|null)=>!!user&&user.active!==false&&['AdminGlobal','AdminTenant'].includes(user.role);
@@ -15,6 +16,7 @@ export function listenPassengerEvents(db:Firestore,tenantId:string,onData:(event
   },onError);
 }
 export async function createPassengerEvent(db:Firestore,user:UserProfile,event:PassengerEvent){
+  requireOnlineMutation('Conéctese para crear el evento de pasajeros. Se conserva el formulario.');
   authorize(user,event.tenantId);validatePassengerEvent(event);
   if(event.createdBy!==user.uid||event.revision!==1||event.passengers.length||event.trips.length)throw new Error('Cree primero el evento vacío.');
   const ref=doc(db,PASSENGER_EVENT_COLLECTION,event.id);
@@ -22,6 +24,7 @@ export async function createPassengerEvent(db:Firestore,user:UserProfile,event:P
 }
 /** Event and fleet calendars commit together; a concurrent edit cannot overbook. */
 export async function updatePassengerEvent(db:Firestore,user:UserProfile,eventId:string,tenantId:string,revision:number,action:string,update:(event:PassengerEvent)=>PassengerEvent){
+  requireOnlineMutation('Conéctese para confirmar reservas y cupos de pasajeros. Se conserva el formulario.');
   authorize(user,tenantId);const ref=doc(db,PASSENGER_EVENT_COLLECTION,eventId);
   await runTransaction(db,async tx=>{
     const snapshot=await tx.get(ref),before=snapshot.data() as PassengerEvent|undefined;

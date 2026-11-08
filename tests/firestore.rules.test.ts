@@ -24,6 +24,34 @@ after(async()=>{if (env) await env.cleanup();});
 const check=(name:string,fn:()=>Promise<void>)=>test(name,{skip:!enabled},fn);
 const dbFor=(uid:string)=>env.authenticatedContext(uid,{email:`${uid}@test.invalid`}).firestore();
 
+check('Offline receipts are immutable, scoped to the actor and cannot carry form data',async()=>{
+  const db=dbFor('operator');
+  const ref=doc(db,'usuarios/operator/mutaciones_offline/receipt-one');
+  const receipt={id:'receipt-one',actorId:'operator',tenantId:'team-a',createdAt:new Date().toISOString(),kind:'entity'};
+  await assertSucceeds(getDoc(ref));
+  await assertSucceeds(setDoc(ref,receipt));
+  await assertSucceeds(getDoc(ref));
+  await assertFails(getDoc(doc(dbFor('other'),ref.path)));
+  await assertFails(getDoc(doc(dbFor('admin'),ref.path)));
+  await assertFails(updateDoc(ref,{kind:'changed'}));
+  await assertFails(deleteDoc(ref));
+  await assertFails(setDoc(doc(db,'usuarios/operator/mutaciones_offline/foreign'),{...receipt,id:'foreign',tenantId:'team-b'}));
+  await assertFails(setDoc(doc(db,'usuarios/admin/mutaciones_offline/impersonated'),{...receipt,id:'impersonated',actorId:'admin'}));
+  await assertFails(setDoc(doc(db,'usuarios/operator/mutaciones_offline/payload'),{...receipt,id:'payload',payload:{private:'data'}}));
+  await assertFails(setDoc(doc(dbFor('inactive'),'usuarios/inactive/mutaciones_offline/inactive'),{...receipt,id:'inactive',actorId:'inactive'}));
+});
+
+check('A transaction can check a new scoped ID without exposing existing or foreign records',async()=>{
+  const own=dbFor('operator');
+  await assertSucceeds(getDoc(doc(own,'lideres','team-a--new-record')));
+  await assertFails(getDoc(doc(own,'lideres','team-b--new-record')));
+  await assertFails(getDoc(doc(own,'lideres','team-a-other--new-record')));
+  await assertFails(getDoc(doc(own,'not-an-allowed-collection','team-a--new-record')));
+  await assertFails(getDoc(doc(dbFor('inactive'),'lideres','team-a--new-record')));
+  await env.withSecurityRulesDisabled(async ctx=>setDoc(doc(ctx.firestore(),'votantes_rasos','team-a--private-record'),{tenantId:'team-a',createdBy:'admin',leaderId:'unassigned'}));
+  await assertFails(getDoc(doc(own,'votantes_rasos','team-a--private-record')));
+});
+
 check('Reward plans persist with revision control and only administrators certify work',async()=>{
   const id='team-a--rewards-check',operator=dbFor('operator'),admin=dbFor('admin');
   const plan={id,tenantId:'team-a',ownerId:'operator',name:'Work hours',revision:1,updatedAt:'2026-11-06',targetHours:7000,farmCount:1,teamCount:1,farms:[{id:'farm-1',name:'Farm',fruit:'Fruit',production:8,manualHours:[null]}]};

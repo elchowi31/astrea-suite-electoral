@@ -1,7 +1,6 @@
 import React,{useState} from 'react';
 import {createPortal} from 'react-dom';
-import {doc,runTransaction} from 'firebase/firestore';
-import {auth,db} from '../lib/firebase';
+import {saveGeographicFeature} from '../lib/mapPersistence';
 import {canonicalStoredValue} from '../lib/serialization';
 import {validateGeographicFeatures,type GeographicLayer,type GeoFeature} from '../lib/geographicImport';
 const input='min-h-11 w-full min-w-0 rounded-lg border border-slate-600 bg-slate-950 p-2.5 text-sm text-white';
@@ -20,17 +19,7 @@ export function GeographicFeatureEditor({layer,feature,readOnly=false,inline=fal
     event.preventDefault();setBusy(true);setError('');
     try{
       if(!draft.name.trim())throw new Error('Complete el nombre.');
-      validateGeographicFeatures([draft]);const actor=auth.currentUser;if(!actor)throw new Error('Inicie sesión para guardar.');const auditId=crypto.randomUUID();
-      await runTransaction(db,async transaction=>{
-        const reference=doc(db,'capas_geograficas',layer.id),current=(await transaction.get(reference)).data() as GeographicLayer|undefined;
-        if(!current||current.tenantId!==layer.tenantId)throw new Error('No se encontró la capa.');
-        const existing=current.features.find(item=>item.id===feature.id);
-        if(canonicalStoredValue(existing)!==original)throw new Error('Otra persona modificó este elemento. Cancele y vuelva a abrir la edición.');
-        const features=current.features.map(item=>item.id===feature.id?{...draft,name:draft.name.trim()}:item);
-        if(new TextEncoder().encode(JSON.stringify(features)).length>600000)throw new Error('La capa supera el límite de tamaño. Divida sus elementos.');
-        transaction.update(reference,{features,updatedBy:actor.uid,updatedAt:new Date().toISOString()});
-        transaction.set(doc(db,'auditoria',auditId),{id:auditId,tenantId:layer.tenantId,actorId:actor.uid,entity:'capas_geograficas',entityId:layer.id,action:'edit',createdAt:new Date().toISOString()});
-      });close();setSaved(true);
+      validateGeographicFeatures([draft]);await saveGeographicFeature(layer,draft,original);close();setSaved(true);
     }catch(error){setError((error as Error).message);}finally{setBusy(false);}
   }}>
     <h3 className="font-bold text-white">Editar ficha</h3><fieldset disabled={busy} className="min-w-0 space-y-4">
@@ -46,5 +35,5 @@ export function GeographicFeatureEditor({layer,feature,readOnly=false,inline=fal
     </fieldset>
     {error&&<p role="alert" className="text-amber-300">{error}</p>}<div className="sticky bottom-0 flex gap-2 bg-slate-900 py-2"><button className={button} disabled={busy}>{busy?'Guardando…':'Guardar cambios'}</button><button className={button} type="button" disabled={busy} onClick={close}>Cancelar</button></div>
   </form>;
-  return <>{!draft&&<button className={button} disabled={readOnly} onClick={()=>{setDraft(structuredClone(feature));setOriginal(canonicalStoredValue(feature));setPart(0);setRing(0);setPage(0);setError('');setSaved(false);onEditingChange?.(true);}}>{inline?'Editar datos':`Editar: ${feature.name}`}</button>}{saved&&<p role="status" className="mt-2 text-sm text-emerald-300">Datos guardados.</p>}{draft&&(inline?form:createPortal(<div className="fixed inset-0 z-[5000] flex items-center justify-center bg-slate-950/90 p-3">{form}</div>,document.body))}</>;
+  return <>{!draft&&<button className={button} disabled={readOnly} onClick={()=>{setDraft(structuredClone(feature));setOriginal(canonicalStoredValue(feature));setPart(0);setRing(0);setPage(0);setError('');setSaved(false);onEditingChange?.(true);}}>{inline?'Editar datos':`Editar: ${feature.name}`}</button>}{saved&&<p role="status" className="mt-2 text-sm text-emerald-300">Cambios recibidos. Consulte el estado de sincronización.</p>}{draft&&(inline?form:createPortal(<div className="fixed inset-0 z-[5000] flex items-center justify-center bg-slate-950/90 p-3">{form}</div>,document.body))}</>;
 }

@@ -12,7 +12,7 @@ const RewardsView = lazy(()=>import('./components/RewardsView').then(m=>({defaul
 const SorteappRewardDrawsView = lazy(()=>import('./components/SorteappRewardDrawsView').then(m=>({default:m.SorteappRewardDrawsView})));
 const DataImportsView = lazy(()=>import('./components/DataImportsView').then(m=>({default:m.DataImportsView})));
 const ResourcesView = lazy(()=>import('./components/operations/ResourcesView').then(m=>({default:m.ResourcesView})));
-import { DevicePersistencePanel } from './components/DevicePersistence';
+import { DevicePersistencePanel, OfflineSyncStatus } from './components/DevicePersistence';
 import { RouteTrackingProvider,TrackingStatusBanner } from './components/RouteTrackingProvider';
 import {isTrackingAdministrator} from './lib/trackingPermissions';
 import {keepViewedTenant, type ViewerScope} from './lib/tenantSelection';
@@ -155,6 +155,7 @@ export default function App() {
     setTimeout(() => setFirestoreSyncNotice(null), 4000);
   };
   useEffect(()=>{const verified=(event:Event)=>{const receipt=(event as CustomEvent).detail;notifyFirestoreSave(`Guardado y verificado en Firestore · ${receipt.demo?'datos de prueba':'datos reales'} · ${new Date(receipt.verifiedAt).toLocaleTimeString('es-CO')}`);};window.addEventListener('astrea:save-verified',verified);return()=>window.removeEventListener('astrea:save-verified',verified);},[]);
+  useEffect(()=>{const queued=()=>notifyFirestoreSave('Guardado en este dispositivo · pendiente de sincronizar con Firestore.');window.addEventListener('astrea:mutation-queued',queued);return()=>window.removeEventListener('astrea:mutation-queued',queued);},[]);
 
 
   useEffect(() => {
@@ -322,11 +323,10 @@ export default function App() {
   };
 
   const handleAddCandidate = async (newCandidate: Candidate) => {
-    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'candidatos',newCandidate);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'candidatos',newCandidate);return;}
     requireRealWorkspace();
     try {
       await saveCandidateToFirestore(newCandidate);
-      notifyFirestoreSave(`Candidato "${newCandidate.fullName}" guardado exitosamente en Firestore.`);
     } catch (e) {
       console.error('Error saving candidate to Firestore:', e);
       throw e;
@@ -334,11 +334,10 @@ export default function App() {
   };
 
   const handleAddProposal = async (newProposal: Proposal) => {
-    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'propuestas',newProposal);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'propuestas',newProposal);return;}
     requireRealWorkspace();
     try {
       await saveProposalToFirestore(newProposal);
-      notifyFirestoreSave(`Proyecto "${newProposal.title}" registrado en Firestore.`);
     } catch (e) {
       console.error('Error saving proposal to Firestore:', e);
       throw e;
@@ -346,11 +345,10 @@ export default function App() {
   };
 
   const handleAddExpense = async (newExpense: CampaignExpense) => {
-    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'gastos',newExpense);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'gastos',newExpense);return;}
     requireRealWorkspace();
     try {
       await saveExpenseToFirestore(newExpense);
-      notifyFirestoreSave(`Gasto de $${newExpense.amount.toLocaleString('es-CO')} COP registrado en Firestore.`);
     } catch (e) {
       console.error('Error saving expense to Firestore:', e);
       throw e;
@@ -358,7 +356,7 @@ export default function App() {
   };
 
   const handleUpdateExpense = async (updatedExpense: CampaignExpense) => {
-    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'gastos',updatedExpense);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'gastos',updatedExpense);return;}
     requireRealWorkspace();
     if (updatedExpense.id.startsWith('demo-')) {
       setDemoError('Los registros demo son de solo lectura. Elimine y vuelva a crear la colección para restaurarlos.');
@@ -367,7 +365,6 @@ export default function App() {
     try {
       await saveExpenseToFirestore(updatedExpense);
       setExpenses((prev) => prev.map((e) => e.id === updatedExpense.id ? updatedExpense : e));
-      notifyFirestoreSave(`Gasto "${updatedExpense.description}" actualizado en Firestore.`);
     } catch (e) {
       console.error('Error updating expense in Firestore:', e);
       throw e;
@@ -384,7 +381,6 @@ export default function App() {
     try {
       await deleteExpenseFromFirestore(expenseId);
       setExpenses((prev) => prev.filter((e) => e.id !== expenseId));
-      notifyFirestoreSave(`Gasto eliminado de Firestore.`);
     } catch (e) {
       console.error('Error deleting expense in Firestore:', e);
       throw e;
@@ -392,11 +388,10 @@ export default function App() {
   };
 
   const handleAddDonorContribution = async (newContribution: DonorContribution) => {
-    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'aportes',newContribution);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'aportes',newContribution);return;}
     requireRealWorkspace();
     try {
       await saveDonorContributionToFirestore(newContribution);
-      notifyFirestoreSave(`Aporte de "${newContribution.donorName}" por $${newContribution.amount.toLocaleString('es-CO')} COP registrado en Firestore.`);
     } catch (e) {
       console.error('Error saving donor contribution to Firestore:', e);
       throw e;
@@ -404,11 +399,10 @@ export default function App() {
   };
 
   const handleAddLeader = async (newLeader: Leader) => {
-    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'lideres',newLeader);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'lideres',newLeader);return;}
     requireRealWorkspace();
     try {
       await saveLeaderToFirestore(newLeader);
-      notifyFirestoreSave(`Líder veredal "${newLeader.fullName}" guardado en Firestore.`);
     } catch (e) {
       console.error('Error saving leader to Firestore:', e);
       throw e;
@@ -416,11 +410,10 @@ export default function App() {
   };
 
   const handleAddVehicle = async (newVehicle: TransportVehicle) => {
-    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'vehiculos',newVehicle);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'vehiculos',newVehicle);return;}
     requireRealWorkspace();
     try {
       await saveVehicleToFirestore(newVehicle);
-      notifyFirestoreSave(`Vehículo placa "${newVehicle.licensePlate}" registrado en Firestore.`);
     } catch (e) {
       console.error('Error saving vehicle to Firestore:', e);
       throw e;
@@ -428,11 +421,10 @@ export default function App() {
   };
 
   const handleAddGrassrootsVoter = async (newVoter: GrassrootsVoter) => {
-    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'votantes_rasos',newVoter);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'votantes_rasos',newVoter);return;}
     requireRealWorkspace();
     try {
       await saveGrassrootsVoterToFirestore(newVoter);
-      notifyFirestoreSave(`Votante ${newVoter.fullName} registrado(a) y consolidado en la jerarquía electoral.`);
     } catch (e) {
       console.error('Error saving grassroots voter to Firestore:', e);
       throw e;
@@ -440,7 +432,7 @@ export default function App() {
   };
 
   const handleUpdateCoordination = async (updatedCoordination: CampaignCoordination) => {
-    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'comites_coordinaciones',updatedCoordination);notifyFirestoreSave('Cambios guardados en su entorno de prueba.');return;}
+    if(demoActive){await saveDemoEntity(currentTenant.tenantId,'comites_coordinaciones',updatedCoordination);return;}
     requireRealWorkspace();
     if (updatedCoordination.id.startsWith('demo-')) {
       setDemoError('La estructura demo es de solo lectura y permanece aislada de la operación real.');
@@ -449,7 +441,6 @@ export default function App() {
     try {
       await saveCoordinationToFirestore(updatedCoordination);
       setCoordinations((prev) => prev.map((c) => c.id === updatedCoordination.id ? updatedCoordination : c));
-      notifyFirestoreSave(`Comité "${updatedCoordination.title}" actualizado.`);
     } catch (e) {
       console.error('Error updating coordination in Firestore:', e);
       throw e;
@@ -619,6 +610,7 @@ export default function App() {
       />
 
       <TrackingStatusBanner/>
+      <OfflineSyncStatus userId={currentUser.uid} tenantId={selectedTenantId || currentUser.tenantId}/>
       {/* Main Body Layout */}
       <div className="min-w-0 flex-1 flex flex-col md:flex-row">
 
@@ -645,7 +637,7 @@ export default function App() {
           {activeTab === 'rewards' && <RewardsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId}/>}
           {currentUser && activeTab === 'reward_draws' && <SorteappRewardDrawsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId}/>}
           {activeTab === 'data_imports' && <DataImportsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId} onMap={()=>{setDemoEnabled(false);setActiveTab('map');}}/>}
-          {activeTab === 'device' && isTrackingAdministrator(currentUser) && <><DevicePersistencePanel /><div className="flex flex-wrap gap-3"><EditRecordButton collection="usuarios" record={currentUser} label="Editar mi perfil" />{['AdminTenant','AdminGlobal'].includes(currentUser.role)&&<EditRecordButton collection="organizaciones" record={currentTenant} label="Editar organización" />}</div></>}
+          {activeTab === 'device' && <><DevicePersistencePanel /><div className="flex flex-wrap gap-3"><EditRecordButton collection="usuarios" record={currentUser} label="Editar mi perfil" />{['AdminTenant','AdminGlobal'].includes(currentUser.role)&&<EditRecordButton collection="organizaciones" record={currentTenant} label="Editar organización" />}</div></>}
 
           {/* Personalized User Recognition & Salutation Banner */}
           {currentUser && activeTab !== 'login' && activeTab !== 'routes' && activeTab !== 'dashboard' && (

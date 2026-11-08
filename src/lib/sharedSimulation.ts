@@ -1,5 +1,6 @@
 import { collection, doc, getDocs, onSnapshot, query, where, writeBatch } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth, db, persistFirestoreBatch, type FirestoreBatchWrite } from './firebase';
+import { requireOnlineMutation } from './offlineMutations';
 import { validateSnapshot, type SavedScenario } from './simulationScenarios';
 import { validateRows, type StatisticalRow } from './statisticalData';
 import { omitUndefined } from './serialization';
@@ -31,16 +32,17 @@ export async function appendSharedRows(tenantId:string,rows:StatisticalRow[]):Pr
   if (!auth.currentUser) throw new Error('Inicie sesión para compartir estadísticas.');
   const groups=new Map<string,StatisticalRow[]>();
   for (const row of validateRows(rows)) { const key=sourceKey(row); const group=groups.get(key); if (group) group.push(row); else groups.set(key,[row]); }
-  const batch=writeBatch(db);let count=0;const now=new Date().toISOString();
+  const writes:FirestoreBatchWrite[]=[];const now=new Date().toISOString();
   for (const data of groups.values()) {
     const parts=splitStatisticalRows(data);const uploadId=crypto.randomUUID();
-    parts.forEach((rows,index)=>{count++;batch.set(doc(db,'fuentes_estadisticas',`${tenantId}--${uploadId}--${index}`),{tenantId,datasetId:'importadas',index,total:parts.length,rows,updatedAt:now,updatedBy:auth.currentUser!.uid});});
+    parts.forEach((rows,index)=>{writes.push({collection:'fuentes_estadisticas',id:`${tenantId}--${uploadId}--${index}`,type:'set',data:{tenantId,datasetId:'importadas',index,total:parts.length,rows,updatedAt:now,updatedBy:auth.currentUser!.uid}});});
   }
-  if (count>450) throw new Error('El archivo contiene demasiadas fuentes. Importe menos fuentes por archivo.');
-  const id=crypto.randomUUID();batch.set(doc(db,'auditoria',id),{id,tenantId,actorId:auth.currentUser.uid,action:'create',entity:'fuentes_estadisticas',entityId:'importadas',createdAt:now});
-  await batch.commit();
+  if (writes.length>449) throw new Error('El archivo contiene demasiadas fuentes. Importe menos fuentes por archivo.');
+  const id=crypto.randomUUID();writes.push({collection:'auditoria',id,type:'set',data:{id,tenantId,actorId:auth.currentUser.uid,action:'create',entity:'fuentes_estadisticas',entityId:'importadas',createdAt:now}});
+  await persistFirestoreBatch(tenantId,writes);
 }
 export async function removeSharedSource(tenantId:string,key:string):Promise<void> {
+  requireOnlineMutation('Conéctese para retirar todos los fragmentos de una fuente compartida.');
   if (!auth.currentUser) throw new Error('Inicie sesión para retirar una fuente.');
   const data=await getDocs(query(collection(db,'fuentes_estadisticas'),where('tenantId','==',tenantId)));
   const batch=writeBatch(db);let count=0;
@@ -59,12 +61,12 @@ export async function saveSharedScenario(tenantId: string, scenario: SavedScenar
   if (!auth.currentUser) throw new Error('Inicie sesión para compartir escenarios.');
   const sourceDatasetId=`escenario-${scenario.id}`;
   const chunks=splitStatisticalRows(scenario.snapshot.imported);
-  const batch=writeBatch(db);
-  chunks.forEach((rows,index)=>batch.set(doc(db,'fuentes_estadisticas',`${tenantId}--${sourceDatasetId}--${index}`),{tenantId,datasetId:sourceDatasetId,index,total:chunks.length,rows}));
-  batch.set(doc(db,'simulaciones',scenario.id),omitUndefined({...scenario,tenantId,sourceDatasetId,snapshot:{...scenario.snapshot,imported:[]},updatedBy:auth.currentUser.uid}));
+  if(!scenario.id.startsWith(`${tenantId}--`)) throw new Error('El escenario necesita un identificador de esta organización.');
+  const writes:FirestoreBatchWrite[]=chunks.map((rows,index)=>({collection:'fuentes_estadisticas',id:`${tenantId}--${sourceDatasetId}--${index}`,type:'set',data:{tenantId,datasetId:sourceDatasetId,index,total:chunks.length,rows}}));
+  writes.push({collection:'simulaciones',id:scenario.id,type:'set',data:omitUndefined({...scenario,tenantId,sourceDatasetId,snapshot:{...scenario.snapshot,imported:[]},updatedBy:auth.currentUser.uid})});
   const auditId=crypto.randomUUID();
-  batch.set(doc(db,'auditoria',auditId),{id:auditId,tenantId,actorId:auth.currentUser.uid,action:'create',entity:'simulaciones',entityId:scenario.id,createdAt:new Date().toISOString()});
-  await batch.commit();
+  writes.push({collection:'auditoria',id:auditId,type:'set',data:{id:auditId,tenantId,actorId:auth.currentUser.uid,action:'create',entity:'simulaciones',entityId:scenario.id,createdAt:new Date().toISOString()}});
+  await persistFirestoreBatch(tenantId,writes);
 }
 export async function loadSharedScenario(tenantId:string,scenario:SavedScenario):Promise<SavedScenario> {
   if (!scenario.sourceDatasetId) return scenario;
@@ -73,6 +75,7 @@ export async function loadSharedScenario(tenantId:string,scenario:SavedScenario)
   return {...scenario,snapshot:validateSnapshot({...scenario.snapshot,imported:rows},tenantId)};
 }
 export async function deleteSharedScenario(tenantId:string,id:string):Promise<void> {
+  requireOnlineMutation('Conéctese para eliminar el escenario y sus fuentes compartidas.');
   const data=await getDocs(query(collection(db,'fuentes_estadisticas'),where('tenantId','==',tenantId),where('datasetId','==',`escenario-${id}`)));
   const batch=writeBatch(db);data.docs.forEach(item=>batch.delete(item.ref));batch.delete(doc(db,'simulaciones',id));
   if (!auth.currentUser) throw new Error('Inicie sesión para eliminar el escenario.');

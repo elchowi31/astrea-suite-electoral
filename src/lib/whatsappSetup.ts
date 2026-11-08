@@ -3,6 +3,7 @@ import type {Leader,UserProfile} from '../types';
 import type {OperationalEvent} from './operations';
 import {PLATFORM_OWNER_EMAIL} from './accessPolicy';
 import {verifySavedRecord} from './saveVerification';
+import {requireOnlineMutation} from './offlineMutations';
 
 export type WhatsappConfig={phone:string;responsibleName:string;leaderId:string;eventId:string;municipality:string};
 const validId=(id:string)=>/^[\w-]{1,120}$/.test(id);
@@ -29,6 +30,7 @@ export async function loadWhatsappConfig(db:Firestore,user:UserProfile,tenantId:
 }
 /** Atomically provisions explicit reception references; never reassigns an unrelated leader. */
 export async function saveWhatsappConfig(db:Firestore,user:UserProfile,tenantId:string,input:WhatsappConfig):Promise<WhatsappConfig>{
+ requireOnlineMutation('Conéctese para configurar la recepción de WhatsApp. El formulario se conserva.');
  if(user.role!=='AdminGlobal'||user.active===false)throw new Error('Se requiere una cuenta de administrador global activa.');
  const phone=input.phone.replace(/[+\s()-]/g,''),responsibleName=input.responsibleName.trim(),municipality=input.municipality.trim();
  if(!/^\d{8,15}$/.test(phone))throw new Error('Indique el número con indicativo, entre 8 y 15 dígitos.');

@@ -1,9 +1,10 @@
 import {verifySavedRecord} from './saveVerification';
 import { deleteField, doc, runTransaction } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import { parseLocation } from './territorialMaps';
+import { parseLocation, validLocation } from './territorialMaps';
 import {canonicalStoredValue} from './serialization';
 import { RESOURCE_CATALOG } from './operations';
+import {durableMutation,registerOfflineMutation} from './offlineMutations';
 
 export type EditField = { key:string; label:string; type?:'text'|'number'|'date'|'datetime-local'|'email'|'url'|'textarea'|'list'|'boolean'; choices?:string[]; reference?:string; required?:boolean; min?:number; max?:number };
 const t=(key:string,label:string,required=false):EditField=>({key,label,required});
@@ -37,6 +38,7 @@ export const EDIT_FIELDS:Record<string,EditField[]>={
   tareas:[t('title','Título de la tarea',true),long('description','Descripción'),t('assignedTo','Responsable'),{key:'dueDate',label:'Fecha límite',type:'date'},s('priority','Prioridad',['Alta','Media','Baja']),{key:'completed',label:'Tarea completada',type:'boolean'}],
 };
 export function validateEditablePatch(collection:string,patch:Record<string,unknown>) {
+  if(collection==='recorridos') { validateRoutePatch(patch); return; }
   const fields=EDIT_FIELDS[collection]||[];
   const allowed=new Set([...fields.map(field=>field.key),'leaderName','candidateName','locationSource','locationCapturedAt']);
   if(Object.keys(patch).some(key=>!allowed.has(key)))throw new Error('La edición contiene un campo protegido.');
@@ -48,6 +50,24 @@ export function validateEditablePatch(collection:string,patch:Record<string,unkn
     if(field.type==='list'&&(!Array.isArray(value)||value.some(item=>typeof item!=='string')))throw new Error(`Revise ${field.label}.`);
     if(field.choices&&!field.choices.includes(String(value)))throw new Error(`Revise ${field.label}.`);
     if(['date','datetime-local'].includes(field.type)&&!Number.isFinite(Date.parse(String(value))))throw new Error(`Revise ${field.label}.`);
+  }
+}
+/** Assignment edits and route closure have different allowed fields. Keep GPS identity immutable. */
+export function validateRoutePatch(patch:Record<string,unknown>) {
+  const closing='status' in patch;
+  const allowed=new Set(closing?['status','finishedAt','finishedAtMillis']:['name','userId','employeeName','vehicleId','vehiclePlate','route','instructions','scheduledDate']);
+  if(Object.keys(patch).some(key=>!allowed.has(key)))throw new Error('La edición del recorrido contiene un campo protegido.');
+  if(closing){
+    if(!['Finalizado','Cancelado'].includes(String(patch.status))||typeof patch.finishedAt!=='string'||!Number.isFinite(Date.parse(patch.finishedAt))||!Number.isSafeInteger(patch.finishedAtMillis)||Date.parse(patch.finishedAt)!==patch.finishedAtMillis)throw new Error('Indique un cierre válido para el recorrido.');
+    return;
+  }
+  for(const key of ['name','userId','employeeName','vehicleId','vehiclePlate','instructions','scheduledDate'])if(key in patch){
+    const value=patch[key];if(typeof value!=='string'||(['name','userId','employeeName'].includes(key)&&!value.trim()))throw new Error('Complete los datos de la asignación.');
+    if((key==='name'&&value.length>160)||(key==='instructions'&&value.length>3000)||(key==='scheduledDate'&&value!==''&&!/^\d{4}-\d{2}-\d{2}$/.test(value)))throw new Error('Revise el nombre, fecha o instrucciones del recorrido.');
+  }
+  if('route' in patch){
+    const route=patch.route as any;
+    if(!route||typeof route.name!=='string'||!Array.isArray(route.geometry)||route.geometry.length<2||route.geometry.length>25000||!route.geometry.every(validLocation)||!Array.isArray(route.stops)||route.stops.length<2||route.stops.length>100||!route.stops.every(validLocation))throw new Error('Seleccione un trazado con al menos dos paradas y coordenadas válidas.');
   }
 }
 export function editableValue(field:EditField,value:unknown):string|boolean { if(field.type==='datetime-local'){const date=new Date(String(value));return Number.isFinite(date.getTime())?new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16):'';} if(field.type==='boolean')return value===true; if(field.type==='list')return Array.isArray(value)?value.join('\n'):''; if(field.type==='date')return typeof value==='string'?value.slice(0,10):''; return value===null || value===undefined ? '' : String(value); }
@@ -67,30 +87,61 @@ export function editPatch(fields:EditField[],original:Record<string,unknown>,val
 export async function updateOperationalRecord(collection:string,id:string,tenantId:string,patch:Record<string,unknown>,original?:Record<string,unknown>):Promise<void>{
   validateEditablePatch(collection,patch);
   const actor=auth.currentUser;if(!actor)throw new Error('Inicie sesión antes de guardar.');
+  if(!Object.keys(patch).length)return;
+  await durableMutation('record-edit',{userId:actor.uid,tenantId},{collection,id,tenantId,patch,...(original?{original}:{})});
+}
+async function performRecordEdit(collection:string,id:string,tenantId:string,patch:Record<string,unknown>,original:Record<string,unknown>|undefined,auditId:string):Promise<void>{
+  validateEditablePatch(collection,patch);
+  const actor=auth.currentUser;if(!actor)throw new Error('Inicie sesión antes de guardar.');
   if(id.startsWith('demo-'))throw new Error('Los registros de demostración son de solo lectura.');
   if(Object.keys(patch).some(key=>['id','uid','tenantId','createdBy','createdAt','registeredAt','consentGiven','consentAt','accessVersion','email'].includes(key) && !(key==='email' && collection==='lideres')))throw new Error('No se pueden cambiar los identificadores ni los datos de autorización.');
   if(!Object.keys(patch).length)return;
-  const auditId=crypto.randomUUID();
-  await runTransaction(db,async transaction=>{const reference=doc(db,collection,id);const snapshot=await transaction.get(reference);const data=snapshot.data();
+  const receipt=doc(db,'usuarios',actor.uid,'mutaciones_offline',auditId);
+  const written=await runTransaction(db,async transaction=>{if((await transaction.get(receipt)).exists())return false;const reference=doc(db,collection,id);const snapshot=await transaction.get(reference);const data=snapshot.data();
     if(!data || data.tenantId!==tenantId)throw new Error('El registro no pertenece a esta organización.');
+    if(collection==='recorridos'){
+      if(!('status' in patch)&&data.status!=='Asignado')throw new Error('Solo puede editar una asignación que todavía no ha iniciado.');
+      if('status' in patch&&(['Finalizado','Cancelado'].includes(data.status)||(patch.status==='Finalizado'&&(data.userId!==actor.uid||data.status!=='Pausado'))))throw new Error('El recorrido cambió de estado. Actualice la lista antes de cerrarlo.');
+      if(patch.userId){const member=(await transaction.get(doc(db,'usuarios',String(patch.userId)))).data();if(member?.tenantId!==tenantId||member.active===false||member.accessVersion!==2)throw new Error('Seleccione un integrante activo de esta organización.');}
+      if(patch.vehicleId){const vehicle=(await transaction.get(doc(db,'vehiculos',String(patch.vehicleId)))).data();if(vehicle?.tenantId!==tenantId)throw new Error('Seleccione un vehículo de esta organización.');}
+    }
     if(original)for(const key of Object.keys(patch)){if(['locationSource','locationCapturedAt'].includes(key))continue;if(canonicalStoredValue(data[key])!==canonicalStoredValue(original[key]))throw new Error('Otra persona cambió este campo. Cierre y vuelva a abrir la edición para revisar el dato actualizado.');}
     for(const field of EDIT_FIELDS[collection]||[])if(field.reference&&patch[field.key]){const linked=(await transaction.get(doc(db,field.reference,String(patch[field.key])))).data();if(linked?.tenantId!==tenantId)throw new Error(`Seleccione un registro de esta organización en ${field.label}.`);}
+    if(auth.currentUser?.uid!==actor.uid)throw new Error('La sesión cambió; se conserva la edición para su cuenta.');
     transaction.update(reference,{...Object.fromEntries(Object.entries(patch).map(([key,value])=>[key,value===null?deleteField():value])),updatedAt:new Date().toISOString(),updatedBy:actor.uid});
     transaction.set(doc(db,'auditoria',auditId),{id:auditId,tenantId,actorId:actor.uid,entity:collection,entityId:id,action:'edit',fields:Object.keys(patch),createdAt:new Date().toISOString()});
+    transaction.set(receipt,{id:auditId,tenantId,actorId:actor.uid,kind:'record-edit',createdAt:new Date().toISOString()});
+    return true;
   });
-  await verifySavedRecord(doc(db,collection,id),Object.fromEntries(Object.entries(patch).filter(([,v])=>v!==null)),Object.keys(patch).filter(key=>patch[key]===null));
+  if(written)await verifySavedRecord(doc(db,collection,id),Object.fromEntries(Object.entries(patch).filter(([,v])=>v!==null)),Object.keys(patch).filter(key=>patch[key]===null));
 }
 export async function updateCommitteeRecord(tenantId:string,coordinationId:string,committeeId:string,taskId:string|undefined,patch:Record<string,unknown>,original:Record<string,unknown>):Promise<void>{
   validateEditablePatch(taskId?'tareas':'comites',patch);
+  const actor=auth.currentUser;if(!actor)throw new Error('Inicie sesión antes de guardar.');
+  await durableMutation('committee-edit',{userId:actor.uid,tenantId},{tenantId,coordinationId,committeeId,...(taskId?{taskId}:{}),patch,original});
+}
+async function performCommitteeEdit(tenantId:string,coordinationId:string,committeeId:string,taskId:string|undefined,patch:Record<string,unknown>,original:Record<string,unknown>,auditId:string):Promise<void>{
+  validateEditablePatch(taskId?'tareas':'comites',patch);
   const actor=auth.currentUser;if(!actor)throw new Error('Inicie sesión antes de guardar.');if(coordinationId.startsWith('demo-'))throw new Error('Los datos de demostración son de solo lectura.');
-  const auditId=crypto.randomUUID();const saved=await runTransaction(db,async transaction=>{
+  const receipt=doc(db,'usuarios',actor.uid,'mutaciones_offline',auditId);
+  const saved=await runTransaction(db,async transaction=>{
+    if((await transaction.get(receipt)).exists())return null;
     const reference=doc(db,'comites_coordinaciones',coordinationId);const data=(await transaction.get(reference)).data();if(!data||data.tenantId!==tenantId)throw new Error('No se encontró esta coordinación.');
     let found=false;const committees=data.committees.map((committee:any)=>{if(committee.id!==committeeId)return committee;const current=taskId?committee.tasks?.find((task:any)=>task.id===taskId):committee;if(!current)throw new Error('El registro ya no existe.');
       for(const key of Object.keys(patch))if(canonicalStoredValue(current[key])!==canonicalStoredValue(original[key]))throw new Error('Otra persona modificó este campo. Vuelva a abrir la edición.');found=true;
       const apply=(row:any)=>{const next={...row};for(const [key,value]of Object.entries(patch))value===null?delete next[key]:next[key]=value;return next;};
       if(!taskId)return apply(committee);const tasks=committee.tasks.map((task:any)=>task.id===taskId?apply(task):task);return {...committee,tasks,tasksCount:tasks.length,completedTasksCount:tasks.filter((task:any)=>task.completed).length};
-    });if(!found)throw new Error('No se encontró el comité.');transaction.update(reference,{committees,updatedBy:actor.uid,updatedAt:new Date().toISOString()});transaction.set(doc(db,'auditoria',auditId),{id:auditId,tenantId,actorId:actor.uid,entity:'comites_coordinaciones',entityId:coordinationId,action:'edit',fields:Object.keys(patch),createdAt:new Date().toISOString()});
+    });if(!found)throw new Error('No se encontró el comité.');if(auth.currentUser?.uid!==actor.uid)throw new Error('La sesión cambió; se conserva la edición para su cuenta.');transaction.update(reference,{committees,updatedBy:actor.uid,updatedAt:new Date().toISOString()});transaction.set(doc(db,'auditoria',auditId),{id:auditId,tenantId,actorId:actor.uid,entity:'comites_coordinaciones',entityId:coordinationId,action:'edit',fields:Object.keys(patch),createdAt:new Date().toISOString()});
+    transaction.set(receipt,{id:auditId,tenantId,actorId:actor.uid,kind:'committee-edit',createdAt:new Date().toISOString()});
     return {committees};
   });
-  await verifySavedRecord(doc(db,'comites_coordinaciones',coordinationId),saved);
+  if(saved)await verifySavedRecord(doc(db,'comites_coordinaciones',coordinationId),saved);
 }
+registerOfflineMutation('record-edit',async(payload,context)=>{
+  if(payload.tenantId!==context.scope.tenantId||auth.currentUser?.uid!==context.scope.userId)throw new Error('La sesión cambió; se conserva la edición para su cuenta.');
+  await performRecordEdit(payload.collection,payload.id,payload.tenantId,payload.patch,payload.original,context.id);
+});
+registerOfflineMutation('committee-edit',async(payload,context)=>{
+  if(payload.tenantId!==context.scope.tenantId||auth.currentUser?.uid!==context.scope.userId)throw new Error('La sesión cambió; se conserva la edición para su cuenta.');
+  await performCommitteeEdit(payload.tenantId,payload.coordinationId,payload.committeeId,payload.taskId,payload.patch,payload.original,context.id);
+});

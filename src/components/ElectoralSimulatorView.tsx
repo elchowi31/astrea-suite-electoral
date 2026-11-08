@@ -11,6 +11,7 @@ import { distributeVotes, getVoteBudget, simulateElection, type ElectionParamete
 import { downloadText, historicalBaseline, historyKey, referenceRow, scopeForLevel, validateRows, type StatisticalRow } from '../lib/statisticalData';
 import { auth } from '../lib/firebase';
 import { appendSharedRows, deleteSharedScenario, loadSharedScenario, removeSharedSource, saveSharedScenario, subscribeSharedSimulation } from '../lib/sharedSimulation';
+import { isLastSaveQueued } from '../lib/offlineMutations';
 import { accountError } from '../lib/userProvisioning';
 import { buildScenario, validateSnapshot, type SavedScenario, type SimulatorSnapshot } from '../lib/simulationScenarios';
 import {CHART_COLORS} from '../lib/chartPalette';
@@ -150,10 +151,10 @@ export function ElectoralSimulatorView({ currentTenant, candidates = [], onNavig
       <div className="flex flex-wrap gap-2"><input aria-label="Nombre del escenario" placeholder="Nombre del escenario" maxLength={100} value={scenarioName} onChange={event => setScenarioName(event.target.value)} className={`${inputClass} sm:max-w-xs`} /><button className={buttonClass} disabled={busy || !scenarioName.trim()} onClick={async () => {
         if (busy) return;
         if (saved.length >= 30) { setMessage('Límite de 30 escenarios; elimine uno antes de guardar.'); return; }
-        setBusy(true); const id = crypto.randomUUID();
+        setBusy(true); const id = shared ? `${currentTenant.tenantId}--${crypto.randomUUID()}` : crypto.randomUUID();
         try { const scenario = { id, name: scenarioName.trim(), savedAt: new Date().toISOString(), snapshot: snapshot() };
           if (shared) await saveSharedScenario(currentTenant.tenantId, scenario); else if (!saveScenarios([...saved, scenario])) return;
-          setSavedChoice(id); setMessage(shared ? 'Escenario guardado y compartido en Firestore.' : 'Escenario guardado en este navegador.');
+          setSavedChoice(id); setMessage(shared ? (isLastSaveQueued() ? 'Escenario conservado en este dispositivo. Pendiente de sincronización.' : 'Escenario guardado y compartido en Firestore.') : 'Escenario guardado en este navegador.');
         } catch(error) { setMessage(accountError(error)); } finally { setBusy(false); }
       }}>Guardar escenario</button><button className={buttonClass} onClick={() => downloadText(`escenario-${municipality}.json`, JSON.stringify(snapshot(), null, 2), 'application/json')}>Exportar JSON</button><label className={`${buttonClass} cursor-pointer`}>Importar escenario JSON<input aria-label="Importar escenario JSON" type="file" accept=".json,application/json" className="sr-only" onChange={importScenario} /></label></div>
       {saved.length > 0 && <div className="flex flex-wrap gap-2"><select aria-label="Escenarios guardados" className={`${inputClass} sm:max-w-sm`} value={savedChoice} onChange={event => setSavedChoice(event.target.value)}><option value="">Seleccione un escenario</option>{saved.map(item => <option key={item.id} value={item.id}>{item.name} · {item.snapshot.municipality}</option>)}</select><button className={buttonClass} disabled={busy || !savedChoice} onClick={async () => { if (busy) return; setBusy(true); try { const item = saved.find(row => row.id === savedChoice); if (item) await restore((shared ? await loadSharedScenario(currentTenant.tenantId,item) : item).snapshot); } catch (error) { setMessage(accountError(error)); } finally { setBusy(false); } }}>Recuperar</button><button className={buttonClass} disabled={busy || !savedChoice} onClick={async () => { if (busy) return; setBusy(true); try { if (shared) await deleteSharedScenario(currentTenant.tenantId,savedChoice); else saveScenarios(saved.filter(item => item.id !== savedChoice)); setSavedChoice(''); } catch(error) { setMessage(accountError(error)); } finally { setBusy(false); } }}>Eliminar escenario</button></div>}

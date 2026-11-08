@@ -16,6 +16,7 @@ import {
   collection,
   onSnapshot,
   getDocFromServer,
+  getDocFromCache,
   writeBatch,
   runTransaction,
   query,
@@ -40,6 +41,8 @@ import { personalDemoId } from '../data/contextualDemo';
 import { prepareDemoPresentation } from '../data/demoPresentation';
 import { omitUndefined } from './serialization';
 import { localDataEnabled } from './deviceStorage';
+import { durableMutation, isOfflineMutationScopeActive, queuedOfflineMutations, registerOfflineMutation, requireOnlineMutation, type MutationContext } from './offlineMutations';
+import { canonicalStoredValue } from './serialization';
 
 const emulatorMode = import.meta.env?.VITE_FIREBASE_EMULATORS === 'true' || (typeof process!=='undefined' && process.env.ASTREA_FIREBASE_TEST_EMULATORS==='true');
 export const app = getApps().find(item => item.name === '[DEFAULT]') || initializeApp(emulatorMode ? { ...firebaseConfig, projectId: 'demo-astrea' } : firebaseConfig);
@@ -66,9 +69,16 @@ if (emulatorMode) {
 export async function saveCommitteeTask(tenantId: string, coordinationId: string, committeeId: string, task: CampaignTask): Promise<void> {
   const actorId=auth.currentUser?.uid;
   if (!actorId) throw new Error('Inicie sesión para guardar la tarea.');
+  await durableMutation('committee-task',{userId:actorId,tenantId},{tenantId,coordinationId,committeeId,task});
+}
+registerOfflineMutation('committee-task',async({tenantId,coordinationId,committeeId,task},context)=>{
+  const actorId=auth.currentUser?.uid;
+  if(actorId!==context.scope.userId||tenantId!==context.scope.tenantId)throw new Error('La sesión cambió; la tarea se conserva para su cuenta.');
   const reference=doc(db,'comites_coordinaciones',coordinationId);
-  const auditId=crypto.randomUUID();
+  const auditId=context.id;
+  const receipt=doc(db,'usuarios',actorId,'mutaciones_offline',context.id);
   const saved=await runTransaction(db,async transaction=>{
+    if((await transaction.get(receipt)).exists())return null;
     const snapshot=await transaction.get(reference);
     const coordination=snapshot.data() as CampaignCoordination | undefined;
     if (!coordination || coordination.tenantId!==tenantId || !coordination.committees.some(item=>item.id===committeeId)) throw new Error('No se encontró el comité de esta organización.');
@@ -78,12 +88,14 @@ export async function saveCommitteeTask(tenantId: string, coordinationId: string
       const tasks=current.some(item=>item.id===task.id) ? current.map(item=>item.id===task.id ? {...item,completed:task.completed} : item) : [...current,task];
       return {...committee,tasks,tasksCount:tasks.length,completedTasksCount:tasks.filter(item=>item.completed).length};
     });
+    if(auth.currentUser?.uid!==actorId||!isOfflineMutationScopeActive(context.scope))throw new Error('La cuenta u organización cambió durante el guardado.');
     transaction.update(reference,{committees,updatedBy:actorId});
     transaction.set(doc(db,'auditoria',auditId),{id:auditId,tenantId,actorId,entity:'comites_coordinaciones',entityId:coordinationId,action:'update',createdAt:new Date().toISOString()});
+    transaction.set(receipt,{id:auditId,tenantId,actorId,kind:'committee-task',createdAt:new Date().toISOString()});
     return {committees};
   });
-  await verifySavedRecord(reference,saved);
-}
+  if(saved)await verifySavedRecord(reference,saved);
+});
 
 export async function authenticatedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const user = auth.currentUser;
@@ -96,23 +108,100 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   return fetch(target, { ...init, headers });
 }
 
+export type FirestoreBatchWrite = { collection: string; id: string; type: 'set' | 'update' | 'delete'; data?: Record<string, any>; merge?: boolean };
+type CapturedWrite = FirestoreBatchWrite & { before: string | null; beforeData?: Record<string, any> };
+type CapturedBatch = { writes: CapturedWrite[] };
+const batchKind = 'firestore-batch-v1';
+function applyWrite(before: Record<string, any> | undefined, write: FirestoreBatchWrite) {
+  return write.type === 'delete' ? undefined : write.type === 'update' || write.merge ? { ...before, ...write.data } : write.data;
+}
+async function executeCapturedBatch(payload: CapturedBatch, context: MutationContext) {
+  if (auth.currentUser?.uid !== context.scope.userId) throw new Error('Inicie sesión con la cuenta que creó estos datos pendientes.');
+  const marker = doc(db, 'usuarios', context.scope.userId, 'mutaciones_offline', context.id);
+  const applied = await runTransaction(db, async tx => {
+    if ((await tx.get(marker)).exists()) return false;
+    const current = await Promise.all(payload.writes.map(write => write.collection === 'auditoria' ? Promise.resolve(null) : tx.get(doc(db, write.collection, write.id))));
+    payload.writes.forEach((write, index) => {
+      const snapshot = current[index];
+      if (!snapshot) return;
+      const data = snapshot.exists() ? snapshot.data() : undefined;
+      if (data && data.tenantId !== context.scope.tenantId) throw new Error('El registro pertenece a otra organización. Los datos pendientes se conservan para revisión.');
+      if (canonicalStoredValue(data) !== write.before) throw new Error(`El registro ${write.collection}/${write.id} cambió mientras estaba sin conexión. Sus cambios pendientes se conservan; revise el registro antes de reintentar.`);
+    });
+    if (auth.currentUser?.uid !== context.scope.userId || !isOfflineMutationScopeActive(context.scope)) throw new Error('La cuenta u organización cambió durante el guardado. Vuelva a su cuenta para sincronizar.');
+    for (const write of payload.writes) {
+      const ref = doc(db, write.collection, write.id);
+      if (write.type === 'delete') tx.delete(ref);
+      else if (write.type === 'update') tx.update(ref, write.data!);
+      else tx.set(ref, write.data!, { merge: write.merge === true });
+    }
+    tx.set(marker, { id: context.id, actorId: context.scope.userId, tenantId: context.scope.tenantId, kind: batchKind, createdAt: new Date().toISOString() });
+    return true;
+  });
+  if (!applied) {
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('astrea:save-verified', { detail: { path: marker.path, verifiedAt: new Date().toISOString(), fields: payload.writes.length, demo: false } }));
+    return;
+  }
+  for (const write of payload.writes) {
+    if (write.collection === 'auditoria') continue;
+    const ref = doc(db, write.collection, write.id);
+    if (write.type !== 'delete') await verifySavedRecord(ref, write.data!);
+    else {
+      if ((await getDocFromServer(ref)).exists()) throw new Error('El registro sigue en el servidor. Revise antes de repetir la eliminación.');
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('astrea:save-verified', { detail: { path: ref.path, verifiedAt: new Date().toISOString(), fields: 0, demo: false } }));
+    }
+  }
+}
+registerOfflineMutation(batchKind, executeCapturedBatch);
+
+/** Persist the complete atomic intent before clearing a capture form, then replay with conflict checks. */
+export async function persistFirestoreBatch(tenantId: string, writes: FirestoreBatchWrite[]): Promise<void> {
+  const userId = auth.currentUser?.uid;
+  if (!userId) throw new Error('Inicie sesión antes de guardar información.');
+  if (!tenantId || !writes.length || writes.length > 450) throw new Error('El lote necesita una organización y entre 1 y 450 registros.');
+  if (new TextEncoder().encode(JSON.stringify(writes)).length > 8 * 1024 * 1024) throw new Error('El lote supera 8 MB. Divida la importación antes de guardarla.');
+  if (new Set(writes.map(write => `${write.collection}/${write.id}`)).size !== writes.length) throw new Error('El lote contiene registros duplicados.');
+  const scope = { userId, tenantId };
+  const pending = localDataEnabled() ? await queuedOfflineMutations(scope) : [];
+  const captured = await Promise.all(writes.map(async write => {
+    if (!write.collection || write.collection.includes('/') || !write.id || write.id.includes('/')) throw new Error('Identificador de registro inválido.');
+    if (write.type !== 'delete' && (!write.data || write.data.tenantId && write.data.tenantId !== tenantId)) throw new Error('Los datos no pertenecen a la organización seleccionada.');
+    let beforeData: Record<string, any> | undefined;
+    if (write.collection !== 'auditoria') {
+      const ref = doc(db, write.collection, write.id);
+      try { beforeData = (await getDocFromCache(ref)).data(); } catch {
+        // An uncached record may be read while online; a stalled connection must not block capture.
+        if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+          let timer: ReturnType<typeof setTimeout>;
+          const snapshot = await Promise.race([getDocFromServer(ref).catch(() => undefined), new Promise<undefined>(resolve => { timer = setTimeout(() => resolve(undefined), 1500); })]);
+          clearTimeout(timer!); beforeData = snapshot?.data();
+        }
+      }
+      // An offline create followed by an offline edit must replay in that same order.
+      for (const mutation of pending) if (mutation.kind === batchKind) for (const earlier of (mutation.payload as CapturedBatch).writes) if (earlier.collection === write.collection && earlier.id === write.id) beforeData = applyWrite(beforeData, earlier);
+    }
+    const data = write.data ? omitUndefined(write.data) : undefined;
+    return { ...write, ...(data ? { data } : {}), before: canonicalStoredValue(beforeData) } satisfies CapturedWrite;
+  }));
+  await durableMutation(batchKind, scope, { writes: captured } satisfies CapturedBatch);
+}
+
 export async function persistEntity<T extends { tenantId: string }>(collectionName: string, entityId: string, data: T): Promise<void> {
   const actor = auth.currentUser;
   if (!actor) throw new Error('Inicie sesión antes de guardar información.');
   if (!data.tenantId || !entityId || entityId.includes('/')) throw new Error('El registro no tiene una organización o identificador válido.');
   if (entityId.startsWith('demo-') && collectionName !== 'demo') throw new Error('Los registros de demostración son de solo lectura.');
   const now = new Date().toISOString();
-  const batch = writeBatch(db);
   const stored = {
     ...omitUndefined(data),
     ...((data as any).createdBy || ['organizaciones','usuarios'].includes(collectionName) ? {} : { createdBy: actor.uid }),
     updatedAt: now,
     updatedBy: actor?.uid || 'unknown'
   };
-  batch.set(doc(db, collectionName, entityId), stored, {merge:true});
+  const writes: FirestoreBatchWrite[] = [{ collection: collectionName, id: entityId, type: 'set', data: stored, merge: true }];
   if (actor) {
     const auditId = crypto.randomUUID();
-    batch.set(doc(db, 'auditoria', auditId), {
+    writes.push({ collection: 'auditoria', id: auditId, type: 'set', data: {
       id: auditId,
       tenantId: data.tenantId,
       actorId: actor.uid,
@@ -121,10 +210,9 @@ export async function persistEntity<T extends { tenantId: string }>(collectionNa
       entity: collectionName,
       entityId,
       createdAt: now
-    });
+    } });
   }
-  await batch.commit();
-  await verifySavedRecord(doc(db,collectionName,entityId),stored);
+  await persistFirestoreBatch(data.tenantId, writes);
 }
 
 export async function removeEntity(collectionName: string, entityId: string, tenantId?: string): Promise<void> {
@@ -133,14 +221,14 @@ export async function removeEntity(collectionName: string, entityId: string, ten
     const snapshot = await getDoc(doc(db, collectionName, entityId));
     tenantId = snapshot.exists() ? snapshot.data().tenantId : undefined;
   }
-  const batch = writeBatch(db);
-  batch.delete(doc(db, collectionName, entityId));
+  if (!actor || !tenantId) throw new Error('Inicie sesión y seleccione la organización para retirar el registro.');
+  const writes: FirestoreBatchWrite[] = [{ collection: collectionName, id: entityId, type: 'delete' }];
   if (actor && tenantId) {
     const now = new Date().toISOString();
     const auditId = crypto.randomUUID();
-    batch.set(doc(db, 'auditoria', auditId), { id: auditId, tenantId, actorId: actor.uid, actorEmail: actor.email || null, action: 'delete', entity: collectionName, entityId, createdAt: now });
+    writes.push({collection:'auditoria',id:auditId,type:'set',data:{ id: auditId, tenantId, actorId: actor.uid, actorEmail: actor.email || null, action: 'delete', entity: collectionName, entityId, createdAt: now }});
   }
-  await batch.commit();
+  await persistFirestoreBatch(tenantId, writes);
 }
 
 export enum OperationType {
@@ -379,10 +467,26 @@ export async function deleteProposalFromFirestore(proposalId: string): Promise<v
   }
 }
 
+// Access and organization administration must be acknowledged before changing the UI.
+async function persistAdministrativeEntity<T extends { tenantId: string }>(collectionName: string, id: string, data: T): Promise<void> {
+  requireOnlineMutation('Conéctese para administrar organizaciones y accesos. El formulario se conserva.');
+  const actor = auth.currentUser;
+  if (!actor) throw new Error('Inicie sesión para administrar la organización.');
+  const now = new Date().toISOString();
+  const stored = { ...omitUndefined(data), updatedAt: now, updatedBy: actor.uid };
+  const reference = doc(db, collectionName, id);
+  const batch = writeBatch(db);
+  batch.set(reference, stored, { merge: true });
+  const auditId = crypto.randomUUID();
+  batch.set(doc(db, 'auditoria', auditId), { id: auditId, tenantId: data.tenantId, actorId: actor.uid, entity: collectionName, entityId: id, action: 'update', createdAt: now });
+  await batch.commit();
+  await verifySavedRecord(reference, stored);
+}
+
 // Organizaciones / Tenants
 export async function saveTenantToFirestore(tenant: Tenant): Promise<void> {
   try {
-    await persistEntity('organizaciones', tenant.tenantId, tenant);
+    await persistAdministrativeEntity('organizaciones', tenant.tenantId, tenant);
   } catch (e) {
     handleFirestoreError(e, OperationType.WRITE, `organizaciones/${tenant.tenantId}`);
     throw e;
@@ -391,7 +495,8 @@ export async function saveTenantToFirestore(tenant: Tenant): Promise<void> {
 
 export async function deleteTenantFromFirestore(tenantId: string): Promise<void> {
   try {
-    await removeEntity('organizaciones', tenantId, tenantId);
+    requireOnlineMutation('Conéctese para retirar una organización y comprobar los permisos actuales.');
+    await deleteDoc(doc(db, 'organizaciones', tenantId));
   } catch (e) {
     handleFirestoreError(e, OperationType.DELETE, `organizaciones/${tenantId}`);
     throw e;
@@ -401,7 +506,7 @@ export async function deleteTenantFromFirestore(tenantId: string): Promise<void>
 // Aprovisionamiento mínimo: la organización nace vacía y lista para onboarding.
 export async function seedNewTenantInitialData(newTenant: Tenant): Promise<{ success: boolean; message: string }> {
   try {
-    await persistEntity('organizaciones', newTenant.tenantId, newTenant);
+    await persistAdministrativeEntity('organizaciones', newTenant.tenantId, newTenant);
     return {
       success: true,
       message: `Organización "${newTenant.name}" creada. Complete el onboarding para cargar su información real.`
@@ -428,7 +533,7 @@ export async function saveDriveFileToFirestore(file: DriveFileItem): Promise<voi
 // Usuarios & Perfiles Políticos
 export async function saveUserToFirestore(user: UserProfile): Promise<void> {
   try {
-    await persistEntity('usuarios', user.uid, user);
+    await persistAdministrativeEntity('usuarios', user.uid, user);
   } catch (e) {
     handleFirestoreError(e, OperationType.WRITE, `usuarios/${user.uid}`);
     throw e;
@@ -437,7 +542,8 @@ export async function saveUserToFirestore(user: UserProfile): Promise<void> {
 
 export async function deleteUserFromFirestore(uid: string): Promise<void> {
   try {
-    await removeEntity('usuarios', uid);
+    requireOnlineMutation('Conéctese para retirar un acceso y comprobar los permisos actuales.');
+    await deleteDoc(doc(db, 'usuarios', uid));
   } catch (e) {
     handleFirestoreError(e, OperationType.DELETE, `usuarios/${uid}`);
     throw e;
@@ -502,18 +608,20 @@ export async function saveCoordinationToFirestore(coordination: any): Promise<vo
 }
 
 export async function saveWorkspaceEventToFirestore(tenantId: string, event: Record<string, unknown>): Promise<void> {
-  const id = String(event.id || `workspace-${Date.now()}`);
-  await persistEntity('eventos_workspace', id, { ...event, id, tenantId } as any);
+  const sourceId = String(event.id || crypto.randomUUID());
+  const id = sourceId.startsWith(`${tenantId}--`) ? sourceId : `${tenantId}--${sourceId}`;
+  await persistEntity('eventos_workspace', id, { ...event, id, sourceId, tenantId } as any);
 }
 
 export async function saveAiAnalysisToFirestore(tenantId: string, analysis: { type: string; title: string; content: string }): Promise<void> {
-  const id = `analisis-${Date.now()}`;
+  const id = `${tenantId}--analisis-${crypto.randomUUID()}`;
   await persistEntity('analisis_ia', id, { ...analysis, id, tenantId, createdAt: new Date().toISOString() } as any);
 }
 
 // La demostración vive en una colección aislada. Nunca se mezcla con las
 // colecciones operativas. Cada usuario administra únicamente su presentación.
 export async function createDemoCollection(tenantId: string, profile: UserProfile): Promise<DemoBundle> {
+  requireOnlineMutation('Conéctese para preparar la demostración compartida.');
   if (auth.currentUser?.uid !== profile.uid) throw new Error('Mantenga su sesión activa para cargar los datos de prueba.');
   const bundle = buildDemoBundle(tenantId, profile);
   await setDoc(doc(db, 'demo', bundle.id), omitUndefined(bundle));
@@ -522,6 +630,7 @@ export async function createDemoCollection(tenantId: string, profile: UserProfil
 }
 
 export async function deleteDemoCollection(tenantId: string, uid: string): Promise<void> {
+  requireOnlineMutation('Conéctese para retirar la demostración compartida.');
   if (auth.currentUser?.uid !== uid) throw new Error('Solo puede retirar su propia demostración.');
   await deleteDoc(doc(db, 'demo', personalDemoId(tenantId, uid)));
 }

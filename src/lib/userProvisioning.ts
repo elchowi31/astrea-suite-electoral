@@ -5,6 +5,7 @@ import { app, auth, db } from './firebase';
 import { omitUndefined } from './serialization';
 import { getRoleHierarchyLevel } from './permissions';
 import type { Tenant, UserProfile, UserRole } from '../types';
+import {requireOnlineMutation} from './offlineMutations';
 
 export const TEAM_ROLES: UserRole[] = ['AdminTenant', 'Gobernador', 'Diputado', 'Alcalde', 'Concejal', 'JefePolitico', 'Supervisor', 'Operador', 'LiderVeredal', 'Consulta', 'Invitado'];
 export function canManageUsers(user: UserProfile | null | undefined): boolean {
@@ -32,6 +33,7 @@ function checkInput(input: ProfileInput, password: string) {
 
 /** Creates only a new space owned by this authenticated UID, in one atomic commit. */
 export async function createPersonalOrganization(input: ProfileInput, password: string): Promise<UserProfile> {
+  requireOnlineMutation('Conéctese para crear la cuenta y su organización. Se conserva el formulario.');
   checkInput(input, password);
   if (auth.currentUser) throw new Error('Para agregar personas a su organización, abra Usuarios y accesos.');
   const { user } = await createUserWithEmailAndPassword(auth, input.email.trim().toLowerCase(), password);
@@ -54,11 +56,12 @@ export async function createPersonalOrganization(input: ProfileInput, password: 
 
 /** A secondary Auth instance preserves the administrator's verified session. */
 export async function createTeamUser(input: ProfileInput, password: string, actor: UserProfile): Promise<UserProfile> {
+  requireOnlineMutation('Conéctese para crear y autorizar el acceso de otra persona. Se conserva el formulario.');
   checkInput(input, password);
   if (auth.currentUser?.uid !== actor.uid || !canManageUsers(actor) || !assignableRoles(actor).includes(input.role) || (actor.role !== 'AdminGlobal' && actor.tenantId !== input.tenantId)) throw new Error('No tiene permiso para crear ese acceso.');
   const secondary = initializeApp(app.options, `provision-${crypto.randomUUID()}`);
   const secondaryAuth = getAuth(secondary);
-  if (import.meta.env?.VITE_FIREBASE_EMULATORS === 'true') connectAuthEmulator(secondaryAuth, 'http://127.0.0.1:9098', { disableWarnings: true });
+  if (app.options.projectId === 'demo-astrea' || import.meta.env?.VITE_FIREBASE_EMULATORS === 'true') connectAuthEmulator(secondaryAuth, 'http://127.0.0.1:9098', { disableWarnings: true });
   let createdUser;
   try {
     createdUser = (await createUserWithEmailAndPassword(secondaryAuth, input.email.trim().toLowerCase(), password)).user;
