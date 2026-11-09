@@ -8,13 +8,11 @@ $signingDirectory = Join-Path $Root 'signing'
 New-Item -ItemType Directory -Path $signingDirectory -Force | Out-Null
 
 function Protect-LocalPath([string]$Path, [bool]$Directory = $false) {
-    $acl = Get-Acl -LiteralPath $Path
-    $acl.SetAccessRuleProtection($true, $false)
-    $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
-    $inheritance = if ($Directory) { [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit' } else { [System.Security.AccessControl.InheritanceFlags]::None }
-    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($identity, 'FullControl', $inheritance, 'None', 'Allow')
-    $acl.SetAccessRule($rule)
-    Set-Acl -LiteralPath $Path -AclObject $acl
+    # Change the access ACL only; Set-Acl can also request audit privileges unavailable to a normal account.
+    $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    $rights = '*' + $identity + $(if ($Directory) { ':(OI)(CI)(F)' } else { ':(F)' })
+    & (Join-Path $env:SystemRoot 'System32\icacls.exe') $Path '/inheritance:r' '/grant:r' $rights | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "No se pudieron proteger los permisos de $Path." }
 }
 Protect-LocalPath $signingDirectory $true
 $keystore = Join-Path $signingDirectory 'astrea-release.jks'
