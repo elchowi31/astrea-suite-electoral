@@ -6,6 +6,7 @@ import type {UserProfile} from '../types';
 import {applyAssignments,cancelTrip,changePassengerState,legId,legState,normalizePoint,occupied,passengerAlerts,proposeAssignments,tripCost,type Leg,type Passenger,type PassengerEvent,type PassengerTrip} from '../lib/passengerLogistics';
 import {canManagePassengers,createPassengerEvent,listenPassengerEvents,updatePassengerEvent} from '../lib/passengerLogisticsStore';
 import {Field,Metric,Panel,button,input,money,secondary,tooltipStyle} from './operations/OperationsUI';
+import {usePageBack} from './PageNavigation';
 
 const local=(iso:string)=>iso?new Date(Date.parse(iso)-new Date(iso).getTimezoneOffset()*60000).toISOString().slice(0,16):'';
 const iso=(value:string)=>value?new Date(value).toISOString():'';
@@ -19,6 +20,7 @@ export function PassengerEventsView({tenantId,user,readOnly}:Props){
   const [form,setForm]=useState<'event'|'passenger'|'trip'|''>(''),[search,setSearch]=useState(''),[place,setPlace]=useState(''),[status,setStatus]=useState('');
   const [eventDraft,setEventDraft]=useState({title:'',location:'',startAt:'',endAt:''});
   const [passenger,setPassenger]=useState<Passenger|null>(null),[trip,setTrip]=useState<PassengerTrip|null>(null);
+  usePageBack('Pasajeros y eventos',()=>setForm(''),!!form,20,busy);
   useEffect(()=>{setEvents([]);setSelected('');setLoaded(false);setError('');setForm('');if(readOnly)return;return listenPassengerEvents(db,tenantId,(rows,cache)=>{setEvents(rows);setCached(cache);setLoaded(true);},e=>{setError(e.message);setLoaded(true);});},[tenantId,user.uid,readOnly]);
   useEffect(()=>{const interval=setInterval(()=>setNow(Date.now()),30000);return()=>clearInterval(interval);},[]);
   const event=events.find(e=>e.id===selected)||events[0];

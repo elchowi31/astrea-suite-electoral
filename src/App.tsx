@@ -56,7 +56,9 @@ import { COLOMBIA_ELECTORAL_GEOGRAPHY } from './data/colombiaElectoralData';
 import { logoutFirebaseAuth, observeAuthenticatedProfile } from './lib/firebaseAuth';
 import { UserManagementView } from './components/UserManagementView';
 import { Header } from './components/Header';
-import { Sidebar, ActiveTab } from './components/Sidebar';
+import { Sidebar } from './components/Sidebar';
+import { useModuleNavigation } from './lib/useModuleNavigation';
+import { PageNavigationProvider, PageNavigationBar, PageScrollRestoration } from './components/PageNavigation';
 import { AuthModal } from './components/AuthModal';
 import { LoginView } from './components/LoginView';
 import { LandingPage } from './components/LandingPage';
@@ -107,7 +109,8 @@ export default function App() {
   const userRole: UserRole = currentUser?.role || 'Consulta';
   const selectedTenantId = currentUser?.role === 'AdminGlobal' ? currentTenant.tenantId : currentUser?.tenantId;
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const navigation = useModuleNavigation(currentUser ? JSON.stringify([currentUser.uid, currentUser.role]) : null, selectedTenantId);
+  const { activeTab, navigate } = navigation;
   const [routeToOpen,setRouteToOpen]=useState('');
   useEffect(()=>{if(activeTab!=='routes')setRouteToOpen('');},[activeTab]);
 
@@ -250,7 +253,7 @@ export default function App() {
   // Auth Handlers
   const handleLogin = (user: UserProfile) => {
     setCurrentUser(user);
-    setActiveTab(previous => previous === 'login' ? 'dashboard' : previous);
+    navigate(previous => previous === 'login' ? 'dashboard' : previous);
 
     // Automatically isolate and switch tenant to the user's tenantId
     if (user.tenantId) {
@@ -272,14 +275,14 @@ export default function App() {
   const handleLogout = async () => {
     await logoutFirebaseAuth();
     setCurrentUser(null);
-    setActiveTab('login');
+    navigate('login');
     notifyFirestoreSave('Sesión cerrada. Seleccione o cree un usuario para continuar.');
   };
 
   // Drive scanning action
   const handleScanDrive = async () => {
     setDriveSyncing(false);
-    setActiveTab('workspace');
+    navigate('workspace');
   };
 
   // Add Handlers that persist directly to Firestore
@@ -485,19 +488,19 @@ export default function App() {
 
   // Navigation shortcuts from sub-views
   const handleGenerateSpeechForCandidate = (candName: string, district: string, chamber: string) => {
-    setActiveTab('ai');
+    navigate('ai');
   };
 
   const handleGenerateDistrictStrategy = (districtName: string, keyIssues: string[]) => {
-    setActiveTab('ai');
+    navigate('ai');
   };
 
   const handleAnalyzeProposalWithAi = (title: string, summary: string) => {
-    setActiveTab('ai');
+    navigate('ai');
   };
 
   const handleAnalyzeDriveFileWithAi = async (file: DriveFileItem) => {
-    setActiveTab('ai');
+    navigate('ai');
   };
 
   const demoAvailable = demoMatchesProfile(demoBundle, currentUser, currentTenant.tenantId);
@@ -534,7 +537,7 @@ export default function App() {
                 <button type="button" onClick={() => setShowPublicDemo(false)} className="flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-xs font-bold text-slate-200 hover:bg-slate-900">
                   <ArrowLeft className="h-4 w-4" /> Inicio
                 </button>
-                <button type="button" onClick={() => { setShowPublicDemo(false); setActiveTab('login'); }} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white hover:bg-blue-500">
+                <button type="button" onClick={() => { setShowPublicDemo(false); navigate('login'); }} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white hover:bg-blue-500">
                   <LogIn className="h-4 w-4" /> Iniciar sesión
                 </button>
               </div>
@@ -543,7 +546,7 @@ export default function App() {
           <main className="mx-auto w-full p-3 sm:p-5 lg:p-6">
             <OperationsProvider tenant={PUBLIC_DEMO_TENANT} user={PUBLIC_DEMO_USER} leaders={PUBLIC_DEMO_DATA.leaders} candidates={PUBLIC_DEMO_DATA.candidates} voters={PUBLIC_DEMO_DATA.voters} expenses={PUBLIC_DEMO_DATA.expenses} vehicles={PUBLIC_DEMO_DATA.vehicles} contributions={PUBLIC_DEMO_DATA.contributions} readOnly demo={PUBLIC_DEMO_DATA.operations}>
             <Suspense fallback={<div className="p-10 text-center text-sm text-slate-400">Cargando presentación…</div>}>
-              <DashboardView onNavigateTab={() => { setShowPublicDemo(false); setActiveTab('login'); }} />
+              <DashboardView onNavigateTab={() => { setShowPublicDemo(false); navigate('login'); }} />
             </Suspense>
             </OperationsProvider>
           </main>
@@ -551,9 +554,9 @@ export default function App() {
       );
     }
     if (activeTab !== 'login') {
-      return <LandingPage onEnterLogin={() => setActiveTab('login')} onOpenDemo={() => setShowPublicDemo(true)} tenantName={currentTenant.name || 'Astrea'} />;
+      return <LandingPage onEnterLogin={() => navigate('login')} onOpenDemo={() => setShowPublicDemo(true)} tenantName={currentTenant.name || 'Astrea'} />;
     }
-    return <LoginView users={users} currentUser={null} tenants={tenants} currentTenant={currentTenant} onLogin={handleLogin} onRegister={handleRegisterUser} onLogout={handleLogout} onContinueToApp={() => setActiveTab('dashboard')} onBackToLanding={() => setActiveTab('dashboard')} />;
+    return <LoginView users={users} currentUser={null} tenants={tenants} currentTenant={currentTenant} onLogin={handleLogin} onRegister={handleRegisterUser} onLogout={handleLogout} onContinueToApp={() => navigate('dashboard')} onBackToLanding={() => navigate('dashboard')} />;
   }
 
   const demoControls = currentUser && (activeTab === 'dashboard' || demoActive) && activeTab !== 'login' && (
@@ -594,7 +597,7 @@ export default function App() {
           );
 
   return (
-    <RouteTrackingProvider user={currentUser} tenantId={currentUser.tenantId} monitorTenantId={currentTenant.tenantId}><div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-500 selection:text-white relative isolate overflow-x-hidden">
+    <PageNavigationProvider pageKey={`${navigation.scope}:${activeTab}`}><RouteTrackingProvider user={currentUser} tenantId={currentUser.tenantId} monitorTenantId={currentTenant.tenantId}><div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-500 selection:text-white relative isolate overflow-x-clip">
       <SynapticNeuralBackground interactive={false} />
 
       {/* Top Navigation Header with Streamlined Toolbar & Profile Pill */}
@@ -602,7 +605,7 @@ export default function App() {
         tenants={tenants}
         currentTenant={currentTenant}
         onSelectTenant={setCurrentTenant}
-        onNavigateToTenants={() => setActiveTab('tenants')}
+        onNavigateToTenants={() => navigate('tenants')}
         currentUser={currentUser}
         onOpenAuthModal={() => setShowAuthModal(true)}
         userRole={userRole}
@@ -617,7 +620,7 @@ export default function App() {
         {/* Sidebar */}
         <Sidebar
           activeTab={activeTab}
-          onTabChange={tab=>{if(tab==='rewards'||tab==='reward_draws'||tab==='data_imports')setDemoEnabled(false);setActiveTab(tab);}}
+          onTabChange={tab=>{if(tab==='rewards'||tab==='reward_draws'||tab==='data_imports')setDemoEnabled(false);navigate(tab);}}
           driveFileCount={visibleDriveFiles.length}
           candidateCount={visibleCandidates.filter((c) => c.tenantId === currentTenant.tenantId).length}
           leaderCount={visibleLeaders.filter((l) => l.tenantId === currentTenant.tenantId).length}
@@ -629,14 +632,16 @@ export default function App() {
         />
 
         {/* Content Area */}
-        <main className="app-content min-w-0 flex-1 p-3 sm:p-5 lg:p-6 w-full space-y-5">
+        <main tabIndex={-1} className="app-content min-w-0 flex-1 p-3 sm:p-5 lg:p-6 w-full space-y-5 focus:outline-none">
+          <PageNavigationBar current={activeTab} previous={navigation.previousPage} onBack={navigation.back} onHome={navigation.home} />
+          <Suspense fallback={<div role="status" className="flex min-h-[45vh] items-center justify-center gap-3 text-sm text-slate-300"><RefreshCw className="h-4 w-4 animate-spin text-blue-400" />Cargando módulo…</div>}>
           <OperationsProvider key={`${currentTenant.tenantId}-${demoActive?'demo':'real'}`} tenant={currentTenant} user={demoViewUser} leaders={visibleLeaders} candidates={visibleCandidates} voters={visibleVoters} expenses={visibleExpenses} vehicles={visibleVehicles} contributions={visibleContributions} readOnly={demoActive} demo={demoBundle?.operations}>
           <WhatsappConnectionProvider><WhatsappConnectionStatus/>
           <DemoEditing.Provider value={demoActive&&demoBundle?{bundle:demoBundle,realReferences:{candidatos:candidates.map(c=>({id:c.id,name:c.fullName})),lideres:leaders.map(l=>({id:l.id,name:l.fullName})),aportes:donorContributions.map(c=>({id:c.id,name:c.donorName})),vehiculos:vehicles.map(v=>({id:v.id,name:v.licensePlate}))},onPromoted:()=>{setDemoEnabled(false);notifyFirestoreSave('Ficha guardada en datos reales.');}}:null}>
           <OperationsEditingReferences>
           {activeTab === 'rewards' && <RewardsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId}/>}
           {currentUser && activeTab === 'reward_draws' && <SorteappRewardDrawsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId}/>}
-          {activeTab === 'data_imports' && <DataImportsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId} onMap={()=>{setDemoEnabled(false);setActiveTab('map');}}/>}
+          {activeTab === 'data_imports' && <DataImportsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId} onMap={()=>{setDemoEnabled(false);navigate('map');}}/>}
           {activeTab === 'device' && <><DevicePersistencePanel /><div className="flex flex-wrap gap-3"><EditRecordButton collection="usuarios" record={currentUser} label="Editar mi perfil" />{['AdminTenant','AdminGlobal'].includes(currentUser.role)&&<EditRecordButton collection="organizaciones" record={currentTenant} label="Editar organización" />}</div></>}
 
           {/* Personalized User Recognition & Salutation Banner */}
@@ -671,24 +676,16 @@ export default function App() {
               onLogin={handleLogin}
               onRegister={handleRegisterUser}
               onLogout={handleLogout}
-              onContinueToApp={() => setActiveTab('dashboard')}
+              onContinueToApp={() => navigate('dashboard')}
             />
           )}
 
           {/* Tab Views: each module is loaded only when the user opens it. */}
-          <Suspense fallback={(
-            <div className="min-h-[45vh] flex items-center justify-center" role="status" aria-live="polite">
-              <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/70 px-5 py-4 text-sm text-slate-300">
-                <RefreshCw className="h-4 w-4 animate-spin text-blue-400" />
-                Cargando módulo…
-              </div>
-            </div>
-          )}>
           {currentUser && activeTab === 'dashboard' && (
             <div className="space-y-4">
-            <DashboardView onNavigateTab={setActiveTab} dataControls={demoControls}/>
+            <DashboardView onNavigateTab={navigate} dataControls={demoControls}/>
             <details className="rounded-2xl border border-slate-700 bg-slate-900/80 p-4" onToggle={event=>setShowOperationalDetails(event.currentTarget.open)}><summary className="cursor-pointer text-sm font-semibold text-slate-200">Planillas, control de jornada y detalle administrativo</summary>
-            {showOperationalDetails && <div className="mt-4 space-y-4"><OperationsOverview onNavigate={setActiveTab}/><AdministrativeOverview tenantId={currentTenant.tenantId} expenses={visibleExpenses}/></div>}
+            {showOperationalDetails && <div className="mt-4 space-y-4"><OperationsOverview onNavigate={navigate}/><AdministrativeOverview tenantId={currentTenant.tenantId} expenses={visibleExpenses}/></div>}
             </details>
             </div>
           )}
@@ -705,7 +702,7 @@ export default function App() {
               userRole={userRole}
               coordinations={visibleCoordinations}
               onUpdateCoordination={handleUpdateCoordination}
-              onNavigateTab={setActiveTab}
+              onNavigateTab={navigate}
             />
           )}
 
@@ -725,7 +722,7 @@ export default function App() {
               key={currentTenant.tenantId}
               currentTenant={currentTenant}
               candidates={visibleCandidates}
-              onNavigateTab={setActiveTab}
+              onNavigateTab={navigate}
             />
           )}
 
@@ -740,7 +737,7 @@ export default function App() {
               onAddExpense={handleAddExpense}
               onUpdateExpense={handleUpdateExpense}
               onDeleteExpense={handleDeleteExpense}
-              onNavigateTab={setActiveTab}
+              onNavigateTab={navigate}
             />
           )}
 
@@ -776,8 +773,8 @@ export default function App() {
               readOnly={demoActive}
               members={[currentUser,...users]}
               candidates={visibleCandidates}
-              onExit={()=>setActiveTab('dashboard')}
-              onOpenTracking={(routeId) => { setRouteToOpen(routeId||''); setDemoEnabled(false); setActiveTab('routes'); window.scrollTo({top:0,behavior:'instant'}); }}
+              onExit={navigation.back}
+              onOpenTracking={(routeId) => { setRouteToOpen(routeId||''); setDemoEnabled(false); navigate('routes'); window.scrollTo({top:0,behavior:'instant'}); }}
               leaders={visibleLeaders.filter((l) => l.tenantId === currentTenant.tenantId)}
               vehicles={visibleVehicles.filter((v) => v.tenantId === currentTenant.tenantId)}
               tenantName={currentTenant.name}
@@ -794,7 +791,7 @@ export default function App() {
               donorContributions={visibleContributions}
               onAddExpense={handleAddExpense}
               onAddDonorContribution={handleAddDonorContribution}
-              onNavigateTransport={() => setActiveTab('transport')}
+              onNavigateTransport={() => navigate('transport')}
             />
           )}
 
@@ -885,12 +882,13 @@ export default function App() {
               donorContributions={donorContributions}
             />
           )}
-          </Suspense>
+          <PageScrollRestoration page={navigation.currentPage} revision={navigation.revision} />
 
           </OperationsEditingReferences>
           </DemoEditing.Provider>
           </WhatsappConnectionProvider>
           </OperationsProvider>
+          </Suspense>
         </main>
 
       </div>
@@ -914,6 +912,6 @@ export default function App() {
         <p className="mt-1 text-slate-400">Desarrollada por Wilson José Arias</p>
       </footer>
 
-    </div></RouteTrackingProvider>
+    </div></RouteTrackingProvider></PageNavigationProvider>
   );
 }

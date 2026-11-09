@@ -7,8 +7,8 @@ import {recordedTrackLayers} from '../lib/recordedTrack';
 import {googleDirectionsUrl, type TerritoryPoint} from '../lib/territorialMaps';
 import {SatelliteRadarCanvas, type BaseLayer} from './SatelliteRadarCanvas';
 
-export function RouteDetailView({route, samples, loading, error, onRetry, onBack}: {
-  key?: string; route: AssignedRoute; samples: RouteSample[]; loading: boolean; error: string; onRetry: () => void; onBack: () => void;
+export function RouteDetailView({route, samples, loading, error, onRetry, onBack, backLabel = 'Volver a recorridos'}: {
+  key?: string; route: AssignedRoute; samples: RouteSample[]; loading: boolean; error: string; onRetry: () => void; onBack: () => void; backLabel?: string;
 }) {
   const [layer, setLayer] = useState<BaseLayer>('streets');
   const [focusedId, setFocusedId] = useState('');
@@ -30,7 +30,7 @@ export function RouteDetailView({route, samples, loading, error, onRetry, onBack
   const button = 'min-h-12 rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700';
   const selectSample = (sample: RouteSample) => {setFocusedId(sample.id); mapPanel.current?.scrollIntoView({block:'start', behavior:'smooth'}); mapPanel.current?.focus({preventScroll:true});};
   return <div className="min-w-0 space-y-5" data-testid="route-detail">
-    <button type="button" onClick={onBack} className={`${button} inline-flex items-center gap-2`}><ArrowLeft size={18} />Volver a recorridos</button>
+    <button type="button" onClick={onBack} className={`${button} inline-flex items-center gap-2`}><ArrowLeft size={18} />{backLabel}</button>
     <header className="space-y-2"><p className="text-sm font-semibold text-cyan-300">Detalle del recorrido</p><h2 className="break-words text-2xl font-bold text-white">{route.employeeName}</h2><p className="break-words text-slate-300">{route.kind === 'automatic' ? 'Traslado automático' : route.name} · {route.status}</p><p className="text-sm text-slate-400">{route.vehiclePlate ? `Vehículo: ${route.vehiclePlate}` : 'Sin vehículo asociado'}</p></header>
     {loading && <p role="status" className="rounded-xl bg-slate-900 p-4">Cargando puntos del recorrido…</p>}
     {error && <div role="alert" className="rounded-xl border border-rose-800 bg-rose-950/30 p-4"><p>{error}</p><button type="button" className={`${button} mt-3`} onClick={onRetry}>Volver a cargar el recorrido</button></div>}

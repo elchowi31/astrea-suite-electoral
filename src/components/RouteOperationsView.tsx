@@ -12,6 +12,7 @@ import {LiveMonitorPanel} from './LiveMonitorPanel';
 import {RouteHistoryList} from './RouteHistoryList';
 import {RouteDetailView} from './RouteDetailView';
 import {routeInviteText,smsInviteUrl,whatsappInviteUrl} from '../lib/livePosition';
+import {usePageBack} from './PageNavigation';
 interface RegisteredDevice {id:string;tenantId:string;userId:string;deviceId:string;label:string;gps:string;installed:boolean;activeRouteId:string;firstSeenAt:string;lastSeenAt:string}
 /** Enlace que reciben los integrantes. En la app instalada se usa la dirección pública de la web. */
 const APP_URL=typeof window!=='undefined'&&/^https?:\/\/(?!localhost)/.test(window.location.origin)?window.location.origin:'https://astrea-suite-electoral.vercel.app';
@@ -20,6 +21,7 @@ const button='min-h-12 rounded-lg border border-slate-600 bg-slate-800 px-4 py-3
 export function RouteOperationsView({user,tenantId,users,vehicles,tenants=[],onSelectTenant,initialRouteId=''}:{user:UserProfile;tenantId:string;users:UserProfile[];vehicles:TransportVehicle[];tenants?:Tenant[];onSelectTenant?:(tenant:Tenant)=>void;initialRouteId?:string}){
   const tracking=useRouteTracking();const manager=isTrackingAdministrator(user);const [layers,setLayers]=useState<GeographicLayer[]>([]);const [selected,setSelected]=useState('');const [samples,setSamples]=useState<RouteSample[]>([]);const [error,setError]=useState('');const [busy,setBusy]=useState(false);
   const [view,setView]=useState<'history'|'live'|'manage'>('history');
+  const [detailOrigin,setDetailOrigin]=useState<'history'|'live'|'manage'|null>(null);
   useEffect(()=>{if(initialRouteId)setSelected(initialRouteId);},[initialRouteId]);
   const [samplesLoading,setSamplesLoading]=useState(false);const [samplesError,setSamplesError]=useState('');const [sampleAttempt,setSampleAttempt]=useState(0);
   const modulePanel=useRef<HTMLDivElement>(null);
@@ -29,7 +31,9 @@ export function RouteOperationsView({user,tenantId,users,vehicles,tenants=[],onS
   useEffect(()=>manager?subscribeToCollection<RegisteredDevice>('dispositivos',setDevices,[],tenantId):undefined,[tenantId,manager]);
   const sources=useMemo(()=>[...vehicles.filter(item=>item.plannedRoute).map(item=>({id:`vehicle-${item.id}`,name:`${item.licensePlate} · ${item.plannedRoute!.name}`,route:item.plannedRoute!})),...layers.flatMap(layer=>layer.features.filter(feature=>feature.geometries.some(geometry=>geometry.type==='LineString')).map(feature=>({id:`${layer.id}-${feature.id}`,name:`${layer.name} · ${feature.name}`,route:importedRoute(feature)})))],[vehicles,layers]);
   const route=tracking.routes.find(item=>item.id===selected);
-  const openDetail=(id:string)=>{setSelected(id);setView('history');};
+  const closeDetail=()=>{setSelected('');setView(detailOrigin||'history');setDetailOrigin(null);};
+  usePageBack(detailOrigin==='live'?'Monitoreo en vivo':detailOrigin==='manage'?'Administración de recorridos':'Recorridos y seguimiento',closeDetail,!!route&&detailOrigin!==null);
+  const openDetail=(id:string)=>{setDetailOrigin(view);setSelected(id);setView('history');};
   useEffect(()=>{modulePanel.current?.scrollIntoView({block:'start',behavior:'instant'});modulePanel.current?.focus({preventScroll:true});},[selected,view]);
   useEffect(()=>{
     setSamples([]);setSamplesError('');setSamplesLoading(!!route&&manager);if(!route||!manager)return;
@@ -42,7 +46,7 @@ export function RouteOperationsView({user,tenantId,users,vehicles,tenants=[],onS
   const perform=async(action:()=>Promise<void>)=>{setBusy(true);setError('');try{await action();}catch(error){setError((error as Error).message);}finally{setBusy(false);}};
   if(!manager)return null;
   return <div ref={modulePanel} tabIndex={-1} className="min-w-0 scroll-mt-20 space-y-5 pb-12 text-slate-200 focus:outline-none">
-    {route?<RouteDetailView key={route.id} route={route} samples={samples} loading={samplesLoading} error={samplesError} onRetry={()=>setSampleAttempt(value=>value+1)} onBack={()=>{setSelected('');setView('history');}}/>:<>
+    {route?<RouteDetailView key={route.id} route={route} samples={samples} loading={samplesLoading} error={samplesError} onRetry={()=>setSampleAttempt(value=>value+1)} onBack={closeDetail} backLabel={detailOrigin==='live'?'Volver al monitoreo en vivo':detailOrigin==='manage'?'Volver a administración':'Volver a recorridos'}/>:<>
     <header><h2 className="text-2xl font-bold text-white">Recorridos y seguimiento</h2><p className="mt-2 text-base text-slate-400">Elija una persona y abra un recorrido para consultar su trayecto y sus horarios.</p></header>
     {user.role==='AdminGlobal'&&onSelectTenant&&<label className="block rounded-xl border border-slate-700 bg-slate-900 p-3 text-sm font-semibold">Equipo a supervisar<select aria-label="Equipo a supervisar" className={input} value={tenantId} onChange={event=>{const tenant=tenants.find(item=>item.tenantId===event.target.value);if(tenant)onSelectTenant(tenant);}}>{tenants.map(tenant=><option key={tenant.tenantId} value={tenant.tenantId}>{tenant.name}</option>)}</select></label>}
     <nav aria-label="Vistas de seguimiento" className="grid grid-cols-3 gap-2">{([['history','Recorridos'],['live','En vivo'],['manage','Administrar']] as const).map(([value,label])=><button key={value} type="button" aria-pressed={view===value} onClick={()=>setView(value)} className={`min-h-12 min-w-0 rounded-xl border px-2 py-3 text-sm font-semibold ${view===value?'border-cyan-400 bg-cyan-500 text-slate-950':'border-slate-700 bg-slate-900 text-slate-300'}`}>{label}</button>)}</nav>
@@ -56,7 +60,7 @@ export function RouteOperationsView({user,tenantId,users,vehicles,tenants=[],onS
       const chosen=sources.find(item=>item.id===source)?.route || editing?.route;const member=availableUsers.find(item=>item.uid===employee);const selectedVehicle=vehicles.find(item=>item.id===vehicle);
       if(!chosen||!member||!name.trim())throw new Error('Complete nombre, empleado y ruta.');
       if(editing){await updateOperationalRecord('recorridos',editing.id,tenantId,{name:name.trim(),userId:member.uid,employeeName:member.displayName,vehicleId:vehicle,vehiclePlate:selectedVehicle?.licensePlate||'',instructions:instructions.trim(),scheduledDate:date,route:chosen},editing as unknown as Record<string,unknown>);}
-      else {const id=`${tenantId}--route-${crypto.randomUUID()}`;await persistEntity('recorridos',id,{id,tenantId,userId:member.uid,employeeName:member.displayName,vehicleId:vehicle,vehiclePlate:selectedVehicle?.licensePlate||'',name:name.trim(),instructions:instructions.trim(),scheduledDate:date,route:chosen,status:'Asignado',createdBy:auth.currentUser!.uid,createdAt:new Date().toISOString()} satisfies AssignedRoute);setSelected(id);}
+      else {const id=`${tenantId}--route-${crypto.randomUUID()}`;await persistEntity('recorridos',id,{id,tenantId,userId:member.uid,employeeName:member.displayName,vehicleId:vehicle,vehiclePlate:selectedVehicle?.licensePlate||'',name:name.trim(),instructions:instructions.trim(),scheduledDate:date,route:chosen,status:'Asignado',createdBy:auth.currentUser!.uid,createdAt:new Date().toISOString()} satisfies AssignedRoute);setDetailOrigin('manage');setSelected(id);}
       reset();
     });}}><h3 className="font-bold">{editing?'Editar asignación':'Asignar recorrido a empleado'}</h3>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><label className="text-xs">Nombre del recorrido<input aria-label="Nombre del recorrido asignado" required maxLength={160} className={input} value={name} onChange={event=>setName(event.target.value)}/></label>

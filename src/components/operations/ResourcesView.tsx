@@ -8,6 +8,7 @@ import { RESOURCE_CATALOG,TRANSPORT_RESOURCE,canCoordinate,type OperationalEvent
 import {useOperationsActions} from './useOperationsActions';
 import { useOperations } from './OperationsContext';
 import { Field,Metric,OperationsNotice,Panel,Status,button,input,money,secondary,tooltipStyle } from './OperationsUI';
+import {usePageBack} from '../PageNavigation';
 
 const colors=categoryColors(RESOURCE_CATALOG.map(c=>c.name));
 const localTime=(iso:string)=>{if(!iso)return '';const d=new Date(iso);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);};
@@ -15,6 +16,7 @@ const toISO=(value:string)=>value?new Date(value).toISOString():'';
 export function ResourcesView({onSwitchAccount}:{onSwitchAccount?:()=>void}){
   const data=useOperations();const {saveEvent,saveRequest,changeRequest,requestToExpense,editable}=useOperationsActions();const manager=canCoordinate(data.user);const [tab,setTab]=useState<'requests'|'events'>('requests');const [error,setError]=useState('');const [success,setSuccess]=useState('');const [busy,setBusy]=useState(false);
   const [request,setRequest]=useState<ResourceRequest|null>(null);const [event,setEvent]=useState<OperationalEvent|null>(null);const [status,setStatus]=useState('');const [eventFilter,setEventFilter]=useState('');const [page,setPage]=useState(0);const [leaderFilter,setLeaderFilter]=useState('');const [requestSearch,setRequestSearch]=useState('');
+  usePageBack('Solicitudes y jornadas',()=>{setRequest(null);setEvent(null);},!!request||!!event,20,busy);
   const run=async(action:()=>Promise<void>)=>{setBusy(true);setError('');setSuccess('');try{if(!editable||!data.user)throw new Error('Seleccione «Usar datos reales» para guardar.');await action();setSuccess('Guardado y verificado en Firestore.');}catch(e){setError((e as Error).message);}finally{setBusy(false);}};
   const newRequest=()=>{setTab('requests');setEvent(null);setRequest({id:`${data.tenant.tenantId}--sol-${crypto.randomUUID()}`,tenantId:data.tenant.tenantId,eventId:eventFilter,leaderId:leaderFilter||data.user?.assignedLeaderId||'',candidateId:data.user?.assignedCandidateId||'',municipality:data.user?.municipality||'',resource:RESOURCE_CATALOG[0].name,description:'',quantity:1,unitCost:0,amount:0,status:'Pendiente',notes:'',createdBy:data.user!.uid,createdAt:new Date().toISOString(),reservedPassengers:0,arrivedPassengers:0,expenseId:''});};
   const newEvent=()=>{setTab('events');setRequest(null);setEvent({id:`${data.tenant.tenantId}--jor-${crypto.randomUUID()}`,tenantId:data.tenant.tenantId,name:'',type:'Evento',department:data.user?.department||'',municipality:data.user?.municipality||'',destination:'',startAt:'',endAt:'',expectedAttendance:0,status:'Planificado',notes:'',createdBy:data.user!.uid,createdAt:new Date().toISOString()});};

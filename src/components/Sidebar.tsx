@@ -4,7 +4,8 @@ import { UserProfile, UserRole } from '../types';
 import { getRoleHierarchyLevel, getTerritorialScope } from '../lib/permissions';
 import {isTrackingAdministrator} from '../lib/trackingPermissions';
 
-export type ActiveTab = 'rewards' | 'reward_draws' | 'data_imports' | 'passengers' | 'resources' | 'device' | 'routes' | 'users' | 'dashboard' | 'campaign_structure' | 'hierarchy_pyramid' | 'login' | 'simulator' | 'costs_report' | 'zone_projections' | 'workspace' | 'map' | 'finances' | 'leaders' | 'transport' | 'candidates' | 'districts' | 'proposals' | 'drive' | 'ai' | 'tenants';
+import type { ActiveTab } from '../lib/moduleNavigation';
+export type { ActiveTab } from '../lib/moduleNavigation';
 
 interface SidebarProps {
   activeTab: ActiveTab;

@@ -133,7 +133,7 @@ export function TrackingStatusBanner(){
   const tracking=useRouteTracking();const [error,setError]=useState('');
   const consented=!trackingConsentNeeded(readSeed());
   if(!consented&&!tracking.automatic&&!tracking.activeId&&!tracking.pending)return null;
-  return <div role="status" className="sticky top-16 z-30 flex flex-wrap items-center justify-between gap-2 border-y border-cyan-700 bg-cyan-950 p-3 text-xs text-cyan-100">
+  return <div data-page-status-banner role="status" className="sticky top-16 z-30 flex flex-wrap items-center justify-between gap-2 border-y border-cyan-700 bg-cyan-950 p-3 text-xs text-cyan-100">
     <span>{tracking.automatic?(tracking.automaticReady?(tracking.moving?'En movimiento · registrando traslado':'Preparado · esperando movimiento'):tracking.message||'Preparando seguimiento automático'):tracking.activeId?'Recorrido GPS activo':'Seguimiento pausado'} · {tracking.pending} posiciones pendientes{tracking.lastFixAt&&` · último desplazamiento ${new Date(tracking.lastFixAt).toLocaleTimeString('es-CO')}`}{error&&` · ${error}`}</span>
     {(tracking.automatic||tracking.activeId)?<button className="rounded-lg bg-slate-800 px-3 py-2" onClick={()=>void tracking.stop().catch(error=>setError(error.message))}>Pausar seguimiento</button>:consented&&<button className="rounded-lg bg-slate-800 px-3 py-2" onClick={()=>{setError('');void tracking.enableAutomatic().catch(error=>setError(error.message));}}>Reanudar mi ubicación</button>}
     {!!tracking.pending&&<button className="rounded-lg bg-slate-800 px-3 py-2" onClick={()=>void tracking.flush()}>Sincronizar posiciones</button>}
