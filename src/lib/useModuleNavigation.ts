@@ -13,12 +13,16 @@ export function useModuleNavigation(viewer: string | null, workspace: string | u
     // Reset before rendering children so another account never inherits this trail.
     setSession(active);
   }
-  const navigate = useCallback((destination: Destination) => setSession(current => {
-    if (current.scope !== scope) return current;
-    const tab = typeof destination === 'function' ? destination(current.trail.current.tab) : destination;
-    const trail = openModule(current.trail, tab, window.scrollY);
-    return trail === current.trail ? current : { ...current, trail, revision: current.revision + 1 };
-  }), [scope]);
+  const navigate = useCallback((destination: Destination) => {
+    // Capture before callers close menus or move the viewport; React may queue the update.
+    const scrollY = window.scrollY;
+    setSession(current => {
+      if (current.scope !== scope) return current;
+      const tab = typeof destination === 'function' ? destination(current.trail.current.tab) : destination;
+      const trail = openModule(current.trail, tab, scrollY);
+      return trail === current.trail ? current : { ...current, trail, revision: current.revision + 1 };
+    });
+  }, [scope]);
   const back = useCallback(() => setSession(current => current.scope !== scope ? current : { ...current, trail: previousModule(current.trail), revision: current.revision + 1 }), [scope]);
   const home = useCallback(() => setSession(current => current.scope !== scope ? current : { ...current, trail: initialModuleTrail(), revision: current.revision + 1 }), [scope]);
   return { activeTab: active.trail.current.tab, currentPage: active.trail.current, previousPage: active.trail.previous.at(-1)?.tab || 'dashboard' as ActiveTab, revision: active.revision, navigate, back, home, scope };
