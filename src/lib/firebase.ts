@@ -589,10 +589,10 @@ export function subscribeToCollection<T>(
       ? query(collection(db, collectionName), where('tenantId', '==', tenantId), where(additionalFilter.field, '==', additionalFilter.value))
       : query(collection(db, collectionName), where('tenantId', '==', tenantId));
     const unsubscribe = onSnapshot(
-      query(colRef,limit(10001)),
+      query(colRef,limit(10000)),
       (snapshot) => {
         if(auth.currentUser?.uid!==owner)return;
-        health({state:snapshot.size>10000?'partial':'ready',count:Math.min(snapshot.size,10000),durationMs:Date.now()-started});
+        health({state:snapshot.size>=10000?'partial':'ready',count:Math.min(snapshot.size,10000),durationMs:Date.now()-started});
         const items = snapshot.docs.slice(0,10000).map((d) => ({ id: d.id, ...d.data() } as T));
         onData(items);
       },
