@@ -45,6 +45,10 @@
       "kind": "docs"
     },
     {
+      "id": "docs/CIERRE-PRODUCCION-2026-11-14.md",
+      "kind": "docs"
+    },
+    {
       "id": "docs/CONTROL-OPERATIVO.md",
       "kind": "docs"
     },
@@ -1314,6 +1318,16 @@
       "kind": "explicit-reference"
     },
     {
+      "source": "docs/CIERRE-PRODUCCION-2026-11-14.md",
+      "target": "docs/CONTROLES-PRODUCCION-2026-11-14.md",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "docs/CIERRE-PRODUCCION-2026-11-14.md",
+      "target": "docs/PLAN-MEJORAS-2026-11-12.md",
+      "kind": "explicit-reference"
+    },
+    {
       "source": "docs/DEPLOYMENT.md",
       "target": "docs/REVISION-Y-SIMULACION.md",
       "kind": "explicit-reference"
@@ -1321,6 +1335,11 @@
     {
       "source": "docs/DEPLOYMENT.md",
       "target": "docs/USUARIOS-Y-FIRESTORE.md",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "docs/PLAN-MEJORAS-2026-11-12.md",
+      "target": "docs/CIERRE-PRODUCCION-2026-11-14.md",
       "kind": "explicit-reference"
     },
     {

@@ -2,7 +2,7 @@
 
 Packet: repo-structure-packet. Modo: structural-fallback.
 
-301 archivos; 790 referencias explícitas. Alcance: src, api, tests y docs.
+302 archivos; 793 referencias explícitas. Alcance: src, api, tests y docs.
 
 Se revisó el grafo original del 11 de noviembre (436 nodos y 1.416 relaciones). Este respaldo actualizado registra referencias de archivos; no sustituye su análisis semántico ni acredita funcionamiento en producción.
 
@@ -15,17 +15,17 @@ Se revisó el grafo original del 11 de noviembre (436 nodos y 1.416 relaciones).
 | `src/lib/operations.ts` | 23 |
 | `src/lib/territorialMaps.ts` | 22 |
 | `src/data/demoSeed.ts` | 20 |
-| `src/components/common/EditRecordButton.tsx` | 18 |
 | `src/lib/geographicImport.ts` | 18 |
 | `src/lib/requestAgent.ts` | 18 |
+| `src/components/common/EditRecordButton.tsx` | 18 |
 | `src/lib/routeTracking.ts` | 17 |
 | `src/components/operations/OperationsContext.tsx` | 17 |
 | `src/lib/trackingPermissions.ts` | 16 |
 | `src/lib/offlineMutations.ts` | 15 |
 | `src/lib/deviceStorage.ts` | 12 |
+| `src/lib/serialization.ts` | 12 |
 | `src/lib/permissions.ts` | 12 |
 | `src/server/requestAgent.ts` | 12 |
-| `src/lib/serialization.ts` | 12 |
 | `src/components/operations/OperationsUI.tsx` | 10 |
 | `src/lib/movementTracking.ts` | 10 |
 | `src/lib/livePosition.ts` | 9 |
