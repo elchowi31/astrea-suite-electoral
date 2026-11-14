@@ -1,9 +1,10 @@
 import { AgentError, advanceAgent, agentRequest, validateAgentTurn, question, type AgentContext, type AgentConversation, type AgentTurn } from '../lib/requestAgent.js';
 
-type Value = {stringValue?:string;booleanValue?:boolean;integerValue?:string;doubleValue?:number;nullValue?:null;mapValue?:{fields:Record<string,Value>};arrayValue?:{values?:Value[]}};
+type Value = {timestampValue?:string;stringValue?:string;booleanValue?:boolean;integerValue?:string;doubleValue?:number;nullValue?:null;mapValue?:{fields:Record<string,Value>};arrayValue?:{values?:Value[]}};
 export function encodeFields(data:Record<string,any>):Record<string,Value>{return Object.fromEntries(Object.entries(data).map(([k,v])=>[k,encode(v)]));}
 function encode(v:any):Value{
   if(v===null)return {nullValue:null};
+  if(v instanceof Date){if(!Number.isFinite(v.getTime()))throw new AgentError('Fecha no válida.');return {timestampValue:v.toISOString()};}
   if(typeof v==='string')return {stringValue:v};
   if(typeof v==='boolean')return {booleanValue:v};
   if(typeof v==='number'&&Number.isFinite(v))return Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v};
@@ -13,7 +14,7 @@ function encode(v:any):Value{
 }
 export function decodeFields(fields:Record<string,Value>={}):Record<string,any>{return Object.fromEntries(Object.entries(fields).map(([k,v])=>[k,decode(v)]));}
 function decode(v:Value):any{
-  if('stringValue'in v)return v.stringValue;if('booleanValue'in v)return v.booleanValue;
+  if('timestampValue'in v)return v.timestampValue;if('stringValue'in v)return v.stringValue;if('booleanValue'in v)return v.booleanValue;
   if('integerValue'in v)return Number(v.integerValue);if('doubleValue'in v)return v.doubleValue;
   if(v.mapValue)return decodeFields(v.mapValue.fields);if(v.arrayValue)return (v.arrayValue.values||[]).map(decode);return null;
 }

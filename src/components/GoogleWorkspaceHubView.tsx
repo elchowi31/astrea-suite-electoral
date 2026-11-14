@@ -35,6 +35,7 @@ import { CampaignExpense, Leader, TransportVehicle, Candidate } from '../types';
 import { saveWorkspaceEventToFirestore } from '../lib/firebase';
 
 interface GoogleWorkspaceHubViewProps {
+  key?: React.Key;
   tenantName?: string;
   tenantId?: string;
   expenses?: CampaignExpense[];
@@ -77,6 +78,7 @@ export const GoogleWorkspaceHubView: React.FC<GoogleWorkspaceHubViewProps> = ({
   const [newEventDate, setNewEventDate] = useState(new Date().toISOString().slice(0, 16));
   const [calendarSuccessMessage, setCalendarSuccessMessage] = useState<string | null>(null);
 
+  useEffect(()=>{setAccessToken(null);setCalendarEvents([]);setCreatedSheetUrl(null);setCreatedFormUrl(null);setFormResponses([]);},[tenantId]);
   // Auto-init Auth listener
   useEffect(() => {
     const unsub = initGoogleWorkspaceAuth(

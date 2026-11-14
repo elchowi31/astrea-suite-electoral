@@ -37,7 +37,7 @@ service cloud.firestore {
     }
 
     function operator() {
-      return profileExists() && teamRole(me().get('role', ''));
+      return profileExists() && me().get('role','') in ['AdminTenant','Gobernador','Diputado','Alcalde','Concejal','JefePolitico','Supervisor','Operador','LiderVeredal'];
     }
 
     function financialManager() {
@@ -89,7 +89,7 @@ service cloud.firestore {
     // Transactions must check that a new scoped ID is absent before creating it.
     // This grants no list access or access to existing documents.
     match /{collectionName}/{recordId} {
-      allow get: if collectionName in ['candidatos', 'distritos', 'lideres', 'votantes_rasos',
+      allow get: if collectionName in ['asignaciones_testigos','actas_electorales','incidencias_electorales','candidatos', 'distritos', 'lideres', 'votantes_rasos',
           'gastos', 'aportes', 'vehiculos', 'propuestas', 'archivos_drive',
           'comites_coordinaciones', 'jornadas_operativas', 'solicitudes_recursos',
           'viajes_operativos', 'reportes_jornada', 'registros_jornada', 'capas_geograficas', 'bases_datos',
@@ -211,7 +211,7 @@ service cloud.firestore {
           || (me().get('assignedLeaderId', '') != '' && me().assignedLeaderId == request.resource.data.leaderId));
       allow update: if canOperateTenant(resource.data.tenantId)
         && immutableTenant()
-        && request.resource.data.consentGiven == true
+        && (request.resource.data.consentGiven == true || (canManageTenant(resource.data.tenantId) && request.resource.data.consentGiven == false && request.resource.data.verified == false && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['consentGiven','consentAt','consentRevokedAt','consentPolicyVersion','consentPurpose','consentChannels','consentEvidence','verified','updatedAt','updatedBy'])))
         && request.resource.data.get('createdBy', '') == resource.data.get('createdBy', '')
         && (platformAdmin() || resource.data.get('createdBy', '') == request.auth.uid || (manager() && me().role != 'Concejal')
           || (me().role == 'Concejal' && me().get('assignedCandidateId', '') != '' && me().assignedCandidateId == resource.data.candidateId && me().assignedCandidateId == request.resource.data.candidateId)
@@ -614,6 +614,80 @@ service cloud.firestore {
         && request.resource.data.revision == resource.data.revision + 1
         && ((!resource.data.boarded || request.resource.data.boarded) && (!resource.data.command || request.resource.data.command) || request.resource.data.notes.size() > 0);
       allow delete: if false;
+    }
+
+    match /cuotas_api/{id} {
+      allow get: if profileExists() && id.matches(request.auth.uid + '--[0-9]+');
+      allow create,update: if profileExists() && sameTenant(request.resource.data.tenantId)
+        && id == request.auth.uid + '--' + string(request.resource.data.minute)
+        && request.resource.data.keys().hasOnly(['userId','tenantId','minute','count','expiresAt'])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.minute is int && request.resource.data.minute == int(request.time.toMillis() / 60000)
+        && request.resource.data.count is int && request.resource.data.count > 0 && request.resource.data.count <= 40
+        && request.resource.data.expiresAt is timestamp && request.resource.data.expiresAt > request.time && request.resource.data.expiresAt < request.time + duration.value(3,'m')
+        && ((!exists(/databases/$(database)/documents/cuotas_api/$(id)) && request.resource.data.count == 1)
+          || (resource.data.userId == request.auth.uid && resource.data.tenantId == request.resource.data.tenantId && request.resource.data.count == resource.data.count+1));
+      allow list,delete: if false;
+    }
+
+    // Private election evidence: scoped assignment, manual capture and human review.
+    function evidenceReader(data) {
+      let profile=me();
+      let tenant=get(/databases/$(database)/documents/organizaciones/$(data.tenantId)).data;
+      return platformAdmin() || (signedIn() && profile.active == true && profile.accessVersion == 2
+        && profile.tenantId == data.tenantId && tenant.active == true
+        && (profile.role in ['AdminTenant','Gobernador','Diputado','Alcalde','Concejal','JefePolitico']
+          || (profile.role in ['Supervisor','Operador','LiderVeredal'] && data.assignedUid == request.auth.uid)));
+    }
+    function validEvidence(data,id) {
+      let assignment=get(/databases/$(database)/documents/asignaciones_testigos/$(data.assignmentId)).data;
+      return data.keys().hasOnly(['id','tenantId','assignmentId','assignedUid','contest','submittedBy','createdAt','updatedAt','revision','status','resultsText','photo','notes','reviewedBy','reviewedAt'])
+        && data.id == id && data.assignmentId == id && assignment.tenantId == data.tenantId
+        && assignment.assignedUid == data.assignedUid && assignment.contest == data.contest
+        && data.resultsText is string && data.resultsText.size() <= 4000 && data.resultsText.matches('[^;\\r\\n]{1,120};(0|[1-9][0-9]{0,5}|1000000)(\\n[^;\\r\\n]{1,120};(0|[1-9][0-9]{0,5}|1000000)){0,29}')
+        && data.photo is string && data.photo.size() <= 500000 && data.photo.matches('data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+')
+        && data.notes is string && data.notes.size() <= 1500
+        && data.createdAt is string && data.updatedAt is string && data.revision is int;
+    }
+    match /asignaciones_testigos/{id} {
+      allow read: if evidenceReader(resource.data);
+      allow create: if canManageTenant(request.resource.data.tenantId)
+        && request.resource.data.keys().hasOnly(['id','tenantId','municipality','pollingStation','tableNumber','contest','assignedUid','assignedName','createdBy','createdAt','updatedAt','revision'])
+        && request.resource.data.id == id && id.matches(request.resource.data.tenantId + '--mesa--[a-f0-9]{64}')
+        && request.resource.data.createdBy == request.auth.uid && request.resource.data.revision == 1
+        && request.resource.data.municipality is string && request.resource.data.municipality.size() > 0 && request.resource.data.municipality.size() <= 120
+        && request.resource.data.pollingStation is string && request.resource.data.pollingStation.size() > 0 && request.resource.data.pollingStation.size() <= 120
+        && request.resource.data.contest is string && request.resource.data.contest.size() > 0 && request.resource.data.contest.size() <= 120
+        && request.resource.data.assignedName is string && request.resource.data.assignedName.size() <= 150
+        && request.resource.data.tableNumber is int && request.resource.data.tableNumber > 0 && request.resource.data.tableNumber <= 10000
+        && get(/databases/$(database)/documents/usuarios/$(request.resource.data.assignedUid)).data.tenantId == request.resource.data.tenantId
+        && get(/databases/$(database)/documents/usuarios/$(request.resource.data.assignedUid)).data.active == true;
+      allow update,delete: if false;
+    }
+    match /actas_electorales/{id} {
+      allow read: if evidenceReader(resource.data);
+      allow create: if evidenceReader(request.resource.data) && validEvidence(request.resource.data,id)
+        && request.resource.data.submittedBy == request.auth.uid && request.resource.data.revision == 1 && request.resource.data.status == 'En revisión'
+        && request.resource.data.get('reviewedBy','') == '' && request.resource.data.get('reviewedAt','') == '';
+      allow update: if evidenceReader(resource.data) && immutableTenant() && validEvidence(request.resource.data,id)
+        && request.resource.data.assignmentId == resource.data.assignmentId && request.resource.data.assignedUid == resource.data.assignedUid
+        && request.resource.data.submittedBy == resource.data.submittedBy && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.revision == resource.data.revision + 1
+        && ((canManageTenant(resource.data.tenantId) && resource.data.status == 'En revisión' && request.resource.data.status == 'Revisada' && request.resource.data.reviewedBy == request.auth.uid && request.resource.data.reviewedAt is string
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedBy','reviewedAt','updatedAt','revision']))
+          || (resource.data.submittedBy == request.auth.uid && request.resource.data.status == 'En revisión' && request.resource.data.get('reviewedBy','') == '' && request.resource.data.get('reviewedAt','') == ''));
+      allow delete: if false;
+    }
+    match /incidencias_electorales/{id} {
+      allow read: if evidenceReader(resource.data);
+      allow create: if evidenceReader(request.resource.data)
+        && request.resource.data.keys().hasOnly(['id','tenantId','assignmentId','assignedUid','notes','createdBy','createdAt'])
+        && request.resource.data.id == id && id.matches(request.resource.data.tenantId + '--inc-.*')
+        && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt is string
+        && request.resource.data.notes is string && request.resource.data.notes.size() >= 8 && request.resource.data.notes.size() <= 1500
+        && get(/databases/$(database)/documents/asignaciones_testigos/$(request.resource.data.assignmentId)).data.tenantId == request.resource.data.tenantId
+        && get(/databases/$(database)/documents/asignaciones_testigos/$(request.resource.data.assignmentId)).data.assignedUid == request.resource.data.assignedUid;
+      allow update,delete: if false;
     }
 
     // bound to the stored profile; demo data never grants operational privileges.

@@ -1,14 +1,17 @@
+import {recordFormOperation} from '../lib/operationMetrics';
+import {useFormWriteAccess} from './WriteAccess';
 import React, { useRef, useState } from 'react';
 import { accountError } from '../lib/userProvisioning';
 
 export function useFirestoreForm() {
+  const canWrite=useFormWriteAccess();
   const lock = useRef(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   async function runSave(operation: () => void | Promise<void>) {
     if (lock.current) return;
-    lock.current = true; setSaving(true); setSaveError('');
-    try { await operation(); } catch(error) { setSaveError(accountError(error)); }
+    lock.current = true; setSaving(true); setSaveError('');const started=performance.now();
+    try { if(!canWrite)throw new Error('Esta cuenta tiene acceso de consulta. Solicite un perfil operativo para modificar datos.');await operation();recordFormOperation('completed',performance.now()-started); } catch(error) {recordFormOperation('error',performance.now()-started);setSaveError(accountError(error)); }
     finally { lock.current = false; setSaving(false); }
   }
   function submit(event: React.FormEvent, handler: (event: React.FormEvent) => void | Promise<void>) {

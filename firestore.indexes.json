@@ -4,18 +4,61 @@
       "collectionGroup": "votantes_rasos",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "tenantId", "order": "ASCENDING" },
-        { "fieldPath": "leaderId", "order": "ASCENDING" }
+        {
+          "fieldPath": "tenantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "leaderId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "votantes_rasos",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "tenantId", "order": "ASCENDING" },
-        { "fieldPath": "candidateId", "order": "ASCENDING" }
+        {
+          "fieldPath": "tenantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "candidateId",
+          "order": "ASCENDING"
+        }
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "whatsapp_sessions",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "handled",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "whatsapp_activity",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "whatsapp_pilot_locks",
+      "fieldPath": "purgeAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "cuotas_api",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    }
+  ]
 }

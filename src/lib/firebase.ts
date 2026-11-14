@@ -1,3 +1,4 @@
+import {notifySubscriptionHealth} from './dataSubscriptionHealth';
 import {verifySavedRecord} from './saveVerification';
 import { initializeApp, getApps } from 'firebase/app';
 import { connectAuthEmulator, getAuth, indexedDBLocalPersistence, initializeAuth } from 'firebase/auth';
@@ -14,6 +15,7 @@ import {
   setDoc,
   deleteDoc,
   collection,
+  limit,
   onSnapshot,
   getDocFromServer,
   getDocFromCache,
@@ -108,7 +110,7 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   return fetch(target, { ...init, headers });
 }
 
-export type FirestoreBatchWrite = { collection: string; id: string; type: 'set' | 'update' | 'delete'; data?: Record<string, any>; merge?: boolean };
+export type FirestoreBatchWrite = { collection: string; id: string; type: 'set' | 'update' | 'delete'; createOnly?: boolean; data?: Record<string, any>; merge?: boolean };
 type CapturedWrite = FirestoreBatchWrite & { before: string | null; beforeData?: Record<string, any> };
 type CapturedBatch = { writes: CapturedWrite[] };
 const batchKind = 'firestore-batch-v1';
@@ -124,6 +126,7 @@ async function executeCapturedBatch(payload: CapturedBatch, context: MutationCon
     payload.writes.forEach((write, index) => {
       const snapshot = current[index];
       if (!snapshot) return;
+      if(write.createOnly && snapshot.exists())throw new Error('Un registro ya existe; la restauración no lo reemplaza. Revise el respaldo de nuevo.');
       const data = snapshot.exists() ? snapshot.data() : undefined;
       if (data && data.tenantId !== context.scope.tenantId) throw new Error('El registro pertenece a otra organización. Los datos pendientes se conservan para revisión.');
       if (canonicalStoredValue(data) !== write.before) throw new Error(`El registro ${write.collection}/${write.id} cambió mientras estaba sin conexión. Sus cambios pendientes se conservan; revise el registro antes de reintentar.`);
@@ -267,7 +270,7 @@ export function handleFirestoreError(
     operationType,
     path
   };
-  console.warn('Firestore Operation Info:', JSON.stringify(errInfo));
+  console.warn('Firestore operation failed',{operationType,code:typeof (error as any)?.code==='string'?(error as any).code:'unknown'});
   return errInfo;
 }
 
@@ -578,25 +581,30 @@ export function subscribeToCollection<T>(
     return () => {};
   }
 
+  const owner=auth.currentUser?.uid||'',started=Date.now();
+  const health=(value:Partial<import('./dataSubscriptionHealth').SubscriptionHealth>)=>notifySubscriptionHealth({collection:collectionName,tenantId,userId:owner,state:'loading',...value});
+  onData([]);health({state:'loading'});
   try {
     const colRef = globalOrganizations && collectionName === 'organizaciones' ? collection(db, collectionName) : additionalFilter
       ? query(collection(db, collectionName), where('tenantId', '==', tenantId), where(additionalFilter.field, '==', additionalFilter.value))
       : query(collection(db, collectionName), where('tenantId', '==', tenantId));
     const unsubscribe = onSnapshot(
-      colRef,
+      query(colRef,limit(10001)),
       (snapshot) => {
-        const items = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as T));
+        if(auth.currentUser?.uid!==owner)return;
+        health({state:snapshot.size>10000?'partial':'ready',count:Math.min(snapshot.size,10000),durationMs:Date.now()-started});
+        const items = snapshot.docs.slice(0,10000).map((d) => ({ id: d.id, ...d.data() } as T));
         onData(items);
       },
       (error) => {
         handleFirestoreError(error, OperationType.LIST, collectionName);
-        onData([]);
+        health({state:'error',code:error.code});
       }
     );
     return unsubscribe;
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, collectionName);
-    onData([]);
+    health({state:'error',code:'subscription-failed'});
     return () => {};
   }
 }

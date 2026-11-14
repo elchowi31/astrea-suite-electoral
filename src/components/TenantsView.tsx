@@ -1,3 +1,4 @@
+import {BudgetSettingsButton} from './CampaignPlanningPanel';
 import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
@@ -688,6 +689,8 @@ export const TenantsView: React.FC<TenantsViewProps> = ({
           </div>
         </div>
       )}
+
+      <section className="rounded-2xl border border-slate-700 bg-slate-900 p-4"><h3 className="mb-2 font-bold text-white">Presupuesto de la organización seleccionada</h3><p className="mb-3 text-sm text-slate-300">Inversión prevista y fecha de campaña de {currentTenant.name}. También puede configurarlas en Finanzas.</p><BudgetSettingsButton tenant={currentTenant} userRole={userRole}/></section>
 
       {/* DELETE CONFIRMATION MODAL */}
       {tenantToDelete && (

@@ -1,4 +1,6 @@
+import {summarizeFinances} from '../lib/financialSummary';
 import { ServiceCostsDashboard } from './ServiceCostsDashboard';
+import {BudgetSettingsButton,CampaignPlanningPanel} from './CampaignPlanningPanel';
 import { EditRecordButton } from './common/EditRecordButton';
 import { createRecordId } from '../lib/recordIds';
 import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
@@ -61,7 +63,7 @@ import {
 
 import { useOperations } from './operations/OperationsContext';
 
-interface FinancesViewProps {
+export interface FinancesViewProps {
   currentTenant: Tenant;
   currentUser?: UserProfile | null;
   userRole?: UserRole;
@@ -72,6 +74,7 @@ interface FinancesViewProps {
   onDeleteExpense?: (id: string) => Promise<void>;
   onDeleteDonorContribution?: (id: string) => Promise<void>;
   onNavigateTransport: () => void;
+  onNavigateCandidates: () => void;
 }
 
 const RUBROS_LIST: FinancialRubro[] = [
@@ -106,6 +109,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
   onAddExpense,
   onAddDonorContribution,
   onNavigateTransport,
+  onNavigateCandidates,
 }) => {
   const scope = getTerritorialScope(currentUser, userRole);
   const operation = useOperations();
@@ -114,6 +118,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
   const [expenseEvent,setExpenseEvent]=useState('');
   const [expenseDate,setExpenseDate]=useState(new Date().toISOString().slice(0,10));
   const [expenseStatus,setExpenseStatus]=useState<CampaignExpense['status']>('Pendiente');
+  const [settlementType,setSettlementType]=useState<'Efectivo'|'Especie'>('Efectivo');
   const [expenseQuantity,setExpenseQuantity]=useState('1');
   const [expenseUnit,setExpenseUnit]=useState('servicio');
   // Navigation Sub-tabs
@@ -250,29 +255,11 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
   }, [tenantExpenses, filterRubro, filterMuni, searchTerm]);
 
   // Aggregated Totals
-  const totalAportes = useMemo(() => {
-    return tenantContributions.reduce((acc, curr) => acc + curr.amount, 0);
-  }, [tenantContributions]);
-
-  const totalAportesEfectivo = useMemo(() => {
-    return tenantContributions
-      .filter((c) => c.contributionType.includes('Efectivo'))
-      .reduce((acc, curr) => acc + curr.amount, 0);
-  }, [tenantContributions]);
-
-  const totalAportesEspecie = useMemo(() => {
-    return tenantContributions
-      .filter((c) => c.contributionType.includes('Especie'))
-      .reduce((acc, curr) => acc + curr.amount, 0);
-  }, [tenantContributions]);
-
-  const totalGastos = useMemo(() => {
-    return tenantExpenses.reduce((acc, curr) => acc + curr.amount, 0);
-  }, [tenantExpenses]);
-
-  const saldoNeto = totalAportes - totalGastos;
-  const cneTopeLegalEstimado = currentTenant.budgetCap || 0;
-  const pctTopeAlcanzado = cneTopeLegalEstimado>0?Math.min(100, (totalGastos / cneTopeLegalEstimado) * 100):0;
+  const ledger=useMemo(()=>summarizeFinances(tenantExpenses,tenantContributions,currentTenant.tenantId),[tenantExpenses,tenantContributions,currentTenant.tenantId]);
+  const totalAportes=ledger.registeredContributions,totalAportesEfectivo=ledger.cashIncome,totalAportesEspecie=ledger.inKindIncome;
+  const totalGastos=ledger.registeredExpenses,saldoNeto=ledger.recordedCashBalance;
+  const plannedBudget = currentTenant.budgetCap ?? 0;
+  const budgetExecutionPct = plannedBudget>0?(totalGastos / plannedBudget) * 100:0;
 
   // Data for Charts: Comparativa Aportes vs Gastos por Rubro
   const chartDataRubros = useMemo(() => {
@@ -353,6 +340,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
       amount: parseFloat(newExpAmount),
       date: expenseDate,
       status: expenseStatus,
+      settlementType,
       responsibleLeaderId:expenseLeader,candidateId:expenseCandidate,eventId:expenseEvent,
       quantity:Number(expenseQuantity),unitMeasure:expenseUnit,unitCost:Number(newExpAmount)/Number(expenseQuantity),
       supplier: newExpSupplier.trim(),
@@ -537,14 +525,14 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
           <div className="text-2xl font-black text-emerald-400 font-mono tracking-tight">{formatCOP(totalGastos)}</div>
           <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
             <span>{tenantExpenses.length} facturas</span>
-            <span>Ejecución: <strong className="text-amber-300">{pctTopeAlcanzado.toFixed(1)}%</strong></span>
+            <span>Ejecución: <strong className="text-amber-300">{budgetExecutionPct.toFixed(1)}%</strong></span>
           </div>
         </div>
 
         {/* Saldo Neto en Caja */}
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-2 relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Saldo en Caja / Balance</span>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Saldo monetario registrado</span>
             <span className={`p-1.5 rounded-lg ${saldoNeto >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
               <DollarSign className="w-4 h-4" />
             </span>
@@ -553,7 +541,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             {formatCOP(saldoNeto)}
           </div>
           <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800">
-            {saldoNeto >= 0 ? 'Superávit disponible' : 'Déficit temporal por fondear'}
+            {saldoNeto >= 0 ? 'Según aportes monetarios y pagos registrados' : 'Saldo monetario negativo; requiere revisión'}
           </div>
         </div>
 
@@ -577,14 +565,16 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Presupuesto configurado</span>
             <span className="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg"><ShieldCheck className="w-4 h-4" /></span>
           </div>
-          <div className="text-2xl font-black text-amber-300 font-mono tracking-tight">{cneTopeLegalEstimado > 0 ? formatCOP(cneTopeLegalEstimado) : 'Sin configurar'}</div>
+          <div className="text-2xl font-black text-amber-300 font-mono tracking-tight">{currentTenant.budgetCap !== undefined ? formatCOP(plannedBudget) : 'Sin configurar'}</div>
           <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-            <div className="bg-amber-400 h-full rounded-full" style={{ width: `${pctTopeAlcanzado}%` }} />
+            <div className="bg-amber-400 h-full rounded-full" style={{ width: `${Math.min(100,budgetExecutionPct)}%` }} />
           </div>
         </div>
       </div>
 
+      <section aria-label="Conciliación de registros" className="rounded-xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300"><p>El saldo monetario usa aportes en efectivo y pagos monetarios registrados; no equivale a una conciliación bancaria. Los aportes en especie no aumentan caja.</p><div className="mt-3 grid gap-3 sm:grid-cols-3"><p>Pagado: <strong>{formatCOP(ledger.paid)}</strong></p><p>Aprobado por pagar: <strong>{formatCOP(ledger.approved)}</strong></p><p>Pendiente de aprobación: <strong>{formatCOP(ledger.pending)}</strong></p></div><p className="mt-2">Saldo después de compromisos monetarios: {formatCOP(ledger.afterCommitments)}</p>{(ledger.invalidRecords>0||ledger.unknownExpenseStatuses>0||ledger.unknownContributionAmount>0)&&<p role="alert" className="mt-2 text-amber-300">Hay registros inválidos o sin clasificación. Revise los datos antes de conciliar.</p>}</section>
       {/* Sub-Navigation Tabs */}
+      <CampaignPlanningPanel tenant={currentTenant} userRole={userRole as UserRole} onNavigateCandidates={onNavigateCandidates}/>
       <div className="flex flex-wrap gap-1 border-b border-slate-800">
         <button onClick={() => setActiveTab('service_costs')} className={`flex min-h-11 items-center gap-2 rounded-t-xl px-4 py-2.5 text-xs font-bold ${activeTab === 'service_costs' ? 'border-t-2 border-cyan-400 bg-slate-900 text-cyan-300' : 'text-slate-400 hover:text-slate-200'}`}><BarChart3 className="h-4 w-4"/>Costos por servicio</button>
         <button
@@ -620,7 +610,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
           }`}
         >
           <Receipt className="w-4 h-4" />
-          <span>Costos & Gastos Ejecutados ({tenantExpenses.length})</span>
+          <span>Costos y gastos registrados ({tenantExpenses.length})</span>
         </button>
 
         <button
@@ -1132,10 +1122,11 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 space-y-2">
                 <span className="text-xs font-bold text-slate-400 uppercase">Presupuesto general configurado</span>
-                <div className="text-xl font-black text-amber-300 font-mono">{cneTopeLegalEstimado ? formatCOP(cneTopeLegalEstimado) : 'Sin configurar'}</div>
+                <div className="text-xl font-black text-amber-300 font-mono">{currentTenant.budgetCap !== undefined ? formatCOP(plannedBudget) : 'Sin configurar'}</div>
                 <p className="text-[11px] text-slate-400">
-                  Defina el presupuesto en la organización y documente por separado la fuente del límite aplicable.
+                  Inversión prevista de esta organización. Documente por separado la fuente del límite legal aplicable.
                 </p>
+                <BudgetSettingsButton tenant={currentTenant} userRole={userRole as UserRole}/>
               </div>
 
               <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 space-y-2">
@@ -1435,6 +1426,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
                 <label className="text-xs text-slate-300">Jornada o evento<select aria-label="Jornada del gasto" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-800 p-2 text-white" value={expenseEvent} onChange={e=>setExpenseEvent(e.target.value)}><option value="">Operación general</option>{operation.events.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
                 <label className="text-xs text-slate-300">Fecha del gasto<input required type="date" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-800 p-2 text-white" value={expenseDate} onChange={e=>setExpenseDate(e.target.value)}/></label>
                 <label className="text-xs text-slate-300">Estado del gasto<select className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-800 p-2 text-white" value={expenseStatus} onChange={e=>setExpenseStatus(e.target.value as CampaignExpense['status'])}>{['Pendiente','Aprobado','Pagado'].map(s=><option key={s}>{s}</option>)}</select></label>
+                <label className="text-xs text-slate-300">Forma de liquidación<select className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-800 p-2 text-white" value={settlementType} onChange={e=>setSettlementType(e.target.value as 'Efectivo'|'Especie')}><option value="Efectivo">Pago monetario</option><option value="Especie">Cubierto en especie</option></select><span className="mt-1 block text-[11px] text-slate-400">Los gastos en especie no reducen el saldo monetario.</span></label>
                 <label className="text-xs text-slate-300">Cantidad<input required type="number" min={0.01} step="any" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-800 p-2 text-white" value={expenseQuantity} onChange={e=>setExpenseQuantity(e.target.value)}/></label>
                 <label className="text-xs text-slate-300">Unidad de medida<input required className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-800 p-2 text-white" value={expenseUnit} onChange={e=>setExpenseUnit(e.target.value)}/></label>
               </div>

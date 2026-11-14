@@ -1,6 +1,6 @@
 /** Every application module belongs here and inherits the shared page navigation. */
 export const MODULE_LABELS = {
-  dashboard: 'Tablero principal', campaign_structure: 'Equipo y comités', hierarchy_pyramid: 'Base territorial',
+  witnesses: 'Testigos y actas', data_quality: 'Calidad de datos y recuperación', dashboard: 'Tablero principal', campaign_structure: 'Equipo y comités', hierarchy_pyramid: 'Base territorial',
   leaders: 'Líderes y metas', map: 'Mapa territorial', routes: 'Recorridos y seguimiento', device: 'Mi dispositivo',
   transport: 'Transporte', rewards: 'Recompensas', data_imports: 'Bases de datos', resources: 'Solicitudes y jornadas',
   passengers: 'Pasajeros y eventos', reward_draws: 'Sorteos gratuitos', users: 'Usuarios y accesos',

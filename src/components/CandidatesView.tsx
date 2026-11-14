@@ -320,6 +320,7 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
               </p>
 
               {/* Vote target & Territory badge */}
+              <div className="mt-3"><EditRecordButton collection="candidatos" record={cand} fieldKeys={['voteTarget']} label="Editar meta" title={`Meta de votos · ${cand.fullName}`}/></div>
               <div className="mt-3 flex items-center justify-between bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-700 text-xs">
                 <div className="flex items-center gap-1.5 text-slate-300 font-semibold">
                   <Target className="w-3.5 h-3.5 text-blue-400" />
@@ -452,11 +453,13 @@ export const CandidatesView: React.FC<CandidatesViewProps> = ({
 
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">
-                    Meta de Votos Sugerida (Calculada por Censo)
+                    Meta de votos de esta candidatura
                   </label>
                   <div className="relative">
                     <input
                       type="number"
+                      min="0"
+                      step="1"
                       value={voteTarget}
                       onChange={(e) => setVoteTarget(parseInt(e.target.value) || 0)}
                       className="w-full bg-slate-800 border border-slate-700 text-emerald-400 font-mono font-bold p-2.5 rounded-xl focus:outline-none"

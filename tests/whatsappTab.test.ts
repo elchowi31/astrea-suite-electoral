@@ -31,6 +31,7 @@ test('Firestore checkpoint survives a new invocation, serializes writes and refu
  };
  const options={base:'https://firestore.test/documents',uid:'admin',token:'test',config,session,fetcher};
  const first=await loadWhatsappSession(options);
+ assert.ok(doc.fields.expiresAt.timestampValue,'retention uses a Firestore timestamp');
  await first.auth.keys.set({'pre-key':{'1':{private:Buffer.from('secret'),public:Buffer.from('pub')}}});
  first.state.conversations.contact='new-draft';first.state.inbox.push({phone:'573009999999',jid:'573009999999@s.whatsapp.net',messageId:'in-1',text:'confirmar'});await first.save();
  first.state.startedAt=1000;await first.save();
@@ -226,4 +227,9 @@ test('shutdown preserves the actual persistence error and ignores late credentia
  assert.equal(saveCalls,1);assert.equal(persisted.creds.registrationId,123);
  assert.equal(events.at(-1).type,'fatal');assert.match(events.at(-1).message,/HTTP 403/);
  assert.doesNotMatch(events.at(-1).message,/finalizar el guardado/);
+});
+
+test('expired encrypted checkpoints are rejected before recovery even while TTL deletion is pending',async()=>{
+ const fetcher:typeof fetch=async()=>new Response(JSON.stringify({fields:{expiresAt:{timestampValue:'2000-01-01T00:00:00Z'},binding:{stringValue:'irrelevant'},ciphertext:{stringValue:'irrelevant'}},updateTime:'old'}));
+ await assert.rejects(()=>loadWhatsappSession({base:'https://firestore.test/documents',uid:'admin',token:'synthetic',config,session,fetcher}),(e:any)=>e.status===410);
 });

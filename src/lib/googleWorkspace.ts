@@ -1,3 +1,5 @@
+import {exportSheetValues} from './googleSheetsExport';
+import {workspaceTokenCache} from './workspaceSession';
 import {
   reauthenticateWithPopup,
   GoogleAuthProvider,
@@ -17,7 +19,8 @@ export const WORKSPACE_SCOPES = [
 const provider = new GoogleAuthProvider();
 WORKSPACE_SCOPES.forEach((scope) => provider.addScope(scope));
 
-let cachedAccessToken: string | null = null;
+const tokenCache=workspaceTokenCache();
+export const setWorkspaceScope=(scope:string)=>tokenCache.setScope(scope);
 let isSigningIn = false;
 
 export const initGoogleWorkspaceAuth = (
@@ -26,6 +29,7 @@ export const initGoogleWorkspaceAuth = (
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
+      const cachedAccessToken=tokenCache.get(user.uid);
       if (cachedAccessToken) {
         if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
       } else if (!isSigningIn) {
@@ -33,7 +37,7 @@ export const initGoogleWorkspaceAuth = (
         if (onAuthFailure) onAuthFailure();
       }
     } else {
-      cachedAccessToken = null;
+      tokenCache.clear();
       if (onAuthFailure) onAuthFailure();
     }
   });
@@ -43,16 +47,18 @@ export const signInWithGoogleWorkspace = async (): Promise<{ user: User; accessT
   try {
     isSigningIn = true;
     if (!auth.currentUser) throw new Error('Inicie sesión antes de conectar Google Workspace.');
+    const owner=auth.currentUser.uid,scope=tokenCache.scope();
     const result = await reauthenticateWithPopup(auth.currentUser, provider);
+    if(auth.currentUser?.uid!==owner||result.user.uid!==owner)throw new Error('La cuenta cambió durante la conexión de Google.');
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (!credential?.accessToken) {
       throw new Error('No se pudo obtener el token de acceso de Google Workspace.');
     }
 
-    cachedAccessToken = credential.accessToken;
-    return { user: result.user, accessToken: cachedAccessToken };
+    tokenCache.save(credential.accessToken,owner,scope);
+    return { user: result.user, accessToken: credential.accessToken };
   } catch (error: any) {
-    console.error('Error al iniciar sesión con Google:', error);
+    console.error('Conexión de Google no completada.');
     throw error;
   } finally {
     isSigningIn = false;
@@ -60,11 +66,11 @@ export const signInWithGoogleWorkspace = async (): Promise<{ user: User; accessT
 };
 
 export const getWorkspaceAccessToken = (): string | null => {
-  return cachedAccessToken;
+  return tokenCache.get(auth.currentUser?.uid||null);
 };
 
 export const logoutGoogleWorkspace = async () => {
-  cachedAccessToken = null;
+  tokenCache.clear();
 };
 
 // ==========================================
@@ -74,13 +80,15 @@ export interface SheetRowData {
   [key: string]: any;
 }
 
-export { exportSheetValues as exportCampaignToGoogleSheets } from './googleSheetsExport';
+function assertWorkspaceToken(token:string){if(!token||token!==getWorkspaceAccessToken())throw new Error('Vuelva a conectar Google Workspace con su cuenta y organización actuales.');}
+export async function exportCampaignToGoogleSheets(title:string,headers:string[],rows:(string|number)[][],token:string){assertWorkspaceToken(token);return exportSheetValues(title,headers,rows,token);}
 
 export async function readGoogleSheetValues(
   spreadsheetId: string,
   range: string,
   accessToken: string
 ): Promise<any[][]> {
+  assertWorkspaceToken(accessToken);
   const res = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`,
     {
@@ -108,6 +116,7 @@ export async function createVolunteerGoogleForm(
   accessToken: string,
   locations: string[] = []
 ): Promise<{ formId: string; responderUri: string }> {
+  assertWorkspaceToken(accessToken);
   const locationOptions = Array.from(new Set(locations.map((item) => item.trim()).filter(Boolean))).slice(0, 50);
   // 1. Create blank form
   const createRes = await fetch('https://forms.googleapis.com/v1/forms', {
@@ -240,13 +249,14 @@ export async function createVolunteerGoogleForm(
   });
 
   if (!updateRes.ok) {
-    console.warn('Batch update en Google Form parcial:', await updateRes.text());
+    throw new Error('El formulario fue creado pero no se completó su configuración. Revíselo en Google antes de compartirlo.');
   }
 
   return { formId, responderUri };
 }
 
 export async function getGoogleFormResponses(formId: string, accessToken: string): Promise<any[]> {
+  assertWorkspaceToken(accessToken);
   const res = await fetch(`https://forms.googleapis.com/v1/forms/${formId}/responses`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -279,6 +289,7 @@ export async function listCampaignCalendarEvents(
   accessToken: string,
   timeMin?: string
 ): Promise<CampaignCalendarEvent[]> {
+  assertWorkspaceToken(accessToken);
   const minTime = timeMin || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const res = await fetch(
     `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(minTime)}&orderBy=startTime&singleEvents=true`,
@@ -316,6 +327,7 @@ export async function createCampaignCalendarEvent(
   },
   accessToken: string
 ): Promise<CampaignCalendarEvent> {
+  assertWorkspaceToken(accessToken);
   const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
     method: 'POST',
     headers: {
@@ -350,6 +362,7 @@ export async function deleteCampaignCalendarEvent(
   eventId: string,
   accessToken: string
 ): Promise<void> {
+  assertWorkspaceToken(accessToken);
   const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
     method: 'DELETE',
     headers: {

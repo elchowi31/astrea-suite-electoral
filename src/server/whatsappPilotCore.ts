@@ -67,14 +67,14 @@ export function pilotLease(options:{base:string;token:string;phone:string;fetche
    if(!got.ok&&got.status!==404)throw new AgentError('No se pudo comprobar la sesión en Firestore.',503);
    const previous=got.ok?await got.json():null;
    if(previous&&Number(decodeFields(previous.fields).expiresAt)>now())throw new AgentError('Ya hay una recepción activa con este número. Deténgala o espere cinco minutos.',409);
-   const saved=await writeCheckpoint({base:options.base,path:documentPath,headers,request,revision:previous?.updateTime||'',fields:encodeFields({owner,expiresAt:now()+300000})});
+   const saved=await writeCheckpoint({base:options.base,path:documentPath,headers,request,revision:previous?.updateTime||'',fields:encodeFields({owner,expiresAt:now()+300000,purgeAt:new Date(now()+86400000)})});
    if(!saved.ok||!saved.updateTime)throw new AgentError('Otra sesión inició primero o Firestore rechazó el bloqueo. No se abrió WhatsApp.',409);
    updateTime=saved.updateTime;
   },
   async release(){
    if(!updateTime)return;
    // A stale invocation cannot release a newer owner's lease.
-   await writeCheckpoint({base:options.base,path:documentPath,headers,request,revision:updateTime,fields:encodeFields({owner,expiresAt:0}),timeout:5000});
+   await writeCheckpoint({base:options.base,path:documentPath,headers,request,revision:updateTime,fields:encodeFields({owner,expiresAt:0,purgeAt:new Date(now()+86400000)}),timeout:5000});
   }
  };
 }

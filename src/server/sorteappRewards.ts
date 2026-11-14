@@ -3,9 +3,10 @@ import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
 import {AgentError} from '../lib/requestAgent.js';
 import {googleFederatedFirestoreToken,readGoogleFederationEnvironment,type GoogleFederationEnvironment} from './googleFederation.js';
 import {decodeFields,encodeFields} from './requestAgent.js';
+import type {RewardDelivery} from '../lib/rewardDelivery.js';
 
 type IntegrationEnvironment={enabled:true;secret:string;federation:GoogleFederationEnvironment;tenantIds:Set<string>};
-type EntryCreatedEvent={schemaVersion:1;eventId:string;eventType:'draw.entry.created';occurredAt:string;draw:{id:string;tenantId:string;title:string;prize:string;kind:'employee_wellbeing_free';paid:false;entryPrice:0;currency:'COP';startsAt?:string;endsAt?:string};entry:{id:string;name:string;email?:string;phone?:string;registeredAt:string};consent:{accepted:true;purpose:'employee_reward_draw';policyVersion:string;acceptedAt:string}};
+type EntryCreatedEvent={schemaVersion:1;eventId:string;eventType:'draw.entry.created';occurredAt:string;draw:{id:string;tenantId:string;title:string;prize:string;kind:'employee_wellbeing_free';paid:false;entryPrice:0;currency:'COP';startsAt?:string;endsAt?:string};entry:{id:string;name:string;email?:string;phone?:string;registeredAt:string;delivery?:RewardDelivery};consent:{accepted:true;purpose:'employee_reward_draw';policyVersion:string;acceptedAt:string}};
 type EntryDeletedEvent={schemaVersion:1;eventId:string;eventType:'draw.entry.deleted';occurredAt:string;draw:{id:string;tenantId:string};entry:{id:string}};
 export type SorteappRewardsEvent=EntryCreatedEvent|EntryDeletedEvent;
 type FirestoreValue={stringValue?:string;booleanValue?:boolean;integerValue?:string;doubleValue?:number;mapValue?:{fields:Record<string,FirestoreValue>};arrayValue?:{values?:FirestoreValue[]};nullValue?:null};
@@ -42,6 +43,25 @@ function iso(value:unknown,label:string){
 function id(value:unknown,label:string){const result=text(value,label,120);if(!idPattern.test(result))throw new AgentError(`El identificador ${label} no es válido.`,422);return result;}
 function plainObject(value:unknown,label:string):Record<string,unknown>{if(!record(value))throw new AgentError(`El bloque ${label} no es válido.`,422);return value;}
 
+function parseDelivery(value:unknown,registeredAt:string):RewardDelivery{
+ const delivery=plainObject(value,'delivery'),address=plainObject(delivery.address,'delivery.address'),consent=plainObject(delivery.consent,'delivery.consent');
+ if(!exactKeys(delivery,['address','consent','location'])||!exactKeys(address,['countryCode','department','municipality','line1','neighborhood','instructions'])||address.countryCode!=='CO')throw new AgentError('La dirección de entrega contiene campos no permitidos o un país no compatible.',422);
+ if(!exactKeys(consent,['accepted','purpose','policyVersion','acceptedAt','scopes'])||consent.accepted!==true||consent.purpose!=='reward_delivery'||!Array.isArray(consent.scopes)||!consent.scopes.includes('address')||consent.scopes.some(scope=>!['address','location'].includes(String(scope)))||new Set(consent.scopes).size!==consent.scopes.length)throw new AgentError('Falta el consentimiento específico para dirección y entrega.',422);
+ const acceptedAt=iso(consent.acceptedAt,'delivery.consent.acceptedAt');
+ if(Date.parse(acceptedAt)>Date.parse(registeredAt))throw new AgentError('El consentimiento de entrega debe ser anterior a la inscripción.',422);
+ const result:RewardDelivery={address:{countryCode:'CO',department:text(address.department,'delivery.address.department',100),municipality:text(address.municipality,'delivery.address.municipality',100),line1:text(address.line1,'delivery.address.line1',250)},consent:{accepted:true,purpose:'reward_delivery',policyVersion:text(consent.policyVersion,'delivery.consent.policyVersion',80),acceptedAt,scopes:consent.scopes as ('address'|'location')[]}};
+ for(const key of ['neighborhood','instructions'] as const)if(address[key]!==undefined)result.address[key]=text(address[key],`delivery.address.${key}`,key==='instructions'?500:150);
+ if(delivery.location!==undefined){
+  const location=plainObject(delivery.location,'delivery.location');
+  if(!exactKeys(location,['latitude','longitude','accuracyMeters','capturedAt','source','confirmedForDelivery'])||location.source!=='device_geolocation'||location.confirmedForDelivery!==true||!consent.scopes.includes('location'))throw new AgentError('La ubicación de entrega debe estar autorizada y confirmada por la persona.',422);
+  for(const [key,min,max] of [['latitude',-90,90],['longitude',-180,180],['accuracyMeters',0,100000]] as const)if(typeof location[key]!=='number'||!Number.isFinite(location[key])||Number(location[key])<min||Number(location[key])>max)throw new AgentError('Las coordenadas o la precisión de entrega no son válidas.',422);
+  const capturedAt=iso(location.capturedAt,'delivery.location.capturedAt');
+  if(Date.parse(capturedAt)<Date.parse(acceptedAt)||Date.parse(capturedAt)>Date.parse(registeredAt))throw new AgentError('La captura debe ocurrir después del consentimiento y antes de la inscripción.',422);
+  result.location={latitude:Number(location.latitude),longitude:Number(location.longitude),accuracyMeters:Number(location.accuracyMeters),capturedAt,source:'device_geolocation',confirmedForDelivery:true};
+ }
+ return result;
+}
+
 export function parseSorteappRewardsEvent(value:unknown):SorteappRewardsEvent{
  const root=plainObject(value,'principal');
  if(!exactKeys(root,allowedRoot)||root.schemaVersion!==1)throw new AgentError('La versión o los campos del aviso de Sorteapp no son compatibles.',422);
@@ -52,7 +72,7 @@ export function parseSorteappRewardsEvent(value:unknown):SorteappRewardsEvent{
   if(root.consent!==undefined||!exactKeys(draw,['id','tenantId'])||!exactKeys(entry,['id']))throw new AgentError('El aviso de retiro contiene campos no permitidos.',422);
   return {schemaVersion:1,eventId,eventType,occurredAt,draw:{id:id(draw.id,'draw.id'),tenantId:id(draw.tenantId,'tenantId')},entry:{id:id(entry.id,'entry.id')}};
  }
- if(!exactKeys(draw,['id','tenantId','title','prize','kind','paid','entryPrice','currency','startsAt','endsAt'])||!exactKeys(entry,['id','name','email','phone','registeredAt']))throw new AgentError('El aviso de inscripción contiene campos no permitidos.',422);
+ if(!exactKeys(draw,['id','tenantId','title','prize','kind','paid','entryPrice','currency','startsAt','endsAt'])||!exactKeys(entry,['id','name','email','phone','registeredAt','delivery']))throw new AgentError('El aviso de inscripción contiene campos no permitidos.',422);
  if(draw.kind!=='employee_wellbeing_free'||draw.paid!==false||draw.entryPrice!==0||draw.currency!=='COP')throw new AgentError('Solo se reciben sorteos internos gratuitos, sin pago ni compra de boletas.',422);
  const consent=plainObject(root.consent,'consent');
  if(!exactKeys(consent,['accepted','purpose','policyVersion','acceptedAt'])||consent.accepted!==true||consent.purpose!=='employee_reward_draw')throw new AgentError('La inscripción no acredita el consentimiento específico para el sorteo gratuito.',422);
@@ -63,6 +83,7 @@ export function parseSorteappRewardsEvent(value:unknown):SorteappRewardsEvent{
  if(entry.email!==undefined){const email=text(entry.email,'entry.email',254).toLowerCase();if(!emailPattern.test(email))throw new AgentError('El correo de la inscripción no es válido.',422);result.entry.email=email;}
  if(entry.phone!==undefined){const phone=String(entry.phone).replace(/[^\d]/g,'');if(!/^\d{8,15}$/.test(phone))throw new AgentError('El teléfono de la inscripción no es válido.',422);result.entry.phone=phone;}
  if(!result.entry.email&&!result.entry.phone)throw new AgentError('La inscripción debe incluir un medio de contacto.',422);
+ if(entry.delivery!==undefined)result.entry.delivery=parseDelivery(entry.delivery,registeredAt);
  return result;
 }
 
@@ -117,7 +138,7 @@ export async function processSorteappRewardsEvent(options:{projectId:string;data
  }
  const drawEvent=event as EntryCreatedEvent;
  if(drawEvent.draw.startsAt&&Date.parse(drawEvent.entry.registeredAt)<Date.parse(drawEvent.draw.startsAt)||drawEvent.draw.endsAt&&Date.parse(drawEvent.entry.registeredAt)>Date.parse(drawEvent.draw.endsAt))throw new AgentError('La inscripción está fuera del período del sorteo.',422);
- const entryData={id:entryKey,tenantId:drawEvent.draw.tenantId,drawId:drawKey,source:'sorteapp',kind:'employee_wellbeing_free',paid:false,entryPrice:0,currency:'COP',participant:{name:drawEvent.entry.name,...(drawEvent.entry.email?{email:drawEvent.entry.email}:{}),...(drawEvent.entry.phone?{phone:drawEvent.entry.phone}:{})},consent:{accepted:true,purpose:drawEvent.consent.purpose,policyVersion:drawEvent.consent.policyVersion,acceptedAt:drawEvent.consent.acceptedAt},registeredAt:drawEvent.entry.registeredAt,receivedAt:new Date().toISOString()};
+ const entryData={...(drawEvent.entry.delivery?{delivery:drawEvent.entry.delivery}:{}),id:entryKey,tenantId:drawEvent.draw.tenantId,drawId:drawKey,source:'sorteapp',kind:'employee_wellbeing_free',paid:false,entryPrice:0,currency:'COP',participant:{name:drawEvent.entry.name,...(drawEvent.entry.email?{email:drawEvent.entry.email}:{}),...(drawEvent.entry.phone?{phone:drawEvent.entry.phone}:{})},consent:{accepted:true,purpose:drawEvent.consent.purpose,policyVersion:drawEvent.consent.policyVersion,acceptedAt:drawEvent.consent.acceptedAt},registeredAt:drawEvent.entry.registeredAt,receivedAt:new Date().toISOString()};
  const now=new Date().toISOString(),drawData={id:drawKey,tenantId:drawEvent.draw.tenantId,source:'sorteapp',sourceDrawHash:drawKey,name:drawEvent.draw.title,prize:drawEvent.draw.prize,kind:'employee_wellbeing_free',paid:false,entryPrice:0,currency:'COP',...(drawEvent.draw.startsAt?{startsAt:drawEvent.draw.startsAt}:{}),...(drawEvent.draw.endsAt?{endsAt:drawEvent.draw.endsAt}:{}),createdAt:now,updatedAt:now};
  for(let attempt=0;attempt<4;attempt++){
   const [existingDraw,existingEntry,existingReceipt]=await Promise.all([getDocument(base,drawPath,headers,request),getDocument(base,entryPath,headers,request),getDocument(base,receiptPath,headers,request)]);

@@ -1,3 +1,4 @@
+import {availableWorkspaces} from '../src/lib/workspaces';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {isTrackingAdministrator} from '../src/lib/trackingPermissions';
@@ -13,8 +14,7 @@ test('Tracking is exclusive to verified administrators, regardless of political 
   assert.equal(isTrackingAdministrator({...profile('AdminTenant'),accessVersion:1}),false);
   assert.equal(isTrackingAdministrator(null),false);
 });
-test('Members can prepare their own device offline while tracking administration remains restricted',()=>{
-  const html=(role:UserRole)=>renderToStaticMarkup(React.createElement(Sidebar,{activeTab:'dashboard',onTabChange:()=>{},driveFileCount:0,candidateCount:0,currentUser:profile(role)}));
-  for(const role of ['Alcalde','Gobernador','Operador','Consulta','Invitado'] as const){const markup=html(role);assert.equal(markup.includes('Recorridos y seguimiento'),false,role);assert.ok(markup.includes('Mi dispositivo'),role);assert.ok(markup.includes('Transporte'),role);}
-  assert.ok(html('AdminTenant').includes('Recorridos y seguimiento'));
+test('Members can prepare their device while grouped tracking access remains restricted',()=>{
+  for(const role of ['Alcalde','Gobernador','Operador','Consulta','Invitado'] as const){const tabs=availableWorkspaces(profile(role)).flatMap(w=>w.tabs);assert.equal(tabs.includes('routes'),false,role);assert.ok(tabs.includes('device'),role);assert.ok(tabs.includes('transport'),role);}
+  assert.ok(availableWorkspaces(profile('AdminTenant')).flatMap(w=>w.tabs).includes('routes'));
 });

@@ -1,3 +1,11 @@
+import {WriteAccessProvider} from './components/WriteAccess';
+import {setOperationMetricsScope} from './lib/operationMetrics';
+import {FinanceWorkspaceView} from './components/FinanceWorkspaceView';
+import {ElectoralEvidenceView} from './components/ElectoralEvidenceView';
+import {DataHealthStatus} from './components/DataHealthStatus';
+import {DataQualityView} from './components/DataQualityView';
+import {setWorkspaceScope} from './lib/googleWorkspace';
+import {WorkspaceNavigation} from './components/WorkspaceNavigation';
 import {DemoEditing} from './components/common/EditRecordButton';
 import {DemoDataEditor} from './components/DemoDataEditor';
 import {saveDemoEntity,deleteDemoExpense} from './lib/demoWorkspace';
@@ -521,6 +529,8 @@ export default function App() {
   const visibleCoordinations = demoActive ? demoBundle!.coordinations : coordinations;
   const visibleVoters = demoActive ? demoBundle!.voters : grassrootsVoters;
 
+  useEffect(()=>{setWorkspaceScope(`${currentUser?.uid||'signed-out'}:${currentTenant?.tenantId||''}`);},[currentUser?.uid,currentTenant?.tenantId]);
+  useEffect(()=>{setOperationMetricsScope(currentUser?`${currentUser.uid}:${currentTenant.tenantId}`:'',activeTab);},[currentUser?.uid,currentTenant.tenantId,activeTab]);
   if (!currentUser) {
     if (showPublicDemo) {
       return (
@@ -545,7 +555,8 @@ export default function App() {
           </header>
           <main className="mx-auto w-full p-3 sm:p-5 lg:p-6">
             <OperationsProvider tenant={PUBLIC_DEMO_TENANT} user={PUBLIC_DEMO_USER} leaders={PUBLIC_DEMO_DATA.leaders} candidates={PUBLIC_DEMO_DATA.candidates} voters={PUBLIC_DEMO_DATA.voters} expenses={PUBLIC_DEMO_DATA.expenses} vehicles={PUBLIC_DEMO_DATA.vehicles} contributions={PUBLIC_DEMO_DATA.contributions} readOnly demo={PUBLIC_DEMO_DATA.operations}>
-            <Suspense fallback={<div className="p-10 text-center text-sm text-slate-400">Cargando presentación…</div>}>
+            <WorkspaceNavigation tab={activeTab} user={currentUser} role={userRole} onNavigate={tab=>{if(['rewards','reward_draws','data_imports'].includes(tab))setDemoEnabled(false);navigate(tab);}}/>
+          <Suspense fallback={<div className="p-10 text-center text-sm text-slate-400">Cargando presentación…</div>}>
               <DashboardView onNavigateTab={() => { setShowPublicDemo(false); navigate('login'); }} />
             </Suspense>
             </OperationsProvider>
@@ -597,7 +608,7 @@ export default function App() {
           );
 
   return (
-    <PageNavigationProvider pageKey={`${navigation.scope}:${activeTab}`}><RouteTrackingProvider user={currentUser} tenantId={currentUser.tenantId} monitorTenantId={currentTenant.tenantId}><div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-500 selection:text-white relative isolate overflow-x-clip">
+    <WriteAccessProvider role={userRole}><PageNavigationProvider pageKey={`${navigation.scope}:${activeTab}`}><RouteTrackingProvider user={currentUser} tenantId={currentUser.tenantId} monitorTenantId={currentTenant.tenantId}><div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-500 selection:text-white relative isolate overflow-x-clip">
       <SynapticNeuralBackground interactive={false} />
 
       {/* Top Navigation Header with Streamlined Toolbar & Profile Pill */}
@@ -614,6 +625,7 @@ export default function App() {
 
       <TrackingStatusBanner/>
       <OfflineSyncStatus userId={currentUser.uid} tenantId={selectedTenantId || currentUser.tenantId}/>
+      <DataHealthStatus tenantId={currentTenant.tenantId} userId={currentUser.uid}/>
       {/* Main Body Layout */}
       <div className="min-w-0 flex-1 flex flex-col md:flex-row">
 
@@ -634,6 +646,7 @@ export default function App() {
         {/* Content Area */}
         <main tabIndex={-1} className="app-content min-w-0 flex-1 p-3 sm:p-5 lg:p-6 w-full space-y-5 focus:outline-none">
           <PageNavigationBar current={activeTab} previous={navigation.previousPage} onBack={navigation.back} onHome={navigation.home} />
+          <WorkspaceNavigation tab={activeTab} user={currentUser} role={userRole} onNavigate={tab=>{if(['rewards','reward_draws','data_imports'].includes(tab))setDemoEnabled(false);navigate(tab);}}/>
           <Suspense fallback={<div role="status" className="flex min-h-[45vh] items-center justify-center gap-3 text-sm text-slate-300"><RefreshCw className="h-4 w-4 animate-spin text-blue-400" />Cargando módulo…</div>}>
           <OperationsProvider key={`${currentTenant.tenantId}-${demoActive?'demo':'real'}`} tenant={currentTenant} user={demoViewUser} leaders={visibleLeaders} candidates={visibleCandidates} voters={visibleVoters} expenses={visibleExpenses} vehicles={visibleVehicles} contributions={visibleContributions} readOnly={demoActive} demo={demoBundle?.operations}>
           <WhatsappConnectionProvider><WhatsappConnectionStatus/>
@@ -642,6 +655,8 @@ export default function App() {
           {activeTab === 'rewards' && <RewardsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId}/>}
           {currentUser && activeTab === 'reward_draws' && <SorteappRewardDrawsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId}/>}
           {activeTab === 'data_imports' && <DataImportsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId} onMap={()=>{setDemoEnabled(false);navigate('map');}}/>}
+          {activeTab === 'witnesses' && <ElectoralEvidenceView key={currentTenant.tenantId} tenantId={currentTenant.tenantId} user={currentUser} users={users} readOnly={demoActive}/>}
+          {activeTab === 'data_quality' && ['AdminTenant','AdminGlobal'].includes(currentUser.role) && <DataQualityView key={currentTenant.tenantId} tenantId={currentTenant.tenantId} user={currentUser} voters={visibleVoters} readOnly={demoActive}/>}
           {activeTab === 'device' && <><DevicePersistencePanel /><div className="flex flex-wrap gap-3"><EditRecordButton collection="usuarios" record={currentUser} label="Editar mi perfil" />{['AdminTenant','AdminGlobal'].includes(currentUser.role)&&<EditRecordButton collection="organizaciones" record={currentTenant} label="Editar organización" />}</div></>}
 
           {/* Personalized User Recognition & Salutation Banner */}
@@ -726,21 +741,6 @@ export default function App() {
             />
           )}
 
-          {currentUser && activeTab === 'costs_report' && (
-            <CampaignCostsReportView
-              currentTenant={currentTenant}
-              userRole={userRole}
-              expenses={visibleExpenses}
-              leaders={visibleLeaders}
-              vehicles={visibleVehicles}
-              donorContributions={visibleContributions}
-              onAddExpense={handleAddExpense}
-              onUpdateExpense={handleUpdateExpense}
-              onDeleteExpense={handleDeleteExpense}
-              onNavigateTab={navigate}
-            />
-          )}
-
           {currentUser && activeTab === 'zone_projections' && (
             <ZoneElectoralProjectionView
               currentTenant={currentTenant}
@@ -755,6 +755,7 @@ export default function App() {
 
           {currentUser && activeTab === 'workspace' && (
             <GoogleWorkspaceHubView
+              key={`${currentUser.uid}-${currentTenant.tenantId}`}
               tenantName={currentTenant.name}
               tenantId={currentTenant.tenantId}
               expenses={visibleExpenses.filter((e) => e.tenantId === currentTenant.tenantId)}
@@ -782,8 +783,14 @@ export default function App() {
           )}
           {isTrackingAdministrator(currentUser) && activeTab === 'routes' && (demoActive?<p className="rounded-xl border border-amber-700 bg-slate-900 p-4 text-sm text-amber-200">Seleccione «Usar datos reales» para gestionar recorridos y registrar GPS.</p>:<RouteOperationsView key={currentTenant.tenantId} initialRouteId={routeToOpen} user={currentUser} tenantId={currentTenant.tenantId} tenants={tenants} onSelectTenant={setCurrentTenant} users={users} vehicles={vehicles.filter(item=>item.tenantId===currentTenant.tenantId)} />)}
 
-          {currentUser && activeTab === 'finances' && (
-            <FinancesView
+          {currentUser && ['finances','costs_report'].includes(activeTab) && (
+            <FinanceWorkspaceView
+              initialControl={activeTab==='costs_report'}
+              leaders={visibleLeaders}
+              vehicles={visibleVehicles}
+              onUpdateExpense={handleUpdateExpense}
+              onDeleteExpense={handleDeleteExpense}
+              onNavigateTab={navigate}
               currentTenant={currentTenant}
               currentUser={currentUser}
               userRole={userRole}
@@ -792,6 +799,7 @@ export default function App() {
               onAddExpense={handleAddExpense}
               onAddDonorContribution={handleAddDonorContribution}
               onNavigateTransport={() => navigate('transport')}
+              onNavigateCandidates={() => navigate('candidates')}
             />
           )}
 
@@ -912,6 +920,6 @@ export default function App() {
         <p className="mt-1 text-slate-400">Desarrollada por Wilson José Arias</p>
       </footer>
 
-    </div></RouteTrackingProvider></PageNavigationProvider>
+    </div></RouteTrackingProvider></PageNavigationProvider></WriteAccessProvider>
   );
 }

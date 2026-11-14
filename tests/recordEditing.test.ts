@@ -5,6 +5,12 @@ test('Targets and financial totals cannot be erased into invalid KPI denominator
   assert.throws(()=>editPatch(EDIT_FIELDS.lideres,{voteTarget:50},{voteTarget:''}),/Complete/);
   assert.throws(()=>editPatch(EDIT_FIELDS.gastos,{amount:100},{amount:''}),/Complete/);
 });
+test('planning accepts zero budgets, rejects negative investment and fractional vote targets',()=>{
+ assert.doesNotThrow(()=>validateEditablePatch('organizaciones',{budgetCap:0,campaignDate:'2026-11-09'}));
+ assert.throws(()=>validateEditablePatch('organizaciones',{budgetCap:-1}),/presupuesto/i);
+ assert.throws(()=>validateEditablePatch('candidatos',{voteTarget:3.5}),/entero/);
+ assert.doesNotThrow(()=>validateEditablePatch('candidatos',{voteTarget:2500}));
+});
 test('Edits validate coordinate pairs and retain legitimate zero and false values',()=>{const original={fullName:'Líder',latitude:9.5,longitude:-74};const fields=EDIT_FIELDS.lideres;const values=Object.fromEntries(fields.map(field=>[field.key,editableValue(field,original[field.key])]));values.latitude='';assert.throws(()=>editPatch(fields,original,values),/latitud/);values.longitude='';assert.equal(editPatch(fields,original,values).latitude,null);assert.deepEqual(editPatch(EDIT_FIELDS.gastos,{amount:100},{amount:'0'}),{amount:0});assert.deepEqual(editPatch(EDIT_FIELDS.votantes_rasos,{requiresTransport:true},{requiresTransport:false}),{requiresTransport:false});assert.throws(()=>editPatch(EDIT_FIELDS.gastos,{amount:100},{amount:'-1'}),/rango/);});
 
 test('Route assignment edits and closures are accepted without allowing GPS identity changes',()=>{
