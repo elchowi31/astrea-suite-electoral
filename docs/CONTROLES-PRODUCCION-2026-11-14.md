@@ -9,7 +9,7 @@ El informe original del grafo (11 de noviembre, 436 nodos y 1.416 relaciones) se
 | SEG-03 | Retirada local: sincronizar pendientes, cerrar sesión, terminar Firestore, borrar su persistencia y retirar todas las claves de Astrea de ambos almacenes. Se conservan claves de otras aplicaciones. |
 | SEG-04 | Copia privada y huella de las reglas publicadas antes de su cambio. Publicar las reglas probadas y comprobar su contenido después. |
 | SEG-05 | Cuota de IA por usuario y minuto compartida entre instancias mediante precondiciones de Firestore; concurrencia real ensayada. El límite HTTP general sigue siendo por proceso y así se declara. |
-| SEG-06 | Respaldo operativo seleccionado, validado y restauración solo de faltantes, con auditoría y protección transaccional contra sobrescrituras. Sesión cifrada de WhatsApp caduca tras 24 horas sin actualización; recibos de transporte a 7 días y diagnóstico a 30 días. Campos TTL de tipo timestamp e instalación de la política comprobados durante publicación. |
+| SEG-06 | Respaldo operativo seleccionado, validado y restauración solo de faltantes, con auditoría y protección transaccional contra sobrescrituras. Sesión cifrada de WhatsApp caduca tras 24 horas sin actualización; recibos de transporte a 7 días y diagnóstico a 30 días. Campos TTL preparados con tipo timestamp; instalación automática y recuperación histórica pendientes por decisión de conservar el plan gratuito (14 de noviembre). |
 | SEG-07 | Salud básica identifica versión y declara dependencias no comprobadas. Las pruebas autenticadas de Firestore, recuperación y actas se registran aparte. |
 | SEG-08 | Suscripciones con límite explícito, aviso de resultados parciales, latencia y error visible; se conserva el último resultado del mismo ámbito ante errores. |
 | SEG-09 | Diagnóstico sin texto de mensajes ni respuestas, teléfono limitado a cuatro cifras; registros de errores sin datos de sesión ni excepciones completas de proveedores. |
@@ -27,3 +27,13 @@ El informe original del grafo (11 de noviembre, 436 nodos y 1.416 relaciones) se
 - Actas: captura manual y revisión humana, máximo de 30 líneas por acta y foto codificada de hasta 500 KB. La representación canónica nombre;cantidad permite validar todas las filas en el servidor. La consolidación privada incluye solo evidencias revisadas por elección; no sustituye resultados oficiales.
 - La verificación de producción utiliza una organización y cuentas ficticias aisladas; se retiran únicamente sus registros al terminar.
 - El controlador visual de la sesión de trabajo presentó un error de inicialización. Las comprobaciones automáticas de interfaz usan un navegador aislado y datos ficticios; no reutilizan ni extraen credenciales del navegador del usuario.
+
+## Decisión de infraestructura del 14 de noviembre
+
+El usuario decidió conservar el plan gratuito y dejar pendientes el borrado automático TTL y la recuperación histórica PITR. No se vinculó una cuenta de cobro. La aplicación rechaza sesiones cifradas caducadas y conserva el respaldo operativo seleccionado; estos mecanismos no sustituyen el borrado remoto automático ni una copia completa de la base. Se activó la protección contra eliminación de la base, disponible sin cambiar el plan. Las políticas TTL preparadas se conservan en `firestore-ttl-pending.json`, separadas de los índices que sí pueden desplegarse.
+
+## Capacidad del plan gratuito
+
+Firestore publica una cuota diaria de 50.000 lecturas, 20.000 escrituras y 20.000 eliminaciones, además de 1 GiB de almacenamiento para una base gratuita por proyecto ([fuente oficial](https://firebase.google.com/docs/firestore/pricing)). Son límites del proyecto, compartidos entre organizaciones; no equivalen a usuarios ni a formularios. Un guardado con auditoría y recibo usa varias escrituras. Los contadores de IA también consumen lecturas y escrituras. Las suscripciones cargan resultados al abrirse y cuando cambian.
+
+El aviso de 10.000 registros impide presentar una consulta recortada como completa; no representa una promesa de capacidad gratuita. Antes de abrir una campaña grande, revisar el consumo real en Firebase y el tamaño de las consultas. Al agotarse la cuota, la aplicación debe mostrar el fallo y conservar los pendientes compatibles para revisión; las operaciones que exigen conexión no se ofrecen como confirmadas. La medición de guardados no permite inferir un precio ni un costo mensual sin observación real.

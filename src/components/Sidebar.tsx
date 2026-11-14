@@ -41,11 +41,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, driveF
       const focusable = mobileRef.current?.querySelectorAll<HTMLElement>('button, [href], select, input, [tabindex="0"]');
       if (!focusable?.length) return;
       const first = focusable[0], last = focusable[focusable.length-1];
+      if (!mobileRef.current?.contains(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first).focus(); return; }
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     };
-    document.addEventListener('keydown', handleKey);
-    return () => { document.body.style.overflow = previousOverflow; document.removeEventListener('keydown', handleKey); mobileTrigger.current?.focus(); };
+    const retainFocus = (event: FocusEvent) => { if (!mobileRef.current?.contains(event.target as Node)) mobileRef.current?.querySelector<HTMLButtonElement>('button')?.focus({preventScroll:true}); };
+    const closeOnDesktop = () => { if(window.innerWidth >= 768)setMobileOpen(false); };
+    document.addEventListener('keydown', handleKey);document.addEventListener('focusin',retainFocus);window.addEventListener('resize',closeOnDesktop);
+    return () => { document.body.style.overflow = previousOverflow; document.removeEventListener('keydown', handleKey);document.removeEventListener('focusin',retainFocus);window.removeEventListener('resize',closeOnDesktop);mobileTrigger.current?.focus(); };
   }, [mobileOpen]);
   useEffect(() => {
     const outside = (event: PointerEvent) => { if (!desktopRef.current?.contains(event.target as Node)) setExpanded(false); };
