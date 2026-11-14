@@ -1,0 +1,5172 @@
+{
+  "mode": "structural-fallback",
+  "date": "2026-11-14",
+  "scope": [
+    "src",
+    "api",
+    "tests",
+    "docs"
+  ],
+  "limitations": [
+    "Imports and explicit file links only; not native semantic Graphify output.",
+    "Paths are repository-relative; source data and credentials are excluded."
+  ],
+  "nodes": [
+    {
+      "id": "api/index.ts",
+      "kind": "api"
+    },
+    {
+      "id": "api/sorteapp-rewards.ts",
+      "kind": "api"
+    },
+    {
+      "id": "api/whatsapp-cloud.ts",
+      "kind": "api"
+    },
+    {
+      "id": "api/whatsapp-pilot.ts",
+      "kind": "api"
+    },
+    {
+      "id": "docs/AGENTE-SOLICITUDES.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/APP-NATIVA-Y-PLAY-STORE.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/AUDITORIA-TECNICA-Y-PLAN-2026-11-04.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/CAPAS-EQUIPOS-Y-TRANSPORTE-WEB.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/CONTROL-OPERATIVO.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/CONTROLES-PRODUCCION-2026-11-14.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/DASHBOARD-PERSISTENCIA-2026-10-28.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/DATOS-DE-PRUEBA-POR-PERFIL.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/DEPLOYMENT.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/election-history-evidence.json",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/FORMULARIOS-Y-SINCRONIZACION-2026-11-08.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/INSTALACION-ANDROID.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/inventario-graficos.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/LOGISTICA-DE-EVENTOS-2026-11-05.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/MAPAS-Y-RUTAS.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/PLAN-MEJORAS-2026-11-12.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/PROMPT-CONTINUACION.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/PRUEBA-REINSTALACION-2026-10-10.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/PRUEBA-SAMSUNG-2026-10-10.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/publication-evidence.json",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/RASTREO-Y-DISPOSITIVOS.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/REFERENTES-Y-MEJORAS-2026-11-07.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/REVISION-INSTALACION-2026-10-10.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/REVISION-Y-SIMULACION.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/seats-evidence.json",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/SEGUIMIENTO-WEB.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/sorteapp-wellbeing-integration.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/statistics-evidence.json",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/USUARIOS-Y-FIRESTORE.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/VERIFICACION-ACCESO-1.0.5.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/VERIFICACION-DETALLE-WEB-2026-10-10.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/VERIFICACION-FINAL-2026-10-10.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/VERIFICACION-SELECTOR-1.0.6.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/VERIFICACION-WHATSAPP-Y-COSTOS-2026-11-05.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/whatsapp-cloud-production.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/WHATSAPP-IDENTIDAD-E-INVITACIONES.md",
+      "kind": "docs"
+    },
+    {
+      "id": "docs/WHATSAPP-PRUEBA-VERCEL.md",
+      "kind": "docs"
+    },
+    {
+      "id": "src/App.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/AdministrativeOverview.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/AiAssistantView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/AuthModal.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/CampaignCostsReportView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/CampaignPlanningPanel.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/CampaignStructureView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/CandidatesView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/ChartInventory.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/common/AuditorAlertCard.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/common/AuthorHeader.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/common/EditRecordButton.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/common/LocationPicker.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/common/PasswordInput.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/common/StatsCard.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/DashboardView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/DataHealthStatus.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/DataImportsView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/DataQualityView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/DemoDataEditor.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/DevicePersistence.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/DistrictsView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/DriveView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/ElectionTransportRoutes.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/ElectoralEvidenceView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/ElectoralHierarchyRollupView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/ElectoralSimulatorView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/FinancesView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/FinanceWorkspaceView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/FirestoreStatusModal.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/FleetTrackingPanel.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/FormSaveStatus.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/GeographicFeatureCard.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/GeographicFeatureEditor.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/GeographicImportPanel.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/GeographicLayerCard.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/GoogleTerritorialMap.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/GoogleWorkspaceHubView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/Header.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/LandingPage.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/LeadersView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/LiveMonitorPanel.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/LoginView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/OperationMetricsPanel.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/operations/AttendanceSheet.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/operations/DayControl.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/operations/OperationsContext.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/operations/OperationsEditingReferences.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/operations/OperationsOverview.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/operations/OperationsUI.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/operations/RebalancingPanel.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/operations/RequestAgentPanel.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/operations/ResourcesView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/operations/TransportControlCenter.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/operations/TransportReconciliation.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/operations/useOperationsActions.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/operations/WhatsappConnectionContext.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/operations/WhatsappDiagnosticsPanel.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/operations/WhatsappPilotPanel.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/PageNavigation.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/PassengerEventsView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/ProposalsView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/RewardDeliveryPanel.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/RewardManagementReport.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/RewardsView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/RouteDetailView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/RouteHistoryList.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/RouteOperationsView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/RouteTrackingProvider.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/SatelliteRadarCanvas.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/ServiceCostsDashboard.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/Sidebar.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/SorteappRewardDrawsView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/StatisticalDataPanel.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/SynapticNeuralBackground.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/TeamLocationList.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/TenantsView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/TerritorialMapView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/TransportView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/useAutomaticTracking.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/UserGreetingBanner.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/UserManagementView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/useTeamPositions.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/WorkspaceNavigation.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/WriteAccess.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/components/ZoneElectoralProjectionView.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/data/campaignStructureData.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/data/cesarElectionHistory.json",
+      "kind": "src"
+    },
+    {
+      "id": "src/data/cesarSeats.json",
+      "kind": "src"
+    },
+    {
+      "id": "src/data/cesarStatistics.json",
+      "kind": "src"
+    },
+    {
+      "id": "src/data/chartInventory.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/data/colombiaElectoralData.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/data/completeDemo.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/data/contextualDemo.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/data/demoData.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/data/demoPresentation.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/data/demoRegistrations.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/data/demoSeed.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/data/geography.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/data/witnessesAuditData.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/accessPolicy.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/aiAvailability.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/analytics.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/attendanceStore.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/authFeedback.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/chartPalette.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/dataQuality.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/dataSubscriptionHealth.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/demoOperationsStore.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/demoWorkspace.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/deviceSeed.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/deviceStorage.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/electionTransport.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/electoralEvidence.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/electoralEvidenceStore.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/electoralSimulation.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/eventRegistration.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/financialSummary.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/firebase.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/firebaseAuth.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/geographicImport.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/googleSheetsExport.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/googleWorkspace.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/livePosition.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/managerDashboard.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/mapPersistence.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/mapTeams.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/moduleNavigation.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/monitorRoutes.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/movementTracking.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/nativeAuth.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/nativeTracking.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/offlineMutations.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/offlineRegistry.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/operationalBackup.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/operationalRecoveryStore.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/operationMetrics.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/operations.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/operationsStore.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/passengerLogistics.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/passengerLogisticsStore.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/permissions.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/recordEditing.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/recordedTrack.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/recordIds.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/requestAgent.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/requestReference.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/rewardDelivery.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/rewardFiles.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/rewards.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/rewardStore.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/rewardWorkbook.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/routePresentation.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/routeTracking.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/saveVerification.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/serialization.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/serviceCosts.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/sharedSimulation.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/simulationScenarios.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/slugify.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/statisticalData.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/tableImport.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/teamLocations.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/tenantSelection.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/territorialMaps.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/trackingPermissions.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/trackingQueue.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/useModuleNavigation.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/userProvisioning.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/whatsappSetup.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/whatsappTabConnection.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/workspaces.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/lib/workspaceSession.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/main.tsx",
+      "kind": "src"
+    },
+    {
+      "id": "src/server/firebaseToken.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/server/firestoreCheckpoint.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/server/googleFederation.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/server/googleMapImport.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/server/rawBody.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/server/requestAgent.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/server/sharedQuota.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/server/sorteappRewards.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/server/whatsappCloud.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/server/whatsappDiagnostics.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/server/whatsappPairing.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/server/whatsappPilot.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/server/whatsappPilotCore.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/server/whatsappSessionStore.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/types.ts",
+      "kind": "src"
+    },
+    {
+      "id": "src/vite-env.d.ts",
+      "kind": "src"
+    },
+    {
+      "id": "tests/aiAvailability.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/api.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/authFeedback.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/cesarHistory.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/contextualDemo.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/dataRecovery.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/demoWorkspace.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/deviceSeed.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/deviceStorage.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/electionTransport.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/electoralEvidence.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/electoralSimulation.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/eventRegistration.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/financialSummary.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/firebaseToken.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/firestore.rules.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/geographicCards.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/geographicImport.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/googleFederation.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/googleMapImport.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/googleSheetsExport.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/improvementWorkflows.integration.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/livePosition.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/managerDashboard.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/mapTeams.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/moduleNavigation.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/monitorRoutes.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/movementTracking.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/nativeAuth.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/nativeTracking.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/offlineApp.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/offlineMutations.integration.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/offlineMutations.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/operationMetrics.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/operations.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/passengerFixtures.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/passengerLogistics.integration.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/passengerLogistics.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/persistence.integration.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/recordEditing.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/recordedTrack.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/requestAgent.integration.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/requestAgent.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/requestAgentRest.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/rewardDelivery.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/rewards.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/rewardWorkbook.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/routePresentation.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/routeTracking.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/securityBoundaries.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/serialization.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/serviceCosts.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/sharedQuota.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/sorteappRewards.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/statisticalData.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/tableImport.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/teamLocations.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/tenantSelection.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/territorialMaps.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/trackingConsent.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/trackingPermissions.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/trackingQueue.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/whatsappCloud.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/whatsappConnection.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/whatsappDiagnostics.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/whatsappPairing.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/whatsappPilot.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/whatsappSetup.integration.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/whatsappTab.test.ts",
+      "kind": "tests"
+    },
+    {
+      "id": "tests/workspaces.test.ts",
+      "kind": "tests"
+    }
+  ],
+  "edges": [
+    {
+      "source": "api/index.ts",
+      "target": "src/lib/accessPolicy.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/index.ts",
+      "target": "src/lib/aiAvailability.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/index.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/index.ts",
+      "target": "src/server/firebaseToken.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/index.ts",
+      "target": "src/server/googleMapImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/index.ts",
+      "target": "src/server/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/index.ts",
+      "target": "src/server/sharedQuota.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/sorteapp-rewards.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/sorteapp-rewards.ts",
+      "target": "src/server/rawBody.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/sorteapp-rewards.ts",
+      "target": "src/server/sorteappRewards.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/whatsapp-cloud.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/whatsapp-cloud.ts",
+      "target": "src/server/rawBody.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/whatsapp-cloud.ts",
+      "target": "src/server/whatsappCloud.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/whatsapp-pilot.ts",
+      "target": "api/index.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/whatsapp-pilot.ts",
+      "target": "src/lib/accessPolicy.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/whatsapp-pilot.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/whatsapp-pilot.ts",
+      "target": "src/server/whatsappPilot.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/whatsapp-pilot.ts",
+      "target": "src/server/whatsappPilotCore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "api/whatsapp-pilot.ts",
+      "target": "src/server/whatsappSessionStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "docs/DEPLOYMENT.md",
+      "target": "docs/REVISION-Y-SIMULACION.md",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "docs/DEPLOYMENT.md",
+      "target": "docs/USUARIOS-Y-FIRESTORE.md",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "docs/RASTREO-Y-DISPOSITIVOS.md",
+      "target": "docs/APP-NATIVA-Y-PLAY-STORE.md",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "docs/REVISION-Y-SIMULACION.md",
+      "target": "docs/MAPAS-Y-RUTAS.md",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/AuthModal.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/DataHealthStatus.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/DataQualityView.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/DemoDataEditor.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/DevicePersistence.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/ElectoralEvidenceView.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/FinanceWorkspaceView.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/Header.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/LandingPage.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/LoginView.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/PageNavigation.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/RouteTrackingProvider.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/Sidebar.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/SynapticNeuralBackground.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/UserGreetingBanner.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/UserManagementView.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/WorkspaceNavigation.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/WriteAccess.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/operations/OperationsEditingReferences.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/components/operations/WhatsappConnectionContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/data/colombiaElectoralData.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/data/contextualDemo.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/lib/demoWorkspace.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/lib/firebaseAuth.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/lib/googleWorkspace.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/lib/operationMetrics.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/lib/tenantSelection.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/lib/useModuleNavigation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/App.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/AdministrativeOverview.tsx",
+      "target": "src/lib/chartPalette.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/AdministrativeOverview.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/AiAssistantView.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/AiAssistantView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/AuthModal.tsx",
+      "target": "src/components/common/PasswordInput.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/AuthModal.tsx",
+      "target": "src/data/geography.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/AuthModal.tsx",
+      "target": "src/lib/firebaseAuth.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/AuthModal.tsx",
+      "target": "src/lib/permissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/AuthModal.tsx",
+      "target": "src/lib/slugify.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/AuthModal.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CampaignCostsReportView.tsx",
+      "target": "src/components/FormSaveStatus.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CampaignCostsReportView.tsx",
+      "target": "src/components/common/AuthorHeader.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CampaignCostsReportView.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CampaignCostsReportView.tsx",
+      "target": "src/lib/recordIds.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CampaignCostsReportView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CampaignPlanningPanel.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CampaignPlanningPanel.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CampaignStructureView.tsx",
+      "target": "src/components/FormSaveStatus.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CampaignStructureView.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CampaignStructureView.tsx",
+      "target": "src/lib/demoWorkspace.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CampaignStructureView.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CampaignStructureView.tsx",
+      "target": "src/lib/recordEditing.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CampaignStructureView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CandidatesView.tsx",
+      "target": "src/components/FormSaveStatus.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CandidatesView.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CandidatesView.tsx",
+      "target": "src/data/colombiaElectoralData.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CandidatesView.tsx",
+      "target": "src/lib/permissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CandidatesView.tsx",
+      "target": "src/lib/recordIds.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CandidatesView.tsx",
+      "target": "src/lib/slugify.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/CandidatesView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ChartInventory.tsx",
+      "target": "src/data/chartInventory.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ChartInventory.tsx",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DashboardView.tsx",
+      "target": "src/components/Sidebar.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DashboardView.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DashboardView.tsx",
+      "target": "src/lib/managerDashboard.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DataHealthStatus.tsx",
+      "target": "src/lib/dataSubscriptionHealth.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DataImportsView.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DataImportsView.tsx",
+      "target": "src/lib/tableImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DataImportsView.tsx",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DataImportsView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DataQualityView.tsx",
+      "target": "src/components/OperationMetricsPanel.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DataQualityView.tsx",
+      "target": "src/components/PageNavigation.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DataQualityView.tsx",
+      "target": "src/lib/dataQuality.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DataQualityView.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DataQualityView.tsx",
+      "target": "src/lib/operationalBackup.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DataQualityView.tsx",
+      "target": "src/lib/operationalRecoveryStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DataQualityView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DemoDataEditor.tsx",
+      "target": "src/components/ChartInventory.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DemoDataEditor.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DemoDataEditor.tsx",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DemoDataEditor.tsx",
+      "target": "src/lib/demoWorkspace.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DevicePersistence.tsx",
+      "target": "src/lib/deviceSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DevicePersistence.tsx",
+      "target": "src/lib/deviceStorage.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DevicePersistence.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DevicePersistence.tsx",
+      "target": "src/lib/nativeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DevicePersistence.tsx",
+      "target": "src/lib/offlineMutations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DistrictsView.tsx",
+      "target": "src/components/common/AuthorHeader.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DistrictsView.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DistrictsView.tsx",
+      "target": "src/data/colombiaElectoralData.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DistrictsView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DriveView.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/DriveView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectionTransportRoutes.tsx",
+      "target": "src/components/SatelliteRadarCanvas.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectionTransportRoutes.tsx",
+      "target": "src/lib/electionTransport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectionTransportRoutes.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectionTransportRoutes.tsx",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectionTransportRoutes.tsx",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectionTransportRoutes.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralEvidenceView.tsx",
+      "target": "src/components/PageNavigation.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralEvidenceView.tsx",
+      "target": "src/lib/electoralEvidence.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralEvidenceView.tsx",
+      "target": "src/lib/electoralEvidenceStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralEvidenceView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralHierarchyRollupView.tsx",
+      "target": "src/components/FormSaveStatus.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralHierarchyRollupView.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralHierarchyRollupView.tsx",
+      "target": "src/lib/recordIds.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralHierarchyRollupView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralSimulatorView.tsx",
+      "target": "src/components/StatisticalDataPanel.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralSimulatorView.tsx",
+      "target": "src/components/common/AuthorHeader.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralSimulatorView.tsx",
+      "target": "src/data/cesarElectionHistory.json",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralSimulatorView.tsx",
+      "target": "src/data/cesarSeats.json",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralSimulatorView.tsx",
+      "target": "src/data/cesarStatistics.json",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralSimulatorView.tsx",
+      "target": "src/data/geography.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralSimulatorView.tsx",
+      "target": "src/lib/chartPalette.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralSimulatorView.tsx",
+      "target": "src/lib/electoralSimulation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralSimulatorView.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralSimulatorView.tsx",
+      "target": "src/lib/offlineMutations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralSimulatorView.tsx",
+      "target": "src/lib/sharedSimulation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralSimulatorView.tsx",
+      "target": "src/lib/simulationScenarios.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralSimulatorView.tsx",
+      "target": "src/lib/statisticalData.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralSimulatorView.tsx",
+      "target": "src/lib/userProvisioning.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ElectoralSimulatorView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinanceWorkspaceView.tsx",
+      "target": "src/components/CampaignCostsReportView.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinanceWorkspaceView.tsx",
+      "target": "src/components/FinancesView.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinanceWorkspaceView.tsx",
+      "target": "src/components/PageNavigation.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinanceWorkspaceView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinancesView.tsx",
+      "target": "src/components/CampaignPlanningPanel.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinancesView.tsx",
+      "target": "src/components/FormSaveStatus.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinancesView.tsx",
+      "target": "src/components/ServiceCostsDashboard.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinancesView.tsx",
+      "target": "src/components/common/AuthorHeader.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinancesView.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinancesView.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinancesView.tsx",
+      "target": "src/data/colombiaElectoralData.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinancesView.tsx",
+      "target": "src/lib/financialSummary.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinancesView.tsx",
+      "target": "src/lib/permissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinancesView.tsx",
+      "target": "src/lib/recordIds.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinancesView.tsx",
+      "target": "src/lib/slugify.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FinancesView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FirestoreStatusModal.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FleetTrackingPanel.tsx",
+      "target": "src/components/RouteDetailView.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FleetTrackingPanel.tsx",
+      "target": "src/components/RouteHistoryList.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FleetTrackingPanel.tsx",
+      "target": "src/components/RouteTrackingProvider.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FleetTrackingPanel.tsx",
+      "target": "src/components/SatelliteRadarCanvas.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FleetTrackingPanel.tsx",
+      "target": "src/components/TeamLocationList.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FleetTrackingPanel.tsx",
+      "target": "src/components/useTeamPositions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FleetTrackingPanel.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FleetTrackingPanel.tsx",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FleetTrackingPanel.tsx",
+      "target": "src/lib/teamLocations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FleetTrackingPanel.tsx",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FleetTrackingPanel.tsx",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FleetTrackingPanel.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FormSaveStatus.tsx",
+      "target": "src/components/WriteAccess.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FormSaveStatus.tsx",
+      "target": "src/lib/operationMetrics.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/FormSaveStatus.tsx",
+      "target": "src/lib/userProvisioning.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GeographicFeatureCard.tsx",
+      "target": "src/components/GeographicFeatureEditor.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GeographicFeatureCard.tsx",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GeographicFeatureEditor.tsx",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GeographicFeatureEditor.tsx",
+      "target": "src/lib/mapPersistence.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GeographicFeatureEditor.tsx",
+      "target": "src/lib/serialization.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GeographicImportPanel.tsx",
+      "target": "src/components/GeographicFeatureEditor.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GeographicImportPanel.tsx",
+      "target": "src/components/GeographicLayerCard.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GeographicImportPanel.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GeographicImportPanel.tsx",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GeographicImportPanel.tsx",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GeographicLayerCard.tsx",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GeographicLayerCard.tsx",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GoogleTerritorialMap.tsx",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GoogleTerritorialMap.tsx",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GoogleWorkspaceHubView.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GoogleWorkspaceHubView.tsx",
+      "target": "src/lib/googleWorkspace.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/GoogleWorkspaceHubView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/Header.tsx",
+      "target": "src/lib/permissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/Header.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LandingPage.tsx",
+      "target": "src/components/SynapticNeuralBackground.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LeadersView.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LeadersView.tsx",
+      "target": "src/components/common/LocationPicker.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LeadersView.tsx",
+      "target": "src/data/colombiaElectoralData.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LeadersView.tsx",
+      "target": "src/lib/permissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LeadersView.tsx",
+      "target": "src/lib/recordIds.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LeadersView.tsx",
+      "target": "src/lib/slugify.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LeadersView.tsx",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LeadersView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LiveMonitorPanel.tsx",
+      "target": "src/components/SatelliteRadarCanvas.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LiveMonitorPanel.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LiveMonitorPanel.tsx",
+      "target": "src/lib/livePosition.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LiveMonitorPanel.tsx",
+      "target": "src/lib/recordedTrack.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LiveMonitorPanel.tsx",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LiveMonitorPanel.tsx",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LiveMonitorPanel.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LoginView.tsx",
+      "target": "src/components/SynapticNeuralBackground.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LoginView.tsx",
+      "target": "src/components/common/PasswordInput.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LoginView.tsx",
+      "target": "src/data/geography.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LoginView.tsx",
+      "target": "src/lib/firebaseAuth.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LoginView.tsx",
+      "target": "src/lib/permissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/LoginView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/OperationMetricsPanel.tsx",
+      "target": "src/lib/moduleNavigation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/OperationMetricsPanel.tsx",
+      "target": "src/lib/operationMetrics.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/PageNavigation.tsx",
+      "target": "src/lib/moduleNavigation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/PassengerEventsView.tsx",
+      "target": "src/components/PageNavigation.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/PassengerEventsView.tsx",
+      "target": "src/components/operations/OperationsUI.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/PassengerEventsView.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/PassengerEventsView.tsx",
+      "target": "src/lib/passengerLogistics.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/PassengerEventsView.tsx",
+      "target": "src/lib/passengerLogisticsStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/PassengerEventsView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ProposalsView.tsx",
+      "target": "src/components/FormSaveStatus.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ProposalsView.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ProposalsView.tsx",
+      "target": "src/lib/recordIds.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ProposalsView.tsx",
+      "target": "src/lib/slugify.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ProposalsView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RewardDeliveryPanel.tsx",
+      "target": "src/lib/rewardDelivery.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RewardDeliveryPanel.tsx",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RewardManagementReport.tsx",
+      "target": "src/lib/rewards.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RewardsView.tsx",
+      "target": "src/components/RewardManagementReport.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RewardsView.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RewardsView.tsx",
+      "target": "src/lib/rewardFiles.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RewardsView.tsx",
+      "target": "src/lib/rewardStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RewardsView.tsx",
+      "target": "src/lib/rewards.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RewardsView.tsx",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RewardsView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteDetailView.tsx",
+      "target": "src/components/SatelliteRadarCanvas.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteDetailView.tsx",
+      "target": "src/lib/recordedTrack.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteDetailView.tsx",
+      "target": "src/lib/routePresentation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteDetailView.tsx",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteDetailView.tsx",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteHistoryList.tsx",
+      "target": "src/lib/routePresentation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteHistoryList.tsx",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteOperationsView.tsx",
+      "target": "src/components/LiveMonitorPanel.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteOperationsView.tsx",
+      "target": "src/components/PageNavigation.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteOperationsView.tsx",
+      "target": "src/components/RouteDetailView.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteOperationsView.tsx",
+      "target": "src/components/RouteHistoryList.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteOperationsView.tsx",
+      "target": "src/components/RouteTrackingProvider.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteOperationsView.tsx",
+      "target": "src/lib/deviceStorage.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteOperationsView.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteOperationsView.tsx",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteOperationsView.tsx",
+      "target": "src/lib/livePosition.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteOperationsView.tsx",
+      "target": "src/lib/recordEditing.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteOperationsView.tsx",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteOperationsView.tsx",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteOperationsView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteTrackingProvider.tsx",
+      "target": "src/components/useAutomaticTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteTrackingProvider.tsx",
+      "target": "src/lib/deviceSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteTrackingProvider.tsx",
+      "target": "src/lib/deviceStorage.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteTrackingProvider.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteTrackingProvider.tsx",
+      "target": "src/lib/livePosition.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteTrackingProvider.tsx",
+      "target": "src/lib/monitorRoutes.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteTrackingProvider.tsx",
+      "target": "src/lib/movementTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteTrackingProvider.tsx",
+      "target": "src/lib/nativeAuth.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteTrackingProvider.tsx",
+      "target": "src/lib/nativeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteTrackingProvider.tsx",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteTrackingProvider.tsx",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteTrackingProvider.tsx",
+      "target": "src/lib/trackingQueue.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/RouteTrackingProvider.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/SatelliteRadarCanvas.tsx",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/SatelliteRadarCanvas.tsx",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ServiceCostsDashboard.tsx",
+      "target": "src/lib/serviceCosts.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ServiceCostsDashboard.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/Sidebar.tsx",
+      "target": "src/lib/moduleNavigation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/Sidebar.tsx",
+      "target": "src/lib/permissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/Sidebar.tsx",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/Sidebar.tsx",
+      "target": "src/lib/workspaces.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/Sidebar.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/SorteappRewardDrawsView.tsx",
+      "target": "src/components/RewardDeliveryPanel.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/SorteappRewardDrawsView.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/SorteappRewardDrawsView.tsx",
+      "target": "src/lib/rewardDelivery.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/SorteappRewardDrawsView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/StatisticalDataPanel.tsx",
+      "target": "src/lib/statisticalData.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/StatisticalDataPanel.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TeamLocationList.tsx",
+      "target": "src/lib/routePresentation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TeamLocationList.tsx",
+      "target": "src/lib/teamLocations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TenantsView.tsx",
+      "target": "src/components/CampaignPlanningPanel.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TenantsView.tsx",
+      "target": "src/components/FormSaveStatus.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TenantsView.tsx",
+      "target": "src/components/common/AuthorHeader.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TenantsView.tsx",
+      "target": "src/lib/slugify.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TenantsView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/components/GeographicFeatureCard.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/components/GeographicImportPanel.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/components/GoogleTerritorialMap.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/components/RouteTrackingProvider.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/components/SatelliteRadarCanvas.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/components/TeamLocationList.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/components/useTeamPositions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/lib/mapPersistence.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/lib/mapTeams.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/lib/permissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/lib/teamLocations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TerritorialMapView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TransportView.tsx",
+      "target": "src/components/ElectionTransportRoutes.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TransportView.tsx",
+      "target": "src/components/FleetTrackingPanel.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TransportView.tsx",
+      "target": "src/components/common/AuthorHeader.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TransportView.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TransportView.tsx",
+      "target": "src/components/common/LocationPicker.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TransportView.tsx",
+      "target": "src/components/operations/TransportControlCenter.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TransportView.tsx",
+      "target": "src/data/colombiaElectoralData.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TransportView.tsx",
+      "target": "src/lib/permissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TransportView.tsx",
+      "target": "src/lib/recordIds.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TransportView.tsx",
+      "target": "src/lib/slugify.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TransportView.tsx",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TransportView.tsx",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/TransportView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/UserGreetingBanner.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/UserManagementView.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/UserManagementView.tsx",
+      "target": "src/data/geography.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/UserManagementView.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/UserManagementView.tsx",
+      "target": "src/lib/userProvisioning.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/UserManagementView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/WorkspaceNavigation.tsx",
+      "target": "src/lib/moduleNavigation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/WorkspaceNavigation.tsx",
+      "target": "src/lib/workspaces.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/WorkspaceNavigation.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ZoneElectoralProjectionView.tsx",
+      "target": "src/lib/chartPalette.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ZoneElectoralProjectionView.tsx",
+      "target": "src/lib/permissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/ZoneElectoralProjectionView.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/common/EditRecordButton.tsx",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/common/EditRecordButton.tsx",
+      "target": "src/lib/demoWorkspace.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/common/EditRecordButton.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/common/EditRecordButton.tsx",
+      "target": "src/lib/recordEditing.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/common/LocationPicker.tsx",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/AttendanceSheet.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/AttendanceSheet.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/AttendanceSheet.tsx",
+      "target": "src/components/operations/OperationsUI.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/AttendanceSheet.tsx",
+      "target": "src/lib/attendanceStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/AttendanceSheet.tsx",
+      "target": "src/lib/demoWorkspace.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/AttendanceSheet.tsx",
+      "target": "src/lib/eventRegistration.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/AttendanceSheet.tsx",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/DayControl.tsx",
+      "target": "src/components/operations/AttendanceSheet.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/DayControl.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/DayControl.tsx",
+      "target": "src/components/operations/OperationsUI.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/DayControl.tsx",
+      "target": "src/components/operations/RebalancingPanel.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/DayControl.tsx",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/OperationsContext.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/OperationsContext.tsx",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/OperationsContext.tsx",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/OperationsEditingReferences.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/OperationsEditingReferences.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/OperationsOverview.tsx",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/OperationsOverview.tsx",
+      "target": "src/components/operations/DayControl.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/OperationsOverview.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/OperationsOverview.tsx",
+      "target": "src/components/operations/OperationsUI.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/OperationsOverview.tsx",
+      "target": "src/lib/chartPalette.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/OperationsOverview.tsx",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/OperationsUI.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/RebalancingPanel.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/RebalancingPanel.tsx",
+      "target": "src/components/operations/OperationsUI.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/RebalancingPanel.tsx",
+      "target": "src/components/operations/useOperationsActions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/RebalancingPanel.tsx",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/RequestAgentPanel.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/RequestAgentPanel.tsx",
+      "target": "src/components/operations/OperationsUI.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/RequestAgentPanel.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/RequestAgentPanel.tsx",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/RequestAgentPanel.tsx",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/ResourcesView.tsx",
+      "target": "src/components/PageNavigation.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/ResourcesView.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/ResourcesView.tsx",
+      "target": "src/components/operations/OperationsUI.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/ResourcesView.tsx",
+      "target": "src/components/operations/RequestAgentPanel.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/ResourcesView.tsx",
+      "target": "src/components/operations/WhatsappPilotPanel.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/ResourcesView.tsx",
+      "target": "src/components/operations/useOperationsActions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/ResourcesView.tsx",
+      "target": "src/lib/chartPalette.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/ResourcesView.tsx",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/ResourcesView.tsx",
+      "target": "src/lib/requestReference.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/TransportControlCenter.tsx",
+      "target": "src/components/operations/AttendanceSheet.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/TransportControlCenter.tsx",
+      "target": "src/components/operations/DayControl.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/TransportControlCenter.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/TransportControlCenter.tsx",
+      "target": "src/components/operations/OperationsUI.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/TransportControlCenter.tsx",
+      "target": "src/components/operations/TransportReconciliation.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/TransportControlCenter.tsx",
+      "target": "src/components/operations/useOperationsActions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/TransportControlCenter.tsx",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/TransportReconciliation.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/TransportReconciliation.tsx",
+      "target": "src/components/operations/OperationsUI.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/TransportReconciliation.tsx",
+      "target": "src/components/operations/useOperationsActions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/TransportReconciliation.tsx",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/WhatsappConnectionContext.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/WhatsappConnectionContext.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/WhatsappConnectionContext.tsx",
+      "target": "src/lib/whatsappSetup.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/WhatsappConnectionContext.tsx",
+      "target": "src/lib/whatsappTabConnection.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/WhatsappDiagnosticsPanel.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/WhatsappDiagnosticsPanel.tsx",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/WhatsappPilotPanel.tsx",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/WhatsappPilotPanel.tsx",
+      "target": "src/components/operations/OperationsUI.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/WhatsappPilotPanel.tsx",
+      "target": "src/components/operations/WhatsappConnectionContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/WhatsappPilotPanel.tsx",
+      "target": "src/components/operations/WhatsappDiagnosticsPanel.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/useOperationsActions.ts",
+      "target": "src/components/common/EditRecordButton.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/useOperationsActions.ts",
+      "target": "src/components/operations/OperationsContext.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/useOperationsActions.ts",
+      "target": "src/lib/demoOperationsStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/operations/useOperationsActions.ts",
+      "target": "src/lib/operationsStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/useAutomaticTracking.ts",
+      "target": "src/lib/deviceSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/useAutomaticTracking.ts",
+      "target": "src/lib/deviceStorage.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/useAutomaticTracking.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/useAutomaticTracking.ts",
+      "target": "src/lib/movementTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/useAutomaticTracking.ts",
+      "target": "src/lib/nativeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/useAutomaticTracking.ts",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/useAutomaticTracking.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/useTeamPositions.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/useTeamPositions.ts",
+      "target": "src/lib/livePosition.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/useTeamPositions.ts",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/components/useTeamPositions.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/campaignStructureData.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/chartInventory.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/chartInventory.ts",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/colombiaElectoralData.ts",
+      "target": "src/data/cesarStatistics.json",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/completeDemo.ts",
+      "target": "src/data/demoPresentation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/completeDemo.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/completeDemo.ts",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/contextualDemo.ts",
+      "target": "src/data/colombiaElectoralData.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/contextualDemo.ts",
+      "target": "src/data/completeDemo.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/contextualDemo.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/contextualDemo.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/demoData.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/demoPresentation.ts",
+      "target": "src/data/demoRegistrations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/demoPresentation.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/demoRegistrations.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/demoRegistrations.ts",
+      "target": "src/lib/eventRegistration.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/demoSeed.ts",
+      "target": "src/data/contextualDemo.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/demoSeed.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/data/witnessesAuditData.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/analytics.ts",
+      "target": "src/lib/financialSummary.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/analytics.ts",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/analytics.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/attendanceStore.ts",
+      "target": "src/lib/eventRegistration.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/attendanceStore.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/attendanceStore.ts",
+      "target": "src/lib/offlineMutations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/attendanceStore.ts",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/attendanceStore.ts",
+      "target": "src/lib/saveVerification.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/attendanceStore.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/dataQuality.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/demoOperationsStore.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/demoOperationsStore.ts",
+      "target": "src/lib/demoWorkspace.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/demoOperationsStore.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/demoOperationsStore.ts",
+      "target": "src/lib/operationsStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/demoWorkspace.ts",
+      "target": "src/data/contextualDemo.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/demoWorkspace.ts",
+      "target": "src/data/demoPresentation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/demoWorkspace.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/demoWorkspace.ts",
+      "target": "src/lib/eventRegistration.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/demoWorkspace.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/demoWorkspace.ts",
+      "target": "src/lib/offlineMutations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/demoWorkspace.ts",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/demoWorkspace.ts",
+      "target": "src/lib/recordEditing.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/demoWorkspace.ts",
+      "target": "src/lib/saveVerification.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/demoWorkspace.ts",
+      "target": "src/lib/serialization.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/demoWorkspace.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/deviceSeed.ts",
+      "target": "src/lib/movementTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/deviceSeed.ts",
+      "target": "src/lib/nativeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/deviceSeed.ts",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/deviceStorage.ts",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/electionTransport.ts",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/electionTransport.ts",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/electionTransport.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/electoralEvidenceStore.ts",
+      "target": "src/lib/electoralEvidence.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/electoralEvidenceStore.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/electoralEvidenceStore.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/electoralSimulation.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/eventRegistration.ts",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/eventRegistration.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/financialSummary.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/firebase.ts",
+      "target": "src/data/contextualDemo.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/firebase.ts",
+      "target": "src/data/demoPresentation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/firebase.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/firebase.ts",
+      "target": "src/lib/dataSubscriptionHealth.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/firebase.ts",
+      "target": "src/lib/deviceStorage.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/firebase.ts",
+      "target": "src/lib/offlineMutations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/firebase.ts",
+      "target": "src/lib/saveVerification.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/firebase.ts",
+      "target": "src/lib/serialization.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/firebase.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/firebaseAuth.ts",
+      "target": "src/lib/accessPolicy.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/firebaseAuth.ts",
+      "target": "src/lib/authFeedback.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/firebaseAuth.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/firebaseAuth.ts",
+      "target": "src/lib/userProvisioning.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/firebaseAuth.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/geographicImport.ts",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/googleWorkspace.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/googleWorkspace.ts",
+      "target": "src/lib/googleSheetsExport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/googleWorkspace.ts",
+      "target": "src/lib/workspaceSession.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/managerDashboard.ts",
+      "target": "src/lib/financialSummary.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/managerDashboard.ts",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/managerDashboard.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/mapPersistence.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/mapPersistence.ts",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/mapPersistence.ts",
+      "target": "src/lib/offlineMutations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/mapPersistence.ts",
+      "target": "src/lib/saveVerification.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/mapPersistence.ts",
+      "target": "src/lib/serialization.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/mapPersistence.ts",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/mapTeams.ts",
+      "target": "src/lib/livePosition.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/mapTeams.ts",
+      "target": "src/lib/teamLocations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/mapTeams.ts",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/mapTeams.ts",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/mapTeams.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/monitorRoutes.ts",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/movementTracking.ts",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/movementTracking.ts",
+      "target": "src/lib/nativeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/movementTracking.ts",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/offlineMutations.ts",
+      "target": "src/lib/deviceStorage.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/offlineMutations.ts",
+      "target": "src/lib/serialization.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/offlineRegistry.ts",
+      "target": "src/lib/attendanceStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/offlineRegistry.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/offlineRegistry.ts",
+      "target": "src/lib/mapPersistence.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/offlineRegistry.ts",
+      "target": "src/lib/operationsStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/offlineRegistry.ts",
+      "target": "src/lib/recordEditing.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/operationalRecoveryStore.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/operationalRecoveryStore.ts",
+      "target": "src/lib/offlineMutations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/operationalRecoveryStore.ts",
+      "target": "src/lib/operationalBackup.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/operations.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/operationsStore.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/operationsStore.ts",
+      "target": "src/lib/offlineMutations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/operationsStore.ts",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/operationsStore.ts",
+      "target": "src/lib/saveVerification.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/operationsStore.ts",
+      "target": "src/lib/serialization.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/operationsStore.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/passengerLogisticsStore.ts",
+      "target": "src/lib/offlineMutations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/passengerLogisticsStore.ts",
+      "target": "src/lib/passengerLogistics.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/passengerLogisticsStore.ts",
+      "target": "src/lib/saveVerification.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/passengerLogisticsStore.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/permissions.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/recordEditing.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/recordEditing.ts",
+      "target": "src/lib/offlineMutations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/recordEditing.ts",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/recordEditing.ts",
+      "target": "src/lib/saveVerification.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/recordEditing.ts",
+      "target": "src/lib/serialization.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/recordEditing.ts",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/recordedTrack.ts",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/recordedTrack.ts",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/requestAgent.ts",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/requestAgent.ts",
+      "target": "src/lib/requestReference.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/rewardFiles.ts",
+      "target": "src/lib/rewards.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/rewardStore.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/rewardStore.ts",
+      "target": "src/lib/offlineMutations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/rewardStore.ts",
+      "target": "src/lib/rewards.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/rewardWorkbook.ts",
+      "target": "src/lib/rewards.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/routePresentation.ts",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/routeTracking.ts",
+      "target": "src/lib/deviceStorage.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/routeTracking.ts",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/routeTracking.ts",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/saveVerification.ts",
+      "target": "src/lib/serialization.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/serviceCosts.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/sharedSimulation.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/sharedSimulation.ts",
+      "target": "src/lib/offlineMutations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/sharedSimulation.ts",
+      "target": "src/lib/serialization.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/sharedSimulation.ts",
+      "target": "src/lib/simulationScenarios.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/sharedSimulation.ts",
+      "target": "src/lib/statisticalData.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/simulationScenarios.ts",
+      "target": "src/data/geography.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/simulationScenarios.ts",
+      "target": "src/lib/electoralSimulation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/simulationScenarios.ts",
+      "target": "src/lib/statisticalData.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/statisticalData.ts",
+      "target": "src/data/geography.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/statisticalData.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/tableImport.ts",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/teamLocations.ts",
+      "target": "src/lib/livePosition.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/teamLocations.ts",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/teamLocations.ts",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/teamLocations.ts",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/teamLocations.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/tenantSelection.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/territorialMaps.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/trackingPermissions.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/trackingQueue.ts",
+      "target": "src/lib/deviceStorage.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/useModuleNavigation.ts",
+      "target": "src/lib/moduleNavigation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/userProvisioning.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/userProvisioning.ts",
+      "target": "src/lib/offlineMutations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/userProvisioning.ts",
+      "target": "src/lib/permissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/userProvisioning.ts",
+      "target": "src/lib/serialization.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/userProvisioning.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/whatsappSetup.ts",
+      "target": "src/lib/accessPolicy.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/whatsappSetup.ts",
+      "target": "src/lib/offlineMutations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/whatsappSetup.ts",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/whatsappSetup.ts",
+      "target": "src/lib/saveVerification.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/whatsappSetup.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/workspaces.ts",
+      "target": "src/lib/moduleNavigation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/workspaces.ts",
+      "target": "src/lib/permissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/workspaces.ts",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/lib/workspaces.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/main.tsx",
+      "target": "src/App.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/main.tsx",
+      "target": "src/components/DevicePersistence.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/main.tsx",
+      "target": "src/lib/offlineRegistry.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/googleFederation.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/rawBody.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/requestAgent.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/sharedQuota.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/sorteappRewards.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/sorteappRewards.ts",
+      "target": "src/lib/rewardDelivery.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/sorteappRewards.ts",
+      "target": "src/server/googleFederation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/sorteappRewards.ts",
+      "target": "src/server/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappCloud.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappCloud.ts",
+      "target": "src/server/firestoreCheckpoint.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappCloud.ts",
+      "target": "src/server/googleFederation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappCloud.ts",
+      "target": "src/server/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappCloud.ts",
+      "target": "src/server/whatsappDiagnostics.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappCloud.ts",
+      "target": "src/server/whatsappPilotCore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappDiagnostics.ts",
+      "target": "src/server/firestoreCheckpoint.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappDiagnostics.ts",
+      "target": "src/server/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappPilot.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappPilot.ts",
+      "target": "src/server/whatsappDiagnostics.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappPilot.ts",
+      "target": "src/server/whatsappPairing.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappPilot.ts",
+      "target": "src/server/whatsappPilotCore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappPilot.ts",
+      "target": "src/server/whatsappSessionStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappPilotCore.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappPilotCore.ts",
+      "target": "src/server/firestoreCheckpoint.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappPilotCore.ts",
+      "target": "src/server/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappSessionStore.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappSessionStore.ts",
+      "target": "src/server/firestoreCheckpoint.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappSessionStore.ts",
+      "target": "src/server/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "src/server/whatsappSessionStore.ts",
+      "target": "src/server/whatsappPilotCore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/aiAvailability.test.ts",
+      "target": "src/lib/aiAvailability.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/api.test.ts",
+      "target": "api/index.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/api.test.ts",
+      "target": "api/whatsapp-pilot.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/authFeedback.test.ts",
+      "target": "src/lib/authFeedback.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/cesarHistory.test.ts",
+      "target": "src/data/cesarElectionHistory.json",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/cesarHistory.test.ts",
+      "target": "src/data/cesarSeats.json",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/cesarHistory.test.ts",
+      "target": "src/data/geography.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/cesarHistory.test.ts",
+      "target": "src/lib/statisticalData.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/contextualDemo.test.ts",
+      "target": "src/data/contextualDemo.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/contextualDemo.test.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/contextualDemo.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/dataRecovery.test.ts",
+      "target": "src/lib/dataQuality.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/dataRecovery.test.ts",
+      "target": "src/lib/operationalBackup.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/demoWorkspace.test.ts",
+      "target": "src/data/chartInventory.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/demoWorkspace.test.ts",
+      "target": "src/data/demoPresentation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/demoWorkspace.test.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/demoWorkspace.test.ts",
+      "target": "src/lib/chartPalette.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/demoWorkspace.test.ts",
+      "target": "src/lib/demoWorkspace.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/demoWorkspace.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/deviceSeed.test.ts",
+      "target": "src/lib/deviceSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/deviceStorage.test.ts",
+      "target": "src/lib/deviceStorage.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/deviceStorage.test.ts",
+      "target": "src/lib/movementTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/electionTransport.test.ts",
+      "target": "src/lib/electionTransport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/electionTransport.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/electoralEvidence.test.ts",
+      "target": "src/lib/electoralEvidence.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/electoralSimulation.test.ts",
+      "target": "src/lib/electoralSimulation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/electoralSimulation.test.ts",
+      "target": "src/lib/simulationScenarios.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/eventRegistration.test.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/eventRegistration.test.ts",
+      "target": "src/lib/eventRegistration.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/eventRegistration.test.ts",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/eventRegistration.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/financialSummary.test.ts",
+      "target": "src/lib/financialSummary.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/financialSummary.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/firebaseToken.test.ts",
+      "target": "src/server/firebaseToken.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/firestore.rules.test.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/firestore.rules.test.ts",
+      "target": "src/lib/movementTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/firestore.rules.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/geographicCards.test.ts",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/geographicImport.test.ts",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/googleFederation.test.ts",
+      "target": "src/server/googleFederation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/googleMapImport.test.ts",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/googleMapImport.test.ts",
+      "target": "src/server/googleMapImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/googleSheetsExport.test.ts",
+      "target": "src/lib/googleSheetsExport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/improvementWorkflows.integration.test.ts",
+      "target": "src/lib/electoralEvidence.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/improvementWorkflows.integration.test.ts",
+      "target": "src/lib/electoralEvidenceStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/improvementWorkflows.integration.test.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/improvementWorkflows.integration.test.ts",
+      "target": "src/lib/operationalRecoveryStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/improvementWorkflows.integration.test.ts",
+      "target": "src/server/sharedQuota.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/livePosition.test.ts",
+      "target": "src/lib/livePosition.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/managerDashboard.test.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/managerDashboard.test.ts",
+      "target": "src/lib/managerDashboard.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/managerDashboard.test.ts",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/managerDashboard.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/mapTeams.test.ts",
+      "target": "src/lib/livePosition.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/mapTeams.test.ts",
+      "target": "src/lib/mapTeams.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/mapTeams.test.ts",
+      "target": "src/lib/teamLocations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/mapTeams.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/moduleNavigation.test.ts",
+      "target": "src/components/PageNavigation.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/moduleNavigation.test.ts",
+      "target": "src/lib/moduleNavigation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/monitorRoutes.test.ts",
+      "target": "src/lib/monitorRoutes.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/monitorRoutes.test.ts",
+      "target": "src/lib/movementTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/movementTracking.test.ts",
+      "target": "src/lib/movementTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/movementTracking.test.ts",
+      "target": "src/lib/nativeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/nativeAuth.test.ts",
+      "target": "src/lib/nativeAuth.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/nativeTracking.test.ts",
+      "target": "src/lib/nativeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/offlineMutations.integration.test.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/offlineMutations.integration.test.ts",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/offlineMutations.integration.test.ts",
+      "target": "src/lib/serialization.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/offlineMutations.integration.test.ts",
+      "target": "src/lib/simulationScenarios.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/offlineMutations.integration.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/offlineMutations.test.ts",
+      "target": "src/lib/deviceStorage.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/offlineMutations.test.ts",
+      "target": "src/lib/offlineMutations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/operationMetrics.test.ts",
+      "target": "src/lib/operationMetrics.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/operations.test.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/operations.test.ts",
+      "target": "src/lib/eventRegistration.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/operations.test.ts",
+      "target": "src/lib/operations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/operations.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/passengerFixtures.ts",
+      "target": "src/lib/passengerLogistics.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/passengerLogistics.integration.test.ts",
+      "target": "src/lib/passengerLogistics.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/passengerLogistics.integration.test.ts",
+      "target": "src/lib/passengerLogisticsStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/passengerLogistics.integration.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/passengerLogistics.integration.test.ts",
+      "target": "tests/passengerFixtures.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/passengerLogistics.test.ts",
+      "target": "src/lib/passengerLogistics.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/passengerLogistics.test.ts",
+      "target": "tests/passengerFixtures.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/persistence.integration.test.ts",
+      "target": "src/data/contextualDemo.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/persistence.integration.test.ts",
+      "target": "src/data/demoSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/persistence.integration.test.ts",
+      "target": "src/lib/demoOperationsStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/persistence.integration.test.ts",
+      "target": "src/lib/demoWorkspace.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/persistence.integration.test.ts",
+      "target": "src/lib/firebase.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/persistence.integration.test.ts",
+      "target": "src/lib/operationsStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/persistence.integration.test.ts",
+      "target": "src/lib/recordEditing.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/persistence.integration.test.ts",
+      "target": "src/lib/saveVerification.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/persistence.integration.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/recordEditing.test.ts",
+      "target": "src/lib/recordEditing.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/recordedTrack.test.ts",
+      "target": "src/lib/deviceStorage.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/recordedTrack.test.ts",
+      "target": "src/lib/movementTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/recordedTrack.test.ts",
+      "target": "src/lib/recordedTrack.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/requestAgent.integration.test.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/requestAgent.integration.test.ts",
+      "target": "src/lib/requestReference.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/requestAgent.integration.test.ts",
+      "target": "src/server/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/requestAgent.integration.test.ts",
+      "target": "src/server/whatsappPilotCore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/requestAgent.integration.test.ts",
+      "target": "src/server/whatsappSessionStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/requestAgent.test.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/requestAgent.test.ts",
+      "target": "src/lib/requestReference.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/requestAgent.test.ts",
+      "target": "src/server/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/requestAgentRest.test.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/requestAgentRest.test.ts",
+      "target": "src/server/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/rewardDelivery.test.ts",
+      "target": "src/lib/rewardDelivery.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/rewardWorkbook.test.ts",
+      "target": "src/lib/rewardFiles.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/rewardWorkbook.test.ts",
+      "target": "src/lib/rewardWorkbook.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/rewardWorkbook.test.ts",
+      "target": "src/lib/rewards.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/rewards.test.ts",
+      "target": "src/lib/rewardFiles.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/rewards.test.ts",
+      "target": "src/lib/rewards.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/routePresentation.test.ts",
+      "target": "src/lib/movementTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/routePresentation.test.ts",
+      "target": "src/lib/routePresentation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/routePresentation.test.ts",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/routeTracking.test.ts",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/routeTracking.test.ts",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/securityBoundaries.test.ts",
+      "target": "src/lib/workspaceSession.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/securityBoundaries.test.ts",
+      "target": "src/server/rawBody.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/serialization.test.ts",
+      "target": "src/lib/serialization.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/serialization.test.ts",
+      "target": "src/lib/slugify.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/serviceCosts.test.ts",
+      "target": "src/lib/serviceCosts.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/serviceCosts.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/sharedQuota.test.ts",
+      "target": "src/server/sharedQuota.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/sorteappRewards.test.ts",
+      "target": "src/server/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/sorteappRewards.test.ts",
+      "target": "src/server/sorteappRewards.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/statisticalData.test.ts",
+      "target": "src/lib/statisticalData.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/tableImport.test.ts",
+      "target": "src/lib/tableImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/teamLocations.test.ts",
+      "target": "src/lib/geographicImport.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/teamLocations.test.ts",
+      "target": "src/lib/livePosition.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/teamLocations.test.ts",
+      "target": "src/lib/routeTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/teamLocations.test.ts",
+      "target": "src/lib/teamLocations.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/teamLocations.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/tenantSelection.test.ts",
+      "target": "src/lib/tenantSelection.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/territorialMaps.test.ts",
+      "target": "src/lib/territorialMaps.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/territorialMaps.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/trackingConsent.test.ts",
+      "target": "src/lib/deviceSeed.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/trackingPermissions.test.ts",
+      "target": "src/components/Sidebar.tsx",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/trackingPermissions.test.ts",
+      "target": "src/lib/trackingPermissions.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/trackingPermissions.test.ts",
+      "target": "src/lib/workspaces.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/trackingPermissions.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/trackingQueue.test.ts",
+      "target": "src/lib/deviceStorage.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/trackingQueue.test.ts",
+      "target": "src/lib/movementTracking.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/trackingQueue.test.ts",
+      "target": "src/lib/trackingQueue.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/whatsappCloud.test.ts",
+      "target": "src/server/whatsappCloud.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/whatsappConnection.test.ts",
+      "target": "src/lib/whatsappTabConnection.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/whatsappDiagnostics.test.ts",
+      "target": "src/server/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/whatsappDiagnostics.test.ts",
+      "target": "src/server/whatsappDiagnostics.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/whatsappPairing.test.ts",
+      "target": "src/lib/whatsappTabConnection.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/whatsappPairing.test.ts",
+      "target": "src/server/whatsappPairing.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/whatsappPairing.test.ts",
+      "target": "src/server/whatsappPilot.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/whatsappPilot.test.ts",
+      "target": "src/server/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/whatsappPilot.test.ts",
+      "target": "src/server/whatsappPilotCore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/whatsappSetup.integration.test.ts",
+      "target": "src/lib/whatsappSetup.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/whatsappSetup.integration.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/whatsappTab.test.ts",
+      "target": "src/lib/requestAgent.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/whatsappTab.test.ts",
+      "target": "src/lib/whatsappTabConnection.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/whatsappTab.test.ts",
+      "target": "src/server/whatsappPilot.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/whatsappTab.test.ts",
+      "target": "src/server/whatsappSessionStore.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/workspaces.test.ts",
+      "target": "src/lib/moduleNavigation.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/workspaces.test.ts",
+      "target": "src/lib/workspaces.ts",
+      "kind": "explicit-reference"
+    },
+    {
+      "source": "tests/workspaces.test.ts",
+      "target": "src/types.ts",
+      "kind": "explicit-reference"
+    }
+  ]
+}

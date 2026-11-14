@@ -1,3 +1,5 @@
+import {DeliveryDetails,RewardDeliveryPanel} from './RewardDeliveryPanel';
+import type {RewardDelivery} from '../lib/rewardDelivery';
 import React,{useEffect,useMemo,useState} from 'react';
 import {collection,limit,onSnapshot,orderBy,query,where} from 'firebase/firestore';
 import {Gift,RefreshCw,ShieldCheck} from 'lucide-react';
@@ -5,7 +7,7 @@ import {db} from '../lib/firebase';
 import type {UserProfile} from '../types';
 
 type Draw={id:string;tenantId:string;source?:string;kind?:string;paid?:boolean;name:string;prize:string;currency?:string;entryPrice?:number;updatedAt?:string};
-type Entry={id:string;tenantId:string;drawId:string;source?:string;kind?:string;paid?:boolean;status?:'withdrawn';participant?:{name:string;email?:string;phone?:string};consent?:{accepted:boolean;purpose:string;policyVersion:string;acceptedAt:string};registeredAt?:string};
+type Entry={id:string;tenantId:string;drawId:string;source?:string;kind?:string;paid?:boolean;status?:'withdrawn';participant?:{name:string;email?:string;phone?:string};consent?:{accepted:boolean;purpose:string;policyVersion:string;acceptedAt:string};registeredAt?:string;delivery?:RewardDelivery};
 const date=(value?:string)=>{const time=value?new Date(value).getTime():NaN;return Number.isFinite(time)?new Date(time).toLocaleString('es-CO',{dateStyle:'medium',timeStyle:'short'}):'—';};
 export function SorteappRewardDrawsView({user,tenantId}:{user:UserProfile;tenantId:string}){
  const [draws,setDraws]=useState<Draw[]>([]),[selectedId,setSelectedId]=useState(''),[entries,setEntries]=useState<Entry[]>([]),[busy,setBusy]=useState(true),[entriesBusy,setEntriesBusy]=useState(false),[error,setError]=useState(''),[entriesError,setEntriesError]=useState('');
@@ -24,10 +26,10 @@ export function SorteappRewardDrawsView({user,tenantId}:{user:UserProfile;tenant
   if(!selected||user.role!=='AdminGlobal'){setEntriesBusy(false);return;}
   setEntriesBusy(true);
   const stop=onSnapshot(query(collection(db,'sorteos_bienestar',selected.id,'participantes'),orderBy('registeredAt','desc'),limit(200)),snapshot=>{
-   setEntries(snapshot.docs.map(item=>({...(item.data() as Omit<Entry,'id'>),id:item.id} as Entry)).filter(item=>item.status!=='withdrawn'));setEntriesBusy(false);setEntriesError('');
+   setEntries(snapshot.docs.map(item=>({...(item.data() as Omit<Entry,'id'>),id:item.id} as Entry)).filter(item=>item.status!=='withdrawn'&&item.tenantId===tenantId&&item.drawId===selected.id&&item.source==='sorteapp'&&item.kind==='employee_wellbeing_free'&&item.paid===false));setEntriesBusy(false);setEntriesError('');
   },()=>{setEntriesBusy(false);setEntriesError('No se pudieron leer las inscripciones de este sorteo.');});
   return()=>stop();
- },[selected?.id,user.role]);
+ },[selected?.id,user.role,tenantId]);
  if(user.role!=='AdminGlobal')return <p className="rounded-xl border border-amber-800 bg-slate-900 p-4 text-sm text-amber-200">Este módulo está reservado al administrador global.</p>;
  return <section className="space-y-5 pb-12 text-slate-100">
   <header className="rounded-2xl border border-violet-800/60 bg-gradient-to-br from-slate-900 via-slate-900 to-violet-950/40 p-5 sm:p-6">
@@ -43,10 +45,10 @@ export function SorteappRewardDrawsView({user,tenantId}:{user:UserProfile;tenant
    </section>
    <section className="min-w-0 rounded-2xl border border-slate-700 bg-slate-900 p-4 sm:p-5"><div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-lg font-semibold">Personas inscritas</h2><p className="text-xs text-slate-400">Se muestran hasta 200 inscripciones recientes.</p></div>{selected&&<span className="rounded-full border border-emerald-800 bg-emerald-950/50 px-3 py-1 text-xs text-emerald-200">Gratis · Sorteapp</span>}</div>
     {entriesError&&<p role="alert" className="mb-3 text-sm text-amber-300">{entriesError}</p>}
-    {!selected&&!busy&&<p className="rounded-xl border border-dashed border-slate-700 p-6 text-center text-sm text-slate-400">Las inscripciones aparecerán aquí cuando se habilite la conexión con Sorteapp.</p>}
+    {!selected&&!busy&&<p className="rounded-xl border border-dashed border-slate-700 p-6 text-center text-sm text-slate-400">Las inscripciones aparecerán aquí cuando SorteApp envíe el primer evento firmado para esta organización.</p>}
     {selected&&entriesBusy&&<p className="flex items-center gap-2 py-8 text-sm text-slate-400"><RefreshCw className="h-4 w-4 animate-spin"/>Cargando inscripciones…</p>}
     {selected&&!entriesBusy&&!entries.length&&!entriesError&&<p className="rounded-xl border border-dashed border-slate-700 p-6 text-center text-sm text-slate-400">Este sorteo todavía no tiene inscripciones.</p>}
-    {selected&&!entriesBusy&&entries.length>0&&<div className="overflow-x-auto"><table className="w-full min-w-[42rem] text-left text-sm"><thead><tr className="border-b border-slate-700 text-xs text-slate-400"><th className="px-3 py-3">Participante</th><th className="px-3 py-3">Contacto</th><th className="px-3 py-3">Inscripción</th><th className="px-3 py-3">Consentimiento</th></tr></thead><tbody>{entries.map(entry=><tr className="border-b border-slate-800 align-top" key={entry.id}><td className="px-3 py-3 font-medium">{entry.participant?.name||'Sin nombre'}</td><td className="px-3 py-3 text-xs text-slate-300">{entry.participant?.email&&<p>{entry.participant.email}</p>}{entry.participant?.phone&&<p>+{entry.participant.phone}</p>}</td><td className="px-3 py-3 text-xs text-slate-300">{date(entry.registeredAt)}</td><td className="px-3 py-3 text-xs"><span className={entry.consent?.accepted?'text-emerald-300':'text-rose-300'}>{entry.consent?.accepted?'Aceptado':'No consta'}</span><p className="mt-1 text-slate-400">{entry.consent?.policyVersion||'—'} · {date(entry.consent?.acceptedAt)}</p></td></tr>)}</tbody></table></div>}
+    {selected&&!entriesBusy&&entries.length>0&&<><RewardDeliveryPanel key={selected.id} entries={entries}/><div className="overflow-x-auto"><table className="w-full min-w-[42rem] text-left text-sm"><thead><tr className="border-b border-slate-700 text-xs text-slate-400"><th className="px-3 py-3">Participante</th><th className="px-3 py-3">Contacto</th><th className="px-3 py-3">Entrega</th><th className="px-3 py-3">Inscripción</th><th className="px-3 py-3">Consentimiento</th></tr></thead><tbody>{entries.map(entry=><tr className="border-b border-slate-800 align-top" key={entry.id}><td className="px-3 py-3 font-medium">{entry.participant?.name||'Sin nombre'}</td><td className="px-3 py-3 text-xs text-slate-300">{entry.participant?.email&&<p>{entry.participant.email}</p>}{entry.participant?.phone&&<p>+{entry.participant.phone}</p>}</td><td className="min-w-56 px-3 py-3"><DeliveryDetails delivery={entry.delivery}/></td><td className="px-3 py-3 text-xs text-slate-300">{date(entry.registeredAt)}</td><td className="px-3 py-3 text-xs"><span className={entry.consent?.accepted?'text-emerald-300':'text-rose-300'}>{entry.consent?.accepted?'Aceptado':'No consta'}</span><p className="mt-1 text-slate-400">{entry.consent?.policyVersion||'—'} · {date(entry.consent?.acceptedAt)}</p></td></tr>)}</tbody></table></div></>}
    </section>
   </div>
  </section>;

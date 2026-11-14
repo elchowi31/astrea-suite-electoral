@@ -8,6 +8,25 @@ const now=Date.now();
 const federationEnvironment={GOOGLE_CLOUD_PROJECT_NUMBER:'123456789012',GOOGLE_WORKLOAD_IDENTITY_POOL_ID:'astrea-vercel',GOOGLE_WORKLOAD_IDENTITY_PROVIDER_ID:'vercel-production',GOOGLE_SERVICE_ACCOUNT_EMAIL:'astrea-firestore@demo.iam.gserviceaccount.com'};
 const rewardsEnvironment=(extra:Record<string,string|undefined>={})=>readSorteappRewardsEnvironment({SORTEAPP_REWARDS_ENABLED:'true',SORTEAPP_WEBHOOK_SECRET:'sorteapp-webhook-secret-with-at-least-32-characters',SORTEAPP_REWARDS_TENANT_IDS:'tenant-astrea-2026',...federationEnvironment,...extra});
 const created=()=>({schemaVersion:1,eventId:'event-001',eventType:'draw.entry.created',occurredAt:new Date(now).toISOString(),draw:{id:'draw-001',tenantId:'tenant-astrea-2026',title:'Sorteo de bienestar',prize:'Licuadora',kind:'employee_wellbeing_free',paid:false,entryPrice:0,currency:'COP',startsAt:new Date(now-86400000).toISOString(),endsAt:new Date(now+86400000).toISOString()},entry:{id:'entry-001',name:'Participante de prueba',email:'persona@example.com',phone:'+57 300 123 4567',registeredAt:new Date(now).toISOString()},consent:{accepted:true,purpose:'employee_reward_draw',policyVersion:'2026-01',acceptedAt:new Date(now-60000).toISOString()}});
+const withDelivery=():any=>{const event:any=created();event.entry.delivery={address:{countryCode:'CO',department:'Cesar',municipality:'Astrea',line1:'Calle ficticia 1',neighborhood:'Centro',instructions:'Casa de prueba'},consent:{accepted:true,purpose:'reward_delivery',policyVersion:'delivery-2026-11',acceptedAt:new Date(now-50000).toISOString(),scopes:['address','location']},location:{latitude:9.4981,longitude:-73.9785,accuracyMeters:18,capturedAt:new Date(now-10000).toISOString(),source:'device_geolocation',confirmedForDelivery:true}};return event;};
+
+test('delivery requires separate prior consent, valid coordinates and confirmation of the delivery place',()=>{
+ const valid=parseSorteappRewardsEvent(withDelivery());if(valid.eventType!=='draw.entry.created')assert.fail();assert.equal(valid.entry.delivery?.location?.accuracyMeters,18);
+ const addressOnly=withDelivery();delete addressOnly.entry.delivery.location;addressOnly.entry.delivery.consent.scopes=['address'];assert.doesNotThrow(()=>parseSorteappRewardsEvent(addressOnly));
+ for(const change of [
+  (event:any)=>delete event.entry.delivery.consent,
+  (event:any)=>event.entry.delivery.consent.purpose='marketing',
+  (event:any)=>event.entry.delivery.consent.scopes=['address'],
+  (event:any)=>event.entry.delivery.location.confirmedForDelivery=false,
+  (event:any)=>event.entry.delivery.location.latitude=91,
+  (event:any)=>event.entry.delivery.location.longitude='-73',
+  (event:any)=>event.entry.delivery.location.accuracyMeters=-1,
+  (event:any)=>event.entry.delivery.location.capturedAt=new Date(now-60000).toISOString(),
+  (event:any)=>event.entry.delivery.location.capturedAt=new Date(now+10000).toISOString(),
+  (event:any)=>event.entry.delivery.address.municipality='',
+  (event:any)=>event.entry.delivery.address.politicalPreference='candidate',
+ ]){const event=withDelivery();change(event);assert.throws(()=>parseSorteappRewardsEvent(event));}
+});
 
 test('Sorteapp signature authenticates the exact request bytes',()=>{
  const raw=Buffer.from('{"eventId":"event-001"}'),secret='sorteapp-webhook-secret-with-at-least-32-characters';
@@ -78,16 +97,20 @@ function firestoreMock(){
 }
 
 test('server-to-server persistence is idempotent and withdrawal removes participant details atomically',async()=>{
- const mock=firestoreMock(),environment=rewardsEnvironment(),event=parseSorteappRewardsEvent(created());
+ const mock=firestoreMock(),environment=rewardsEnvironment(),event=parseSorteappRewardsEvent(withDelivery());
  const process=(current:SorteappRewardsEvent)=>processSorteappRewardsEvent({projectId:'demo',databaseId:'(default)',environment,event:current,fetcher:mock.fetcher,bearerToken:'test-only-token'});
  const first=await process(event);assert.deepEqual(first,{accepted:true,duplicate:false});const afterFirst=mock.commits;
  assert.deepEqual(await process(event),{accepted:true,duplicate:true});assert.equal(mock.commits,afterFirst);
  const entryPath=[...mock.docs.keys()].find(path=>path.startsWith('sorteos_bienestar/')&&path.includes('/participantes/'))!;
  const saved=decodeFields(mock.docs.get(entryPath)!.fields);assert.equal(saved.participant.name,'Participante de prueba');assert.equal(saved.consent.accepted,true);
+ assert.equal(saved.delivery.address.municipality,'Astrea');assert.equal(saved.delivery.location.latitude,9.4981);assert.equal(saved.delivery.consent.purpose,'reward_delivery');
+ assert.ok([...mock.docs.keys()].every(path=>!path.startsWith('votantes_rasos/')&&!path.startsWith('lideres/')));
  const replayWithNewEvent=parseSorteappRewardsEvent({...created(),eventId:'event-002'});assert.deepEqual(await process(replayWithNewEvent),{accepted:true,duplicate:true});
  const deleted=parseSorteappRewardsEvent({schemaVersion:1,eventId:'event-delete-1',eventType:'draw.entry.deleted',occurredAt:new Date().toISOString(),draw:{id:'draw-001',tenantId:'tenant-astrea-2026'},entry:{id:'entry-001'}});
  assert.deepEqual(await process(deleted),{accepted:true,duplicate:false,deleted:true});
  const withdrawn=decodeFields(mock.docs.get(entryPath)!.fields);assert.equal(withdrawn.status,'withdrawn');assert.equal(withdrawn.participant,undefined);assert.equal(withdrawn.consent,undefined);
+ assert.equal(withdrawn.delivery,undefined);assert.equal(JSON.stringify([...mock.docs.entries()]).includes('Calle ficticia'),false);
+ assert.deepEqual(await process(parseSorteappRewardsEvent({...withDelivery(),eventId:'delayed-event'})),{accepted:true,duplicate:true});assert.equal(decodeFields(mock.docs.get(entryPath)!.fields).delivery,undefined);
 });
 
 test('the receiver rejects organizations outside the server-side allowlist before accessing Firestore',async()=>{

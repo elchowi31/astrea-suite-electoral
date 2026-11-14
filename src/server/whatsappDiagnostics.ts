@@ -18,19 +18,21 @@ export function createWhatsappDiagnostics(options:{base:string;token:string;uid:
    const previous=doc?decodeFields(doc.fields):undefined;
    record=previous?.sessionId===options.session.id?previous:{tenantId:options.config.tenantId,eventId:options.config.eventId,sessionId:options.session.id,receiverHint:options.config.phone.slice(-4),received:0,replied:0,saved:0,ignored:0,history:[],createdAt:new Date().toISOString()};
   }
+  delete record.lastText;delete record.lastReply;
+  record.history=(record.history||[]).map(({text,reply,...entry}:Record<string,unknown>)=>entry);
   const at=new Date().toISOString();
   if(stage==='heartbeat'){record.lastHeartbeatAt=at;}else{
    record.stage=stage;record.detail=clean(details.detail,300);
    if(['received','replied','saved','ignored'].includes(stage)&&(stage!=='saved'||details.requestId!==record.lastRequestId))record[stage]=(Number(record[stage])||0)+1;
    if(stage==='connected')record.lastHeartbeatAt=at;
-   if(stage==='received'){record.lastReceivedAt=at;record.lastText=clean(details.text,180);record.lastSenderHint=clean(details.senderHint,20);record.lastConversationHint=clean(details.conversationHint,12);}
-   if(stage==='replied'){record.lastRepliedAt=at;record.lastReply=clean(details.reply,500);if(Number.isFinite(details.responseMs))record.lastResponseMs=Math.max(0,details.responseMs!);if(Number.isFinite(details.processingMs))record.lastProcessingMs=Math.max(0,details.processingMs!);}
+   if(stage==='received'){record.lastReceivedAt=at;record.lastTextLength=details.text?.length||0;record.lastSenderHint=clean(details.senderHint,20).replace(/\D/g,'').slice(-4);record.lastConversationHint=clean(details.conversationHint,12);}
+   if(stage==='replied'){record.lastRepliedAt=at;record.lastReplyLength=details.reply?.length||0;if(Number.isFinite(details.responseMs))record.lastResponseMs=Math.max(0,details.responseMs!);if(Number.isFinite(details.processingMs))record.lastProcessingMs=Math.max(0,details.processingMs!);}
    if(stage==='saved')record.lastRequestId=clean(details.requestId,160);
    if(details.queued!==undefined)record.queued=details.queued;
    if(details.recoveredHandled!==undefined)record.recoveredHandled=details.recoveredHandled;
-   record.history=[...(record.history||[]),{at,stage,detail:clean(details.detail,300),senderHint:clean(details.senderHint,20),conversationHint:clean(details.conversationHint,12),...(Number.isFinite(details.responseMs)?{responseMs:Math.max(0,details.responseMs!)}:{}),...(details.text?{text:clean(details.text,180)}:{}),...(details.reply?{reply:clean(details.reply,500)}:{})}].slice(-30);
+   record.history=[...(record.history||[]),{at,stage,detail:clean(details.detail,300),senderHint:clean(details.senderHint,20).replace(/\D/g,'').slice(-4),conversationHint:clean(details.conversationHint,12),...(Number.isFinite(details.responseMs)?{responseMs:Math.max(0,details.responseMs!)}:{}),...(details.text?{textLength:details.text.length}:{}),...(details.reply?{replyLength:details.reply.length}:{})}].slice(-30);
   }
-  record.updatedAt=at;
+  record.updatedAt=at;record.expiresAt=new Date(Date.now()+30*86400000);
   const saved=await writeCheckpoint({base:options.base,path,headers,request,revision,fields:encodeFields(record),timeout:10000});
   if(!saved.ok||!saved.updateTime){record=undefined;throw Error('Diagnostic write failed');}
   revision=saved.updateTime;

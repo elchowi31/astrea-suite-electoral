@@ -1,3 +1,4 @@
+import {summarizeFinances} from './financialSummary';
 import {
   CampaignExpense,
   Candidate,
@@ -24,7 +25,9 @@ export interface PredictiveInsight {
 
 export interface ExecutiveAnalytics {
   healthScore: number;
-  confidence: 'Baja' | 'Media' | 'Alta';
+  dataVolume: 'Bajo' | 'Medio' | 'Alto';
+  recordCount: number;
+  indicatorNote: string;
   coveragePct: number;
   committedVotes: number;
   projectedSupport: number;
@@ -88,9 +91,8 @@ export function calculateExecutiveAnalytics(input: {
     .reduce((sum, item) => sum + Math.max(0, item.capacity), 0);
   const transportCoveragePct = transportDemand > 0 ? clamp(ratio(transportCapacity, transportDemand)) : (vehicles.length > 0 ? 100 : 0);
 
-  const totalSpent = expenses.reduce((sum, item) => sum + Math.max(0, item.amount || 0), 0);
-  const totalIncome = contributions.reduce((sum, item) => sum + Math.max(0, item.amount || 0), 0);
-  const pendingExpenses = expenses.filter((item) => item.status === 'Pendiente').reduce((sum, item) => sum + item.amount, 0);
+  const ledger=summarizeFinances(expenses,contributions,tenant.tenantId);
+  const totalSpent=ledger.registeredExpenses,totalIncome=ledger.registeredContributions,pendingExpenses=ledger.pending;
   const documentedExpensePct = expenses.length > 0 ? ratio(expenses.filter((item) => Boolean(item.invoiceNumber)).length, expenses.length) : 100;
 
   const voterQuality = voters.length > 0
@@ -110,7 +112,7 @@ export function calculateExecutiveAnalytics(input: {
   const healthScore = Math.round(clamp(operationalScore + governanceScore));
 
   const recordCount = candidates.length + leaders.length + voters.length + vehicles.length + expenses.length;
-  const confidence = recordCount >= 80 ? 'Alta' : recordCount >= 20 ? 'Media' : 'Baja';
+  const dataVolume = recordCount >= 80 ? 'Alto' : recordCount >= 20 ? 'Medio' : 'Bajo';
 
   const insights: PredictiveInsight[] = [];
   if (voteTarget === 0) {
@@ -159,7 +161,7 @@ export function calculateExecutiveAnalytics(input: {
 
   return {
     healthScore,
-    confidence,
+    dataVolume,recordCount,indicatorNote:'Volumen de registros operativos; no mide confianza estadística, intención de voto ni votos emitidos.',
     coveragePct,
     committedVotes,
     projectedSupport,
@@ -172,7 +174,7 @@ export function calculateExecutiveAnalytics(input: {
     transportCoveragePct,
     totalSpent,
     totalIncome,
-    availableBalance: totalIncome - totalSpent,
+    availableBalance: ledger.recordedCashBalance,
     pendingExpenses,
     documentedExpensePct,
     dataQualityPct,

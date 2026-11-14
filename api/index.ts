@@ -1,3 +1,4 @@
+import {consumeSharedQuota} from '../src/server/sharedQuota.js';
 import {fetchGoogleMapKml} from '../src/server/googleMapImport.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Buffer } from 'node:buffer';
@@ -63,7 +64,7 @@ async function generate(prompt: string) {
   if (!apiKey) throw new Error('AI_SERVICE_UNAVAILABLE');
   const { GoogleGenAI } = await import('@google/genai');
   const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 30_000 } });
-  const response = await withAvailableModel([process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash', process.env.GEMINI_FALLBACK_MODEL?.trim() || 'gemini-3.5-flash'], model => ai.models.generateContent({ model, contents: prompt }));
+  const response = await withAvailableModel([process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash', process.env.GEMINI_FALLBACK_MODEL?.trim() || 'gemini-3.5-flash'], model => ai.models.generateContent({ model, contents: prompt, config:{maxOutputTokens:4096} }));
   if (!response.text?.trim()) throw new Error('EMPTY_AI_RESPONSE');
   return response.text;
 }
@@ -89,7 +90,7 @@ async function authorizeOrganization(user: TokenPayload, token: string, body: Re
   const tenantId = typeof body.tenantId === 'string' ? body.tenantId : profile.tenantId;
   if (!tenantId || (!platformAdmin && tenantId !== profile.tenantId)) return null;
   const tenant = await readAuthorizedDocument(`organizaciones/${encodeURIComponent(tenantId)}`, token);
-  return tenant?.active === true && typeof tenant.name === 'string' ? tenant : null;
+  return tenant?.active === true && typeof tenant.name === 'string' ? {...tenant,tenantId,name:tenant.name} : null;
 }
 
 function enforceRateLimit(subject: string): boolean {
@@ -143,7 +144,7 @@ export default async function handler(req: ApiRequest, res: ServerResponse) {
   if (req.method === 'OPTIONS') { res.statusCode = NATIVE_APP_ORIGINS.has(origin) ? 204 : 403; res.end(); return; }
 
   if (req.method === 'GET' && pathname === '/api/health') {
-    return json(res, 200, { status: 'ok', service: 'Astrea Suite Electoral API', timestamp: new Date().toISOString() });
+    return json(res, 200, { status: 'ok', service: 'Astrea Suite Electoral API', release: process.env.VERCEL_GIT_COMMIT_SHA || 'local', timestamp: new Date().toISOString(), checks: { http: 'ok', firestore: 'not_checked', google: 'not_checked', ai: 'not_checked' }, rateLimitScope: {general:'process',ai:'shared-user-firestore'}, note: 'Este endpoint acredita la ejecución HTTP; no comprueba dependencias remotas.' });
   }
   if (!pathname.startsWith('/api/')) return json(res, 404, { success: false, error: 'Ruta no encontrada.' });
   const routes = ['/api/ai/analyze-document', '/api/ai/generate-speech', '/api/ai/electoral-strategy', '/api/agent/turn', '/api/maps/import-link'];
@@ -184,6 +185,7 @@ export default async function handler(req: ApiRequest, res: ServerResponse) {
     }
     const tenant = await authorizeOrganization(user, token, body);
     if (!tenant) return json(res, 403, { success: false, error: 'Su perfil no tiene autorización para esta organización o el servicio de IA.' });
+    if(process.env.GEMINI_API_KEY)await consumeSharedQuota({projectId:FIREBASE_PROJECT_ID,databaseId:FIRESTORE_DATABASE_ID,uid:user.sub,tenantId:String(tenant.tenantId),token});
     const tenantName = cleanText(tenant.name, 'la organización');
 
     if (pathname.endsWith('/ai/analyze-document')) {
@@ -217,7 +219,7 @@ export default async function handler(req: ApiRequest, res: ServerResponse) {
     if (error instanceof Error && error.message === 'PAYLOAD_TOO_LARGE') return json(res, 413, { success: false, error: 'Solicitud demasiado grande.' });
     if (error instanceof Error && error.message === 'INVALID_JSON') return json(res, 400, { success: false, error: 'JSON inválido.' });
     if (error instanceof Error && error.message === 'IDENTITY_SERVICE_UNAVAILABLE') return json(res, 503, { success: false, error: 'No fue posible verificar los permisos. Intente más tarde.' });
-    console.error('Astrea API error:', error);
+    console.error('Astrea API request failed',{kind:error instanceof AgentError?'request':'service'});
     if (error instanceof Error && error.message === 'AI_SERVICE_UNAVAILABLE') {
       return json(res, 503, { success: false, error: 'El servicio de IA no está disponible. Intente más tarde.' });
     }

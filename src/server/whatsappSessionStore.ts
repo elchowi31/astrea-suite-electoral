@@ -43,6 +43,7 @@ export async function loadWhatsappSession(options:{base:string;token:string;uid:
  if(!got.ok&&got.status!==404)throw new AgentError('No se pudo recuperar la sesión de Firestore.',503);
  const record=got.ok?await got.json():null;
  const fields=record?decodeFields(record.fields):null;
+ if(fields&&(!Number.isFinite(Date.parse(fields.expiresAt))||Date.parse(fields.expiresAt)<=Date.now()))throw new AgentError('La vinculación temporal caducó. Inicie una nueva desde el panel.',410);
  if(fields&&fields.binding!==binding)throw new AgentError('Esta vinculación pertenece a otro ámbito.',403);
  const state:SessionState=fields?openSession(fields.ciphertext,options.session.key,binding):{version:1,receiptsVersion:1,startedAt:Date.now(),creds:initAuthCreds(),keys:{},conversations:{},inbox:[],handled:[]};
  let revision=record?.updateTime||'';
@@ -58,7 +59,7 @@ export async function loadWhatsappSession(options:{base:string;token:string;uid:
  async function persistSnapshot(){
   // Reuse the exact ciphertext on a retry: it identifies this attempted commit.
   const ciphertext=sealSession(state,options.session.key,binding);
-  const checkpoint=encodeFields({binding,ciphertext,updatedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+86400000).toISOString()});
+  const checkpoint=encodeFields({binding,ciphertext,updatedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+86400000)});
   for(let attempt=0;attempt<2;attempt++){
    let status=0;
    try{
@@ -126,7 +127,7 @@ export async function loadWhatsappSession(options:{base:string;token:string;uid:
   return true;
  };
  const markHandled=async(id:string)=>{
-  const saved=await writeCheckpoint({base:options.base,path:receiptPath(id),headers,request,revision:'',fields:encodeFields({binding,handledAt:new Date().toISOString()})});
+  const saved=await writeCheckpoint({base:options.base,path:receiptPath(id),headers,request,revision:'',fields:encodeFields({binding,handledAt:new Date().toISOString(),expiresAt:new Date(Date.now()+7*86400000)})});
   if(!saved.ok){
    // A replay after a lost response is safe only with a verified durable receipt.
    const check=await request(`${options.base}/${receiptPath(id)}`,{headers,signal:AbortSignal.timeout(12000)});

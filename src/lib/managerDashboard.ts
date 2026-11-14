@@ -1,3 +1,4 @@
+import {summarizeFinances} from './financialSummary';
 import type { CampaignExpense, Candidate, DonorContribution, GrassrootsVoter, Leader, Tenant, TransportVehicle, UserProfile } from '../types';
 import { type OperationsData, TRANSPORT_RESOURCE, uniqueVoters } from './operations';
 
@@ -85,7 +86,8 @@ export function buildManagerDashboard(source: DashboardSource, days = 28, now = 
   const dayOf = (value: string | undefined) => { if (!dayCache.has(value)) dayCache.set(value, recordedDay(value)); return dayCache.get(value)!; };
   const people = uniqueVoters(source.voters), verified = people.filter(v => v.verified);
   const registered = people.length, confirmed = verified.length, pending = registered - confirmed;
-  const spent = sum(source.expenses, e => e.amount), printExpenses = source.expenses.filter(e => e.rubro === PRINT_CATEGORY);
+  const ledger=summarizeFinances(source.expenses,source.contributions,source.tenant.tenantId);
+  const spent = ledger.registeredExpenses, printExpenses = source.expenses.filter(e => e.rubro === PRINT_CATEGORY);
   const printCost = sum(printExpenses, e => e.amount), target = sum(source.leaders, l => l.voteTarget);
   const activeEvents = new Set(source.events.filter(e => e.status !== 'Cancelado').map(e => e.id));
   const transport = source.requests.filter(r => r.resource === TRANSPORT_RESOURCE && r.direction !== 'Regreso' && r.status !== 'Rechazada' && activeEvents.has(r.eventId));
@@ -117,7 +119,7 @@ export function buildManagerDashboard(source: DashboardSource, days = 28, now = 
     printRows:['Pagado','Aprobado','Pendiente'].map(name=>({name,value:sum(printExpenses.filter(e=>e.status===name),e=>e.amount),color:FINANCIAL_COLORS[PRINT_CATEGORY]})),
     eventRows:['Planificado','En curso','Finalizado','Cancelado'].map((name,i)=>({name,value:source.events.filter(e=>e.status===name).length,color:['#60a5fa','#22d3ee','#34d399','#94a3b8'][i]})),
     requestRows:['Pendiente','Aprobada','Entregada','Rechazada'].map((name,i)=>({name,value:source.requests.filter(e=>e.status===name).length,color:['#fbbf24','#60a5fa','#34d399','#94a3b8'][i]})),
-    paid:sum(source.expenses.filter(e=>e.status==='Pagado'),e=>e.amount),income:sum(source.contributions,c=>c.amount),
+    paid:ledger.paid,income:ledger.cashIncome,ledger,
     pendingRequests:source.requests.filter(r=>r.status==='Pendiente').length,
   };
 }

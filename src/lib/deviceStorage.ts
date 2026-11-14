@@ -71,13 +71,14 @@ export async function removeQueuedAutomaticRoute(id: string, expectedFinishedAt?
     return request;
   },'routes');
 }
+export function clearAstreaBrowserStorage(storages:Pick<Storage,'length'|'key'|'removeItem'>[]){
+  for(const storage of storages){const keys=Array.from({length:storage.length},(_,index)=>storage.key(index));for(const key of keys)if(key&&/^astrea[:-]/.test(key))storage.removeItem(key);}
+}
 export async function clearDeviceData(): Promise<void> {
   if ('serviceWorker' in navigator) for (const registration of await navigator.serviceWorker.getRegistrations()) if (registration.active?.scriptURL.endsWith('/service-worker.js')) await registration.unregister();
   if ('caches' in window) for (const key of await caches.keys()) if (key.startsWith('astrea-app-')) await caches.delete(key);
   await new Promise<void>((resolve,reject) => { const request = indexedDB.deleteDatabase('astrea-route-queue'); request.onsuccess = () => resolve(); request.onerror = () => reject(request.error); request.onblocked = () => reject(new Error('Cierre las otras pestañas antes de retirar los datos.')); });
   await new Promise<void>((resolve,reject) => { const request = indexedDB.deleteDatabase('astrea-offline-mutations'); request.onsuccess = () => resolve(); request.onerror = () => reject(request.error); request.onblocked = () => reject(new Error('Cierre las otras pestañas antes de retirar los datos.')); });
-  localStorage.removeItem('astrea-device-user');
-  localStorage.removeItem('astrea-device-seed-v1');
-  sessionStorage.removeItem('astrea-device-seed-v1');
+  clearAstreaBrowserStorage([localStorage,sessionStorage]);
   memoryQueue.clear();
 }

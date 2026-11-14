@@ -208,7 +208,7 @@ check('An operator saves every operational form together with its audit record',
     await assertSucceeds(batch.commit());
     await assertSucceeds(getDoc(doc(db,name,'operator-form')));
   }
-  await assertSucceeds(setDoc(doc(dbFor('reader'),'propuestas','reader-form'),{tenantId:'team-a'}));
+  await assertFails(setDoc(doc(dbFor('reader'),'propuestas','reader-form'),{tenantId:'team-a'}));
 });
 check('Territorial submissions require consent and remain retrievable by their creator',async()=>{
   const db=dbFor('operator');const ref=doc(db,'votantes_rasos','own-voter');
@@ -321,4 +321,32 @@ check('Election transport is readable by every active member, writable only by a
   await assertFails(setDoc(doc(dbFor('admin'),'rutas_transporte_electoral','wrong-route'),{...data,id:'wrong-route',route:{...route,name:'Other route'}}));
   await assertFails(setDoc(doc(dbFor('admin'),'rutas_transporte_electoral','wrong-tenant'),{...data,id:'wrong-tenant',tenantId:'team-b'}));
   await assertSucceeds(deleteDoc(doc(dbFor('admin'),'rutas_transporte_electoral',data.id)));
+});
+
+check('Read-only profiles cannot create operational records and administrators can record consent withdrawal',async()=>{
+  await assertFails(setDoc(doc(dbFor('reader'),'lideres','team-a--readonly-write'),{id:'team-a--readonly-write',tenantId:'team-a',fullName:'Ficticio'}));
+  const id='team-a--consent-test';
+  await env.withSecurityRulesDisabled(async ctx=>setDoc(doc(ctx.firestore(),'votantes_rasos',id),{id,tenantId:'team-a',createdBy:'operator',documentNumber:'1234567',leaderId:'',candidateId:'',consentGiven:true,verified:true}));
+  await assertFails(updateDoc(doc(dbFor('operator'),'votantes_rasos',id),{consentGiven:false,verified:false}));
+  await assertSucceeds(updateDoc(doc(dbFor('admin'),'votantes_rasos',id),{consentGiven:false,verified:false,consentRevokedAt:'2026-11-13T12:00:00Z',consentChannels:[],updatedBy:'admin'}));
+  await assertFails(getDoc(doc(dbFor('other'),'votantes_rasos',id)));
+});
+check('Election evidence enforces assigned witnesses, tenant boundaries, revisions and review authority',async()=>{
+  const admin=dbFor('admin'),operator=dbFor('operator'),id='team-a--mesa--'+'a'.repeat(64),now='2026-11-13T12:00:00Z';
+  const assignment={id,tenantId:'team-a',municipality:'Astrea',pollingStation:'Puesto ficticio',tableNumber:1,contest:'Concejo',assignedUid:'operator',assignedName:'Testigo ficticio',createdBy:'admin',createdAt:now,updatedAt:now,revision:1};
+  await assertSucceeds(setDoc(doc(admin,'asignaciones_testigos',id),assignment));
+  await assertFails(setDoc(doc(operator,'asignaciones_testigos',id+'b'),{...assignment,id:id+'b',createdBy:'operator'}));
+  await assertSucceeds(getDoc(doc(operator,'asignaciones_testigos',id)));await assertFails(getDoc(doc(dbFor('other'),'asignaciones_testigos',id)));
+  const report={id,tenantId:'team-a',assignmentId:id,assignedUid:'operator',contest:'Concejo',submittedBy:'operator',createdAt:now,updatedAt:now,revision:1,status:'En revisión',resultsText:'Lista ficticia;123',photo:'data:image/jpeg;base64,YQ==',notes:'',reviewedBy:'',reviewedAt:''};
+  await assertFails(setDoc(doc(dbFor('reader'),'actas_electorales',id),{...report,submittedBy:'reader'}));
+  await assertSucceeds(setDoc(doc(operator,'actas_electorales',id),report));
+  await assertFails(updateDoc(doc(operator,'actas_electorales',id),{status:'Revisada',revision:2,reviewedBy:'operator',reviewedAt:now}));
+  await assertFails(updateDoc(doc(operator,'actas_electorales',id),{resultsText:'Falsa;-1',revision:2}));
+  await assertSucceeds(updateDoc(doc(admin,'actas_electorales',id),{status:'Revisada',revision:2,reviewedBy:'admin',reviewedAt:now,updatedAt:now}));
+  await assertFails(updateDoc(doc(operator,'actas_electorales',id),{status:'En revisión',revision:2,reviewedBy:'',reviewedAt:''}));
+  await assertSucceeds(getDocs(query(collection(operator,'actas_electorales'),where('tenantId','==','team-a'),where('assignedUid','==','operator'))));
+  const fullId='team-a--mesa--'+'b'.repeat(64);await assertSucceeds(setDoc(doc(admin,'asignaciones_testigos',fullId),{...assignment,id:fullId}));
+  const fullReport={...report,id:fullId,assignmentId:fullId,resultsText:Array.from({length:30},(_,index)=>`Lista ${index};${index}`).join('\n')};
+  await assertSucceeds(setDoc(doc(operator,'actas_electorales',fullId),fullReport));
+  await assertFails(updateDoc(doc(operator,'actas_electorales',fullId),{revision:2,resultsText:fullReport.resultsText.replace('Lista 29;29','Lista 29;-1')}));
 });

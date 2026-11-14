@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {queueAutomaticRoute,queuedAutomaticRoutes,removeQueuedAutomaticRoute,queuedLocations} from '../src/lib/deviceStorage';
+import {queueAutomaticRoute,queuedAutomaticRoutes,removeQueuedAutomaticRoute,queuedLocations,clearAstreaBrowserStorage} from '../src/lib/deviceStorage';
 import {automaticRoute} from '../src/lib/movementTracking';
 Object.defineProperty(globalThis,'localStorage',{value:{getItem:()=>JSON.stringify({enabled:true})},configurable:true});
 test('Queue upgrade preserves earlier GPS samples, and acknowledgment cannot erase a concurrently queued closure',async()=>{
@@ -13,4 +13,9 @@ test('Queue upgrade preserves earlier GPS samples, and acknowledgment cannot era
   assert.equal((await queuedAutomaticRoutes('u1','t1'))[0].finishedAtMillis,2000);
   await removeQueuedAutomaticRoute('r1',2000);assert.deepEqual(await queuedAutomaticRoutes('u1','t1'),[]);
   assert.deepEqual(await queuedLocations('u1','t1'),[legacy]);
+});
+
+test('device withdrawal removes scoped scenarios, drafts and preferences from both stores',()=>{
+ function storage(){const values=new Map([['astrea:simulaciones:v1:org','private'],['astrea-agent:user:org','draft-id'],['astrea-device-user','identity'],['unrelated-app','preserve']]);return {get length(){return values.size;},key:(index:number)=>[...values.keys()][index]??null,removeItem:(key:string)=>{values.delete(key);},values};}
+ const local=storage(),session=storage();clearAstreaBrowserStorage([local,session]);for(const item of [local,session])assert.deepEqual([...item.values.keys()],['unrelated-app']);
 });

@@ -4,16 +4,28 @@
       "collectionGroup": "votantes_rasos",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "tenantId", "order": "ASCENDING" },
-        { "fieldPath": "leaderId", "order": "ASCENDING" }
+        {
+          "fieldPath": "tenantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "leaderId",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "votantes_rasos",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "tenantId", "order": "ASCENDING" },
-        { "fieldPath": "candidateId", "order": "ASCENDING" }
+        {
+          "fieldPath": "tenantId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "candidateId",
+          "order": "ASCENDING"
+        }
       ]
     }
   ],

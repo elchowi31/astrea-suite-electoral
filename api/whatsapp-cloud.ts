@@ -1,3 +1,4 @@
+import {boundedRawBody} from '../src/server/rawBody.js';
 import {Buffer} from 'node:buffer';
 import {timingSafeEqual} from 'node:crypto';
 import type {IncomingMessage,ServerResponse} from 'node:http';
@@ -16,12 +17,7 @@ function sameSecret(actual:string,expected:string){
  const left=Buffer.from(actual),right=Buffer.from(expected);
  return left.length===right.length&&timingSafeEqual(left,right);
 }
-async function readRawBody(req:RawRequest){
- if(Buffer.isBuffer(req.rawBody))return req.rawBody;
- const parts:Buffer[]=[];let size=0;
- for await(const chunk of req){const data=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);size+=data.length;if(size>MAX_BODY_BYTES)throw new AgentError('El aviso de WhatsApp excede el tamaño permitido.',413);parts.push(data);}
- return Buffer.concat(parts);
-}
+async function readRawBody(req:RawRequest){return boundedRawBody(req,MAX_BODY_BYTES,'El aviso de WhatsApp');}
 
 export default async function handler(req:RawRequest,res:ServerResponse){
  let cloud;

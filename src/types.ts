@@ -22,6 +22,7 @@ export interface Tenant {
   active: boolean;
   plan?: 'Gratuito' | 'Profesional' | 'Institucional';
   campaignDate?: string;
+  /** Presupuesto de inversión previsto por la organización; no acredita un tope legal. */
   budgetCap?: number;
   dataRegion?: 'southamerica-east1' | 'us-central1';
 }
@@ -194,6 +195,7 @@ export interface DonorContribution {
 }
 
 export interface CampaignExpense {
+  settlementType?: 'Efectivo' | 'Especie';
   id: string;
   tenantId: string;
   phase?: CampaignPhase; // Precampaña, Campaña, Día D
@@ -378,6 +380,11 @@ export interface GrassrootsVoter {
   verified: boolean;
   consentGiven?: boolean;
   consentAt?: string;
+  consentRevokedAt?: string;
+  consentPolicyVersion?: string;
+  consentPurpose?: string;
+  consentChannels?: ('internal'|'phone'|'email')[];
+  consentEvidence?: string;
   dataSource?: 'Directo' | 'Formulario' | 'Importación autorizada';
 }
 
