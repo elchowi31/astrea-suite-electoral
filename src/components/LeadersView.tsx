@@ -183,62 +183,10 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
   return (
     <div className="space-y-6">
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2 bg-blue-500/20 text-blue-400 rounded-xl border border-blue-500/30">
-              <Users className="w-5 h-5" />
-            </span>
-            <h2 className="text-xl font-bold text-white tracking-tight">Red de Líderes Territoriales & Veredales</h2>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Coordinación de movilización, seguimiento de votos y brigadistas en <strong className="text-slate-200">{currentTenant.name}</strong> • Colección <code className="text-emerald-400 font-mono">/lideres</code>
-          </p>
-        </div>
-
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-lg shadow-blue-600/20 transition cursor-pointer"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>Registrar Nuevo Líder</span>
-        </button>
-      </div>
-
-      {/* Territorial Scope & Access Control Banner */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-lg">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-xl">
-            <Shield className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-white uppercase tracking-wider">
-                Ámbito Territorial de Coordinación: {scope.scopeLevel.toUpperCase()}
-              </span>
-              <span className="text-[10px] bg-blue-500/20 text-blue-300 font-semibold px-2 py-0.5 rounded-full border border-blue-500/30">
-                Rol: {userRole}
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {scope.canViewAllMunicipalities
-                ? 'Acceso Departamental Completo: Visualizando líderes de los 25 municipios del Cesar.'
-                : `Jurisdicción Municipal Estricta: Visualizando y gestionando líderes de ${scope.allowedMunicipality || 'Astrea'}.`}
-            </p>
-          </div>
-        </div>
-
-        {!scope.canViewAllMunicipalities && (
-          <div className="flex items-center gap-1.5 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-xl font-medium shrink-0">
-            <Lock className="w-3.5 h-3.5" />
-            <span>Aislamiento Activo ({scope.allowedMunicipality || 'Astrea'})</span>
-          </div>
-        )}
-      </div>
-
+      <header className="module-heading"><h1>Líderes y metas</h1><button onClick={()=>setShowModal(true)} className="compact-button is-primary"><PlusCircle size={16}/>Nuevo líder</button></header>
+      <details className="compact-disclosure"><summary>Resumen · {scopedLeaders.length} líderes · {scope.canViewAllMunicipalities?'Cesar':scope.allowedMunicipality||'Astrea'}</summary><p className="mt-2 text-xs">{userRole} · {currentTenant.name}. Se muestran los registros de su ámbito autorizado.</p>
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="compact-metrics grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Líderes Activos</span>
           <div className="text-2xl font-extrabold text-white font-mono">{scopedLeaders.length} Coordinadores</div>
@@ -269,12 +217,13 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
         </div>
       </div>
 
+      </details>
       {/* Leaders Table & Cards */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-3">
           <h3 className="font-bold text-white text-sm flex items-center gap-2">
             <Target className="w-4 h-4 text-emerald-400" />
-            Monitoreo de Rendimiento por Coordinador Territorial
+            Líderes registrados
           </h3>
 
           <div className="flex items-center gap-2">

@@ -13,7 +13,6 @@ import {
   DonorContribution,
   UserRole
 } from '../types';
-import { AuthorHeader } from './common/AuthorHeader';
 import {
   DollarSign,
   Plus,
@@ -312,10 +311,6 @@ export const CampaignCostsReportView: React.FC<CampaignCostsReportViewProps> = (
       <FormSaveStatus saving={saving} error={saveError} />
       
       {/* AUTHOR HEADER */}
-      <AuthorHeader 
-        title="Centro de Control de Gastos & Necesidades de Campaña"
-        subtitle="Registro Completo a Voluntad • Precampaña, Campaña & Día D • Presupuesto Proyectado por Líderes"
-      />
 
       {/* TOP SUMMARY BANNER */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-5 shadow-xl">

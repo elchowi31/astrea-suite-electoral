@@ -234,7 +234,8 @@ service cloud.firestore {
     }
 
     function validRewardPlan(data,id) {
-      return data.keys().hasOnly(['id','tenantId','ownerId','name','revision','updatedAt','targetHours','farmCount','teamCount','farms'])
+      return data.keys().hasOnly(['id','tenantId','ownerId','name','revision','updatedAt','targetHours','farmCount','teamCount','farms','schemaVersion'])
+        && data.get('schemaVersion',1) in [1,2]
         && data.id == id && data.ownerId is string && data.ownerId.size() > 0
         && data.name is string && data.name.size() > 0 && data.name.size() <= 160
         && data.revision is int && data.revision > 0 && data.updatedAt is string
@@ -252,18 +253,39 @@ service cloud.firestore {
       allow update: if canOperateTenant(resource.data.tenantId) && immutableTenant()
         && (trackingAdministrator(resource.data.tenantId) || resource.data.ownerId == request.auth.uid)
         && request.resource.data.ownerId == resource.data.ownerId
-        && request.resource.data.revision == resource.data.revision + 1 && validRewardPlan(request.resource.data,id);
+        && request.resource.data.revision == resource.data.revision + 1 && validRewardPlan(request.resource.data,id)
+        && (resource.data.get('schemaVersion',1) != 2 || request.resource.data.get('schemaVersion',1) == 2)
+        && (request.resource.data.get('schemaVersion',1) != 2 ||
+          getAfter(/databases/$(database)/documents/planes_recompensas/$(id)/versiones/$(string(resource.data.revision))).data.plan == resource.data);
       allow delete: if false;
+      match /versiones/{version} {
+        allow read: if canReadTenant(get(/databases/$(database)/documents/planes_recompensas/$(id)).data.tenantId);
+        allow create: if canOperateTenant(resourceParent().tenantId)
+          && (trackingAdministrator(resourceParent().tenantId) || resourceParent().ownerId == request.auth.uid)
+          && request.resource.data.keys().hasOnly(['tenantId','actorId','revision','plan','approval','createdAt'])
+          && request.resource.data.tenantId == resourceParent().tenantId
+          && request.resource.data.actorId == request.auth.uid && request.resource.data.createdAt is string
+          && version == string(resourceParent().revision) && request.resource.data.revision == resourceParent().revision
+          && request.resource.data.plan == resourceParent()
+          && getAfter(/databases/$(database)/documents/planes_recompensas/$(id)).data.revision == resourceParent().revision + 1
+          && ((!exists(/databases/$(database)/documents/validaciones_recompensas/$(id)) && request.resource.data.approval == null)
+            || request.resource.data.approval == get(/databases/$(database)/documents/validaciones_recompensas/$(id)).data);
+        allow update, delete: if false;
+        function resourceParent() { return get(/databases/$(database)/documents/planes_recompensas/$(id)).data; }
+      }
     }
     match /validaciones_recompensas/{id} {
       allow read: if canReadTenant(resource.data.tenantId);
+      allow get: if !exists(/databases/$(database)/documents/validaciones_recompensas/$(id)) && signedIn();
       allow create, update: if trackingAdministrator(request.resource.data.tenantId)
-        && request.resource.data.keys().hasOnly(['id','tenantId','revision','hours','approvedBy','updatedAt'])
+        && request.resource.data.keys().hasOnly(['id','tenantId','revision','hours','approvedBy','updatedAt','source'])
         && request.resource.data.id == id && request.resource.data.approvedBy == request.auth.uid
         && request.resource.data.hours is map && request.resource.data.hours.size() <= 100
         && request.resource.data.updatedAt is string
         && getAfter(/databases/$(database)/documents/planes_recompensas/$(id)).data.tenantId == request.resource.data.tenantId
-        && getAfter(/databases/$(database)/documents/planes_recompensas/$(id)).data.revision == request.resource.data.revision;
+        && getAfter(/databases/$(database)/documents/planes_recompensas/$(id)).data.revision == request.resource.data.revision
+        && (getAfter(/databases/$(database)/documents/planes_recompensas/$(id)).data.get('schemaVersion',1) != 2
+          || (request.resource.data.source == 'manual_v2' && request.resource.data.hours.size() == 0));
       allow delete: if false;
     }
     match /bases_datos/{id} {

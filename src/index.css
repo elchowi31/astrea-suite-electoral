@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./components/sidebar.css";
 @import "./components/manager-dashboard.css";
+@import "./components/compact-app.css";
 
 :root {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);

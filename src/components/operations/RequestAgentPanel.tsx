@@ -9,8 +9,8 @@ import {button,input,secondary,Field,money} from './OperationsUI';
 export function RequestAgentPanel(){
   const {user,tenant,readOnly}=useOperations();const [open,setOpen]=useState(false);
   return <section className="rounded-2xl border border-cyan-900/70 bg-slate-950/60">
-    <button type="button" className="flex w-full items-center gap-3 p-4 text-left" onClick={()=>setOpen(!open)} aria-expanded={open}>
-      <Bot className="shrink-0 text-cyan-300" size={22}/><span className="flex-1"><strong className="text-sm">Asistente de solicitudes</strong><span className="mt-1 block text-xs text-slate-400">Describa la necesidad, revise la ficha y confirme el guardado.</span></span><span className="text-xs text-cyan-300">{open?'Cerrar':'Abrir'}</span>
+    <button type="button" className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left" onClick={()=>setOpen(!open)} aria-expanded={open}>
+      <Bot className="shrink-0 text-cyan-300" size={22}/><span className="flex-1"><strong className="text-sm">Asistente de solicitudes</strong></span><span className="text-xs text-cyan-300">{open?'Cerrar':'Abrir'}</span>
     </button>
     {open&&(readOnly?<p className="px-4 pb-4 text-sm text-amber-200">Seleccione «Usar datos reales» para utilizar el asistente. Los formularios de demostración siguen disponibles en este módulo.</p>:user&&<AgentSession key={`${tenant.tenantId}-${user.uid}`} tenantId={tenant.tenantId} uid={user.uid}/>)}
   </section>;

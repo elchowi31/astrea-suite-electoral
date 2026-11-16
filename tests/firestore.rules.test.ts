@@ -350,3 +350,19 @@ check('Election evidence enforces assigned witnesses, tenant boundaries, revisio
   await assertSucceeds(setDoc(doc(operator,'actas_electorales',fullId),fullReport));
   await assertFails(updateDoc(doc(operator,'actas_electorales',fullId),{revision:2,resultsText:fullReport.resultsText.replace('Lista 29;29','Lista 29;-1')}));
 });
+
+check('Manual rewards certify one capture and require immutable previous versions',async()=>{
+ const admin=dbFor('admin'),operator=dbFor('operator'),id='team-a--rewards-manual';
+ const plan={id,tenantId:'team-a',ownerId:'operator',name:'Manual',schemaVersion:2,revision:1,updatedAt:'2026-11-16',targetHours:500,farmCount:1,teamCount:3,farms:[{id:'farm-1',name:'Farm',fruit:'Fruit',production:20,targetHoursPerTeam:500,manualHours:[300,400,250]}]};
+ const ref=doc(operator,'planes_recompensas',id);await assertSucceeds(getDoc(doc(operator,'validaciones_recompensas',id)));await assertSucceeds(setDoc(ref,plan));
+ const approval={id,tenantId:'team-a',revision:1,source:'manual_v2',hours:{},approvedBy:'admin',updatedAt:'2026-11-16'};
+ await assertFails(setDoc(doc(operator,'validaciones_recompensas',id),{...approval,approvedBy:'operator'}));
+ await assertFails(setDoc(doc(admin,'validaciones_recompensas',id),{...approval,hours:{'farm-1':[300,400,250]}}));
+ await assertSucceeds(setDoc(doc(admin,'validaciones_recompensas',id),approval));
+ await assertFails(updateDoc(ref,{revision:2}));await assertFails(updateDoc(ref,{revision:2,schemaVersion:1}));
+ const archive={tenantId:'team-a',actorId:'operator',revision:1,plan,approval,createdAt:'2026-11-16'};
+ const batch=writeBatch(operator);batch.set(doc(operator,ref.path,'versiones','1'),archive);batch.update(ref,{revision:2});await assertSucceeds(batch.commit());
+ await assertSucceeds(getDocs(collection(admin,ref.path,'versiones')));await assertSucceeds(getDoc(doc(dbFor('reader'),ref.path,'versiones','1')));
+ await assertFails(getDocs(collection(dbFor('other'),ref.path,'versiones')));await assertFails(updateDoc(doc(operator,ref.path,'versiones','1'),{actorId:'admin'}));await assertFails(deleteDoc(doc(admin,ref.path,'versiones','1')));
+ const tampered=writeBatch(operator);tampered.update(ref,{revision:3});tampered.set(doc(operator,ref.path,'versiones','2'),{...archive,revision:2,plan:{...plan,revision:2,name:'Altered'}});await assertFails(tampered.commit());
+});

@@ -12,7 +12,6 @@ import {
   DonorContribution
 } from '../types';
 import { generarIdDocumentoLegible } from '../lib/slugify';
-import { AuthorHeader } from './common/AuthorHeader';
 import {
   Building2,
   Plus,
@@ -193,13 +192,9 @@ export const TenantsView: React.FC<TenantsViewProps> = ({
       <FormSaveStatus saving={saving} error={saveError} />
       
       {/* AUTHOR HEADER */}
-      <AuthorHeader
-        title="Gestión de Partidos Políticos & Organizaciones"
-        subtitle="Ingresa, modifica el nombre, colores, logo o elimina partidos y movimientos políticos con persistencia en Firestore"
-      />
 
       {/* QUICK INSTRUCTIONAL GUIDE */}
-      <div className="bg-gradient-to-r from-blue-950/70 via-slate-900 to-indigo-950/70 border border-blue-500/30 rounded-3xl p-5 shadow-xl">
+      <details className="compact-disclosure"><summary>Ayuda para gestionar organizaciones</summary><div className="bg-gradient-to-r from-blue-950/70 via-slate-900 to-indigo-950/70 border border-blue-500/30 rounded-3xl p-5 shadow-xl">
         <div className="flex items-start gap-3.5">
           <div className="p-2.5 bg-blue-600/30 text-blue-300 rounded-2xl border border-blue-500/40 shrink-0">
             <HelpCircle className="w-5 h-5" />
@@ -236,7 +231,7 @@ export const TenantsView: React.FC<TenantsViewProps> = ({
             </div>
           </div>
         </div>
-      </div>
+      </div></details>
 
       {/* TOP SUMMARY & TENANT PROVISIONING BANNER */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-5 shadow-xl">

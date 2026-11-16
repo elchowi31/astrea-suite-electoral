@@ -570,10 +570,10 @@ export default function App() {
     return <LoginView users={users} currentUser={null} tenants={tenants} currentTenant={currentTenant} onLogin={handleLogin} onRegister={handleRegisterUser} onLogout={handleLogout} onContinueToApp={() => navigate('dashboard')} onBackToLanding={() => navigate('dashboard')} />;
   }
 
-  const demoControls = currentUser && (activeTab === 'dashboard' || demoActive) && activeTab !== 'login' && (
-            <details className={`${activeTab==='dashboard'?'manager-data-controls':'rounded-xl border p-3'} ${demoActive ? 'border-amber-400/40 bg-amber-950/30' : 'border-slate-800 bg-slate-900'}`} aria-label="Control de datos de demostración">
-              <summary className={`cursor-pointer text-sm font-semibold ${demoActive ? 'text-amber-200' : 'text-slate-300'}`}>{demoActive ? 'Datos de prueba activos · ver opciones' : 'Datos de prueba'}</summary>
-              <div className={activeTab==='dashboard'?'manager-data-body':'pt-3'}>
+  const demoControls = currentUser && activeTab !== 'login' && (
+            <details className={`app-popover demo-control ${demoActive?'is-demo':''}`} aria-label="Control de datos de demostración">
+              <summary aria-label={demoActive?'Datos de prueba activos':'Datos reales'}><span className="hidden sm:inline">{demoActive?'Datos de prueba':'Datos reales'}</span><span className="sm:hidden">{demoActive?'Prueba':'Real'}</span></summary>
+              <div className="app-popover-panel demo-panel">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className={`text-sm font-black ${demoActive ? 'text-amber-200' : 'text-blue-200'}`}>
@@ -608,8 +608,7 @@ export default function App() {
           );
 
   return (
-    <WriteAccessProvider role={userRole}><PageNavigationProvider pageKey={`${navigation.scope}:${activeTab}`}><RouteTrackingProvider user={currentUser} tenantId={currentUser.tenantId} monitorTenantId={currentTenant.tenantId}><div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-500 selection:text-white relative isolate overflow-x-clip">
-      <SynapticNeuralBackground interactive={false} />
+    <WriteAccessProvider role={userRole}><PageNavigationProvider pageKey={`${navigation.scope}:${activeTab}`}><RouteTrackingProvider user={currentUser} tenantId={currentUser.tenantId} monitorTenantId={currentTenant.tenantId}><div className="astrea-app min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans antialiased selection:bg-blue-500 selection:text-white relative isolate overflow-x-clip">
 
       {/* Top Navigation Header with Streamlined Toolbar & Profile Pill */}
       <Header
@@ -621,9 +620,11 @@ export default function App() {
         onOpenAuthModal={() => setShowAuthModal(true)}
         userRole={userRole}
         onSelectRole={() => {}}
+        onLogout={handleLogout}
+        status={<TrackingStatusBanner/>}
+        dataControl={demoControls}
       />
 
-      <TrackingStatusBanner/>
       <OfflineSyncStatus userId={currentUser.uid} tenantId={selectedTenantId || currentUser.tenantId}/>
       <DataHealthStatus tenantId={currentTenant.tenantId} userId={currentUser.uid}/>
       {/* Main Body Layout */}
@@ -644,14 +645,13 @@ export default function App() {
         />
 
         {/* Content Area */}
-        <main tabIndex={-1} className="app-content min-w-0 flex-1 p-3 sm:p-5 lg:p-6 w-full space-y-5 focus:outline-none">
-          <PageNavigationBar current={activeTab} previous={navigation.previousPage} onBack={navigation.back} onHome={navigation.home} />
-          <WorkspaceNavigation tab={activeTab} user={currentUser} role={userRole} onNavigate={tab=>{if(['rewards','reward_draws','data_imports'].includes(tab))setDemoEnabled(false);navigate(tab);}}/>
+        <main tabIndex={-1} className="app-content compact-content min-w-0 flex-1 w-full focus:outline-none">
+          <PageNavigationBar current={activeTab} previous={navigation.previousPage} onBack={navigation.back} onHome={navigation.home}><WorkspaceNavigation tab={activeTab} user={currentUser} role={userRole} onNavigate={tab=>{if(['rewards','reward_draws','data_imports'].includes(tab))setDemoEnabled(false);navigate(tab);}}/></PageNavigationBar>
           <Suspense fallback={<div role="status" className="flex min-h-[45vh] items-center justify-center gap-3 text-sm text-slate-300"><RefreshCw className="h-4 w-4 animate-spin text-blue-400" />Cargando módulo…</div>}>
           <OperationsProvider key={`${currentTenant.tenantId}-${demoActive?'demo':'real'}`} tenant={currentTenant} user={demoViewUser} leaders={visibleLeaders} candidates={visibleCandidates} voters={visibleVoters} expenses={visibleExpenses} vehicles={visibleVehicles} contributions={visibleContributions} readOnly={demoActive} demo={demoBundle?.operations}>
           <WhatsappConnectionProvider><WhatsappConnectionStatus/>
           <DemoEditing.Provider value={demoActive&&demoBundle?{bundle:demoBundle,realReferences:{candidatos:candidates.map(c=>({id:c.id,name:c.fullName})),lideres:leaders.map(l=>({id:l.id,name:l.fullName})),aportes:donorContributions.map(c=>({id:c.id,name:c.donorName})),vehiculos:vehicles.map(v=>({id:v.id,name:v.licensePlate}))},onPromoted:()=>{setDemoEnabled(false);notifyFirestoreSave('Ficha guardada en datos reales.');}}:null}>
-          <OperationsEditingReferences>
+          <OperationsEditingReferences><div className="module-surface" data-module={activeTab}>
           {activeTab === 'rewards' && <RewardsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId}/>}
           {currentUser && activeTab === 'reward_draws' && <SorteappRewardDrawsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId}/>}
           {activeTab === 'data_imports' && <DataImportsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId} onMap={()=>{setDemoEnabled(false);navigate('map');}}/>}
@@ -659,20 +659,9 @@ export default function App() {
           {activeTab === 'data_quality' && ['AdminTenant','AdminGlobal'].includes(currentUser.role) && <DataQualityView key={currentTenant.tenantId} tenantId={currentTenant.tenantId} user={currentUser} voters={visibleVoters} readOnly={demoActive}/>}
           {activeTab === 'device' && <><DevicePersistencePanel /><div className="flex flex-wrap gap-3"><EditRecordButton collection="usuarios" record={currentUser} label="Editar mi perfil" />{['AdminTenant','AdminGlobal'].includes(currentUser.role)&&<EditRecordButton collection="organizaciones" record={currentTenant} label="Editar organización" />}</div></>}
 
-          {/* Personalized User Recognition & Salutation Banner */}
-          {currentUser && activeTab !== 'login' && activeTab !== 'routes' && activeTab !== 'dashboard' && (
-            <UserGreetingBanner
-              currentUser={currentUser}
-              currentTenant={currentTenant}
-              onOpenAuthModal={() => setShowAuthModal(true)}
-            />
-          )}
-
-          {activeTab!=='dashboard' && demoControls}
-
           {/* Real-time Save Toast Notification */}
           {firestoreSyncNotice && (
-            <div className="bg-emerald-950/90 border border-emerald-500/50 rounded-2xl px-4 py-3 flex items-center justify-between text-xs text-emerald-200 shadow-xl shadow-emerald-950/40 animate-fade-in">
+            <div role="status" className="app-save-toast">
               <div className="flex items-center gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span className="font-semibold">{firestoreSyncNotice}</span>
@@ -698,7 +687,7 @@ export default function App() {
           {/* Tab Views: each module is loaded only when the user opens it. */}
           {currentUser && activeTab === 'dashboard' && (
             <div className="space-y-4">
-            <DashboardView onNavigateTab={navigate} dataControls={demoControls}/>
+            <DashboardView onNavigateTab={navigate} dataControls={null}/>
             <details className="rounded-2xl border border-slate-700 bg-slate-900/80 p-4" onToggle={event=>setShowOperationalDetails(event.currentTarget.open)}><summary className="cursor-pointer text-sm font-semibold text-slate-200">Planillas, control de jornada y detalle administrativo</summary>
             {showOperationalDetails && <div className="mt-4 space-y-4"><OperationsOverview onNavigate={navigate}/><AdministrativeOverview tenantId={currentTenant.tenantId} expenses={visibleExpenses}/></div>}
             </details>
@@ -892,7 +881,7 @@ export default function App() {
           )}
           <PageScrollRestoration page={navigation.currentPage} revision={navigation.revision} />
 
-          </OperationsEditingReferences>
+          </div></OperationsEditingReferences>
           </DemoEditing.Provider>
           </WhatsappConnectionProvider>
           </OperationsProvider>

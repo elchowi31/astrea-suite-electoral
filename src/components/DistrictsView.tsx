@@ -7,7 +7,6 @@ import {
   getMunicipiosPorDepartamento,
   calcularProyeccionReal2026
 } from '../data/colombiaElectoralData';
-import { AuthorHeader } from './common/AuthorHeader';
 import {
   MapPin,
   Vote,
@@ -69,10 +68,6 @@ export const DistrictsView: React.FC<DistrictsViewProps> = ({
     <div className="space-y-6">
 
       {/* AUTHOR HEADER */}
-      <AuthorHeader
-        title="Modelo de censo y proyección electoral"
-        subtitle="Escenarios editables • Umbral de referencia • Cuociente y cifra repartidora"
-      />
 
       {/* Title */}
       <div className="bg-slate-900/90 p-5 rounded-3xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
