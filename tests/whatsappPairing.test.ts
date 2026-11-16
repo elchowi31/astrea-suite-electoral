@@ -13,12 +13,12 @@ function signed(creds:ReturnType<typeof initAuthCreds>){
  creds.account={accountSignature:Buffer.from('account-signature'),deviceSignature:Buffer.from('device-signature')};
  return creds;
 }
-async function exercise(options:{creds?:ReturnType<typeof initAuthCreds>;setup?:(socket:any,index:number)=>void;segmentMs?:number;flush?:()=>Promise<void>}={}){
+async function exercise(options:{pairingMode?:'qr'|'code';creds?:ReturnType<typeof initAuthCreds>;setup?:(socket:any,index:number)=>void;segmentMs?:number;flush?:()=>Promise<void>}={}){
  const creds=options.creds||initAuthCreds(),events:any[]=[],stages:string[]=[],order:string[]=[];
  let sockets=0,pairingRequests=0;
  const state={version:1,startedAt:Date.now(),creds,keys:{},conversations:{},inbox:[],handled:[]};
  const res=Object.assign(new EventEmitter(),{destroyed:false,writableEnded:false,statusCode:0,setHeader(){},flushHeaders(){},write(line:string){events.push(JSON.parse(line));},end(){this.writableEnded=true;}});
- await runWhatsappPilot({projectId:'test',databaseId:'test',token:'test',uid:'admin',config,session,res:res as any,checkActive:async()=>{}},{
+ await runWhatsappPilot({projectId:'test',databaseId:'test',token:'test',uid:'admin',config,session,pairingMode:options.pairingMode,res:res as any,checkActive:async()=>{}},{
   segmentMs:options.segmentMs||250,
   makeSocket:(()=>{
    const index=++sockets;order.push('socket-'+index);
@@ -97,4 +97,9 @@ test('browser propagates resetSession and does not retry a terminal incomplete p
   requests++;return new Response(JSON.stringify({type:'fatal',resetSession:true,message:'El intento quedó incompleto.'})+'\n',{headers:{'Content-Type':'application/x-ndjson'}});
  },wait:async()=>assert.fail('A rejected pairing must not retry')});
  assert.equal(requests,1);assert.equal(events.at(-1).resetSession,true);
+});
+
+test('QR pairing rotates visible challenges without requesting or exposing a numeric code',async()=>{
+ const result=await exercise({pairingMode:'qr',segmentMs:35,setup(socket){socket.ev.emit('connection.update',{qr:'first-private-challenge'});socket.ev.emit('connection.update',{qr:'second-private-challenge'});}});
+ assert.equal(result.pairingRequests,0);assert.deepEqual(result.events.filter(e=>e.type==='qr').map(e=>e.qr),['first-private-challenge','second-private-challenge']);assert.ok(!result.events.some(e=>e.type==='pairing'));assert.equal(result.events.at(-1).resetSession,true);
 });

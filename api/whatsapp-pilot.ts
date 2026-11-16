@@ -33,6 +33,7 @@ export default async function handler(req:IncomingMessage,res:ServerResponse){
   };
   await checkActive();
   const session=validateTabSession(body.session);
-  await runWhatsappPilot({projectId:FIREBASE_PROJECT_ID,databaseId:FIRESTORE_DATABASE_ID,token,uid:user.sub,config,session,res,checkActive});
+  const pairingMode=body.pairingMode??'code';if(pairingMode!=='qr'&&pairingMode!=='code')throw new AgentError('Elija vinculación por QR o código.');
+  await runWhatsappPilot({projectId:FIREBASE_PROJECT_ID,databaseId:FIRESTORE_DATABASE_ID,token,uid:user.sub,config,session,pairingMode,res,checkActive});
  }catch(e){respond(e instanceof AgentError?e.status:503,e instanceof AgentError?e.message:'No se pudo iniciar la recepción de WhatsApp.');}
 }

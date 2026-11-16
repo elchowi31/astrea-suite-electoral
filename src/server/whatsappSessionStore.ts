@@ -31,8 +31,8 @@ export function openSession(ciphertext:string,key:string,aad:string):SessionStat
  }catch{throw new AgentError('No se pudo recuperar esta vinculación. Inicie una nueva desde el panel.',422);}
 }
 
-// The random encryption key stays in the open tab's memory, never in Firestore,
-// URLs, browser storage or logs. The AAD binds ciphertext to its operator + scope.
+// Firestore stores ciphertext only. The client keeps the random key in memory or
+// its consented encrypted device vault; never in URLs or logs. AAD binds its scope.
 export async function loadWhatsappSession(options:{base:string;token:string;uid:string;config:PilotConfig;session:TabSession;fetcher?:typeof fetch}){
  const request=options.fetcher||fetch;
  const binding=createHash('sha256').update(JSON.stringify([options.uid,options.session.id,options.config])).digest('hex');
@@ -59,7 +59,7 @@ export async function loadWhatsappSession(options:{base:string;token:string;uid:
  async function persistSnapshot(){
   // Reuse the exact ciphertext on a retry: it identifies this attempted commit.
   const ciphertext=sealSession(state,options.session.key,binding);
-  const checkpoint=encodeFields({binding,ciphertext,updatedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+86400000)});
+  const checkpoint=encodeFields({binding,ciphertext,updatedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+7*86400000)});
   for(let attempt=0;attempt<2;attempt++){
    let status=0;
    try{
@@ -114,7 +114,9 @@ export async function loadWhatsappSession(options:{base:string;token:string;uid:
  // Automatic rotation keeps resumeId; an explicit Start/Resume changes it.
  // Move the cutoff forward before connecting so offline messages from a manual
  // pause are excluded, without discarding previously accepted pending work.
- if(!record||state.resumeId!==options.session.resumeId){state.resumeId=options.session.resumeId;state.startedAt=Date.now();await save();}
+ if(!record||state.resumeId!==options.session.resumeId){state.resumeId=options.session.resumeId;state.startedAt=Date.now();}
+ // An active but quiet receiver renews retention without moving its message cutoff.
+ await save();
  // Durable receipts allow an unbounded number of processed messages without
  // growing the encrypted session document or losing replay protection.
  const receiptPath=(id:string)=>`${path}/handled/${createHash('sha256').update(id).digest('hex')}`;

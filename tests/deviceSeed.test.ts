@@ -95,3 +95,6 @@ test('The interrupted 1.0.3 setup is recoverable while completed, declined and p
   assert.equal(nativeTrackingOnboardingNeeded({...interrupted,automaticPaused:true}),false);
   assert.equal(nativeTrackingOnboardingNeeded({...seed,automaticTracking:false,gpsAskedAt:'2026-10-10'}),false,'a previous explicit decline without an interrupted attempt is not reopened');
 });
+
+// Permission grants alone never replace the explicit tracking decision.
+test('explicit tracking consent is distinct from finishing setup without tracking',async()=>{const {hasTrackingConsent}=await import('../src/lib/deviceSeed');assert.equal(hasTrackingConsent({trackingSetupCompleted:true,automaticTracking:false} as any),false);assert.equal(hasTrackingConsent({trackingConsentVersion:1,trackingConsentAt:'2026-11-16'} as any),true);});

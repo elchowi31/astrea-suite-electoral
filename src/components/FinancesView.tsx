@@ -1,3 +1,4 @@
+import {WorkspaceTools} from './WorkspaceTools';
 import {summarizeFinances} from '../lib/financialSummary';
 import { ServiceCostsDashboard } from './ServiceCostsDashboard';
 import {BudgetSettingsButton,CampaignPlanningPanel} from './CampaignPlanningPanel';
@@ -122,7 +123,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
   const [expenseUnit,setExpenseUnit]=useState('servicio');
   // Navigation Sub-tabs
   const { saving, saveError, submit, runSave } = useFirestoreForm();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'service_costs' | 'aportantes' | 'gastos' | 'topes_cne'>('service_costs');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'service_costs' | 'aportantes' | 'gastos' | 'topes_cne'>('dashboard');
 
   // Dynamic Filters for Finances
   const [filterDonorPerson, setFilterDonorPerson] = useState<string>('TODOS');
@@ -450,137 +451,11 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
       
       {/* AUTHOR HEADER */}
 
-      <header className="module-heading"><h1>Finanzas y aportes</h1><div className="module-actions"><details className="app-popover"><summary className="compact-button">Más</summary><div className="app-popover-panel"><button className="compact-button" onClick={handleExportCneCsv}><FileSpreadsheet size={16}/>Exportar CNE (CSV)</button><button className="compact-button" onClick={()=>setShowDonorModal(true)}><PlusCircle size={16}/>Registrar aportante o aporte</button></div></details><button className="compact-button is-primary" onClick={()=>setShowExpenseModal(true)}><Receipt size={16}/>Nuevo gasto</button></div></header>
+      <h1 className="sr-only">Finanzas y aportes</h1>
+
       {(ledger.invalidRecords>0||ledger.unknownExpenseStatuses>0||ledger.unknownContributionAmount>0)&&<p role="alert" className="compact-alert">Hay registros inválidos o sin clasificación. Revise los datos antes de conciliar.</p>}
-      <details className="compact-disclosure"><summary>Resumen financiero, conciliación y presupuesto</summary>
-      {/* Top 5 High-Precision KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Total Aportes */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-2 relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Aportes</span>
-            <span className="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg"><ArrowDownRight className="w-4 h-4" /></span>
-          </div>
-          <div className="text-2xl font-black text-blue-400 font-mono tracking-tight">{formatCOP(totalAportes)}</div>
-          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
-            <span>Efectivo: <strong className="text-slate-200">{formatCOP(totalAportesEfectivo)}</strong></span>
-            <span>Especie: <strong className="text-slate-200">{formatCOP(totalAportesEspecie)}</strong></span>
-          </div>
-        </div>
-
-        {/* Total Gastos */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-2 relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Gastos</span>
-            <span className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg"><ArrowUpRight className="w-4 h-4" /></span>
-          </div>
-          <div className="text-2xl font-black text-emerald-400 font-mono tracking-tight">{formatCOP(totalGastos)}</div>
-          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
-            <span>{tenantExpenses.length} facturas</span>
-            <span>Ejecución: <strong className="text-amber-300">{budgetExecutionPct.toFixed(1)}%</strong></span>
-          </div>
-        </div>
-
-        {/* Saldo Neto en Caja */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-2 relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Saldo monetario registrado</span>
-            <span className={`p-1.5 rounded-lg ${saldoNeto >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-              <DollarSign className="w-4 h-4" />
-            </span>
-          </div>
-          <div className={`text-2xl font-black font-mono tracking-tight ${saldoNeto >= 0 ? 'text-white' : 'text-red-400'}`}>
-            {formatCOP(saldoNeto)}
-          </div>
-          <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800">
-            {saldoNeto >= 0 ? 'Según aportes monetarios y pagos registrados' : 'Saldo monetario negativo; requiere revisión'}
-          </div>
-        </div>
-
-        {/* Aportantes Únicos */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-2 relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Aportantes Registrados</span>
-            <span className="p-1.5 bg-purple-500/10 text-purple-400 rounded-lg"><Users className="w-4 h-4" /></span>
-          </div>
-          <div className="text-2xl font-black text-purple-300 font-mono tracking-tight">
-            {uniqueDonorsList.length} <span className="text-sm font-normal text-slate-400">personas</span>
-          </div>
-          <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800">
-            Promedio: <strong className="text-slate-200">{formatCOP(uniqueDonorsList.length ? totalAportes / uniqueDonorsList.length : 0)}</strong>
-          </div>
-        </div>
-
-        {/* Tope CNE */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-2 relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Presupuesto configurado</span>
-            <span className="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg"><ShieldCheck className="w-4 h-4" /></span>
-          </div>
-          <div className="text-2xl font-black text-amber-300 font-mono tracking-tight">{currentTenant.budgetCap !== undefined ? formatCOP(plannedBudget) : 'Sin configurar'}</div>
-          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-            <div className="bg-amber-400 h-full rounded-full" style={{ width: `${Math.min(100,budgetExecutionPct)}%` }} />
-          </div>
-        </div>
-      </div>
-
-      <section aria-label="Conciliación de registros" className="rounded-xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300"><p>El saldo monetario usa aportes en efectivo y pagos monetarios registrados; no equivale a una conciliación bancaria. Los aportes en especie no aumentan caja.</p><div className="mt-3 grid gap-3 sm:grid-cols-3"><p>Pagado: <strong>{formatCOP(ledger.paid)}</strong></p><p>Aprobado por pagar: <strong>{formatCOP(ledger.approved)}</strong></p><p>Pendiente de aprobación: <strong>{formatCOP(ledger.pending)}</strong></p></div><p className="mt-2">Saldo después de compromisos monetarios: {formatCOP(ledger.afterCommitments)}</p>{(ledger.invalidRecords>0||ledger.unknownExpenseStatuses>0||ledger.unknownContributionAmount>0)&&<p role="alert" className="mt-2 text-amber-300">Hay registros inválidos o sin clasificación. Revise los datos antes de conciliar.</p>}</section>
-      {/* Sub-Navigation Tabs */}
-      <CampaignPlanningPanel tenant={currentTenant} userRole={userRole as UserRole} onNavigateCandidates={onNavigateCandidates}/></details>
-      <label className="financial-mobile-view">Vista<select aria-label="Vista financiera" className="compact-input" value={activeTab} onChange={e=>setActiveTab(e.target.value as typeof activeTab)}>{[['service_costs','Costos por servicio'],['dashboard','Gráficas y comparativas'],['aportantes','Aportantes'],['gastos','Gastos'],['topes_cne','Presupuesto y topes']].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
-      <div className="financial-desktop-view flex flex-wrap gap-1 border-b border-slate-800">
-        <button onClick={() => setActiveTab('service_costs')} className={`flex min-h-11 items-center gap-2 rounded-t-xl px-4 py-2.5 text-xs font-bold ${activeTab === 'service_costs' ? 'border-t-2 border-cyan-400 bg-slate-900 text-cyan-300' : 'text-slate-400 hover:text-slate-200'}`}><BarChart3 className="h-4 w-4"/>Costos por servicio</button>
-        <button
-          onClick={() => setActiveTab('dashboard')}
-          className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition cursor-pointer flex items-center gap-2 ${
-            activeTab === 'dashboard'
-              ? 'bg-slate-900 text-emerald-400 border-t-2 border-emerald-400'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50'
-          }`}
-        >
-          <PieIcon className="w-4 h-4" />
-          <span>Gráficas & Comparativas</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('aportantes')}
-          className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition cursor-pointer flex items-center gap-2 ${
-            activeTab === 'aportantes'
-              ? 'bg-slate-900 text-blue-400 border-t-2 border-blue-400'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Aportantes & Donaciones ({tenantContributions.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('gastos')}
-          className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition cursor-pointer flex items-center gap-2 ${
-            activeTab === 'gastos'
-              ? 'bg-slate-900 text-emerald-400 border-t-2 border-emerald-400'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50'
-          }`}
-        >
-          <Receipt className="w-4 h-4" />
-          <span>Costos y gastos registrados ({tenantExpenses.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('topes_cne')}
-          className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition cursor-pointer flex items-center gap-2 ${
-            activeTab === 'topes_cne'
-              ? 'bg-slate-900 text-amber-300 border-t-2 border-amber-300'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/50'
-          }`}
-        >
-          <ShieldCheck className="w-4 h-4" />
-          <span>Límites y Alertas CNE 2026</span>
-        </button>
-      </div>
-
-      {/* DYNAMIC FILTER BAR (Visible across all tabs) */}
-      <details className="compact-disclosure"><summary>Filtros{(filterDonorPerson!=='TODOS'||filterRubro!=='TODOS'||filterContributionType!=='TODOS'||searchTerm)?' · activos':''}</summary><div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <section className="summary-first" aria-label="Indicadores financieros">
+      <WorkspaceTools><details className="app-popover"><summary className="compact-button">Más</summary><div className="app-popover-panel"><button className="compact-button" onClick={handleExportCneCsv}><FileSpreadsheet size={16}/>Exportar CNE (CSV)</button><button className="compact-button" onClick={()=>setShowDonorModal(true)}><PlusCircle size={16}/>Registrar aportante o aporte</button></div></details><button className="compact-button is-primary" onClick={()=>setShowExpenseModal(true)}><Receipt size={16}/>Nuevo gasto</button>      <label className="toolbar-field">Vista<select aria-label="Vista financiera" className="compact-input" value={activeTab} onChange={e=>setActiveTab(e.target.value as typeof activeTab)}>{[['service_costs','Costos por servicio'],['dashboard','Gráficas y comparativas'],['aportantes','Aportantes'],['gastos','Gastos'],['topes_cne','Presupuesto y topes']].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>      <details className="app-popover"><summary className="compact-button">Filtros{(filterDonorPerson!=='TODOS'||filterRubro!=='TODOS'||filterContributionType!=='TODOS'||searchTerm)?' · activos':''}</summary><div className="app-popover-panel"><div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
           <Filter className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>Filtros Dinámicos:</span>
@@ -658,8 +533,81 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             </button>
           )}
         </div>
-      </div></details>
+      </div></div></details><details className="app-popover"><summary className="compact-button">Presupuesto</summary><div className="app-popover-panel planning-panel">      <section aria-label="Conciliación de registros" className="rounded-xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300"><p>El saldo monetario usa aportes en efectivo y pagos monetarios registrados; no equivale a una conciliación bancaria. Los aportes en especie no aumentan caja.</p><div className="mt-3 grid gap-3 sm:grid-cols-3"><p>Pagado: <strong>{formatCOP(ledger.paid)}</strong></p><p>Aprobado por pagar: <strong>{formatCOP(ledger.approved)}</strong></p><p>Pendiente de aprobación: <strong>{formatCOP(ledger.pending)}</strong></p></div><p className="mt-2">Saldo después de compromisos monetarios: {formatCOP(ledger.afterCommitments)}</p>{(ledger.invalidRecords>0||ledger.unknownExpenseStatuses>0||ledger.unknownContributionAmount>0)&&<p role="alert" className="mt-2 text-amber-300">Hay registros inválidos o sin clasificación. Revise los datos antes de conciliar.</p>}</section>
+      {/* Sub-Navigation Tabs */}
+      <CampaignPlanningPanel tenant={currentTenant} userRole={userRole as UserRole} onNavigateCandidates={onNavigateCandidates}/></div></details></WorkspaceTools>
+      {/* Top 5 High-Precision KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Total Aportes */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-2 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Aportes</span>
+            <span className="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg"><ArrowDownRight className="w-4 h-4" /></span>
+          </div>
+          <div className="text-2xl font-black text-blue-400 font-mono tracking-tight">{formatCOP(totalAportes)}</div>
+          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+            <span>Efectivo: <strong className="text-slate-200">{formatCOP(totalAportesEfectivo)}</strong></span>
+            <span>Especie: <strong className="text-slate-200">{formatCOP(totalAportesEspecie)}</strong></span>
+          </div>
+        </div>
 
+        {/* Total Gastos */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-2 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Gastos</span>
+            <span className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg"><ArrowUpRight className="w-4 h-4" /></span>
+          </div>
+          <div className="text-2xl font-black text-emerald-400 font-mono tracking-tight">{formatCOP(totalGastos)}</div>
+          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+            <span>{tenantExpenses.length} facturas</span>
+            <span>Ejecución: <strong className="text-amber-300">{budgetExecutionPct.toFixed(1)}%</strong></span>
+          </div>
+        </div>
+
+        {/* Saldo Neto en Caja */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-2 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Saldo monetario registrado</span>
+            <span className={`p-1.5 rounded-lg ${saldoNeto >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+              <DollarSign className="w-4 h-4" />
+            </span>
+          </div>
+          <div className={`text-2xl font-black font-mono tracking-tight ${saldoNeto >= 0 ? 'text-white' : 'text-red-400'}`}>
+            {formatCOP(saldoNeto)}
+          </div>
+          <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+            {saldoNeto >= 0 ? 'Según aportes monetarios y pagos registrados' : 'Saldo monetario negativo; requiere revisión'}
+          </div>
+        </div>
+
+        {/* Aportantes Únicos */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-2 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Aportantes Registrados</span>
+            <span className="p-1.5 bg-purple-500/10 text-purple-400 rounded-lg"><Users className="w-4 h-4" /></span>
+          </div>
+          <div className="text-2xl font-black text-purple-300 font-mono tracking-tight">
+            {uniqueDonorsList.length} <span className="text-sm font-normal text-slate-400">personas</span>
+          </div>
+          <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+            Promedio: <strong className="text-slate-200">{formatCOP(uniqueDonorsList.length ? totalAportes / uniqueDonorsList.length : 0)}</strong>
+          </div>
+        </div>
+
+        {/* Tope CNE */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4.5 space-y-2 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Presupuesto configurado</span>
+            <span className="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg"><ShieldCheck className="w-4 h-4" /></span>
+          </div>
+          <div className="text-2xl font-black text-amber-300 font-mono tracking-tight">{currentTenant.budgetCap !== undefined ? formatCOP(plannedBudget) : 'Sin configurar'}</div>
+          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            <div className="bg-amber-400 h-full rounded-full" style={{ width: `${Math.min(100,budgetExecutionPct)}%` }} />
+          </div>
+        </div>
+      </div></section>
+
+      {/* DYNAMIC FILTER BAR (Visible across all tabs) */}
       {/* ========================================================================= */}
       {/* TAB 1: DASHBOARD & COMPARATIVAS VISUALES CON RECHARTS */}
       {/* ========================================================================= */}

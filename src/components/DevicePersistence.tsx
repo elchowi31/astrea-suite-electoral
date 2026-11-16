@@ -1,3 +1,4 @@
+import {TrackingStatusPanel} from './RouteTrackingProvider';
 import React, { useEffect, useState } from 'react';
 import { browserLocalPersistence, browserSessionPersistence, indexedDBLocalPersistence, onAuthStateChanged, setPersistence, signOut } from 'firebase/auth';
 import { clearIndexedDbPersistence, terminate, waitForPendingWrites } from 'firebase/firestore';
@@ -69,7 +70,7 @@ export function DevicePersistencePanel() {
   useEffect(()=>{let active=true;void offlineAppReadiness().then(value=>{if(active)setOfflineReady(value);}).catch(()=>{if(active)setOfflineReady('No se pudo confirmar la preparación sin internet. Vuelva a comprobar con conexión.');});return()=>{active=false;};},[]);
   useEffect(() => { void navigator.storage?.estimate?.().then(setUsage); const refresh=()=>void gpsPermission().then(state=>{setGps(state);setSeed(updateSeed({gps:state}));}).catch(error=>setMessage((error as Error).message));refresh();document.addEventListener('visibilitychange',refresh);return()=>document.removeEventListener('visibilitychange',refresh); },[]);
   const gpsText = { granted:'autorizado (no se volverá a preguntar)', denied:'bloqueado en el navegador', prompt:'pendiente de autorizar', unsupported:'no disponible en este navegador', unknown:'sin verificar' }[gps];
-  return <section className="space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-6 text-slate-200"><h2 className="text-xl font-bold text-white">Mi dispositivo</h2>
+  return <section className="space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-6 text-slate-200"><h2 className="text-xl font-bold text-white">Mi dispositivo</h2><TrackingStatusPanel/>
     <p>Datos locales: {choice?.enabled ? 'activados' : 'desactivados'}. Sesión: {choice?.enabled ? 'conservada entre aperturas' : 'hasta cerrar esta sesión del navegador'}.</p>
     <div className="rounded-xl border border-slate-700 p-3"><p role="status" className="text-sm">{offlineReady}</p><p className="mt-2 text-xs text-slate-400">Antes de salir sin señal, inicie sesión, abra las listas que necesite y espere a que carguen. Las aprobaciones, reservas de cupos, servicios de Google e IA necesitan conexión.</p><button className={`${button} mt-2`} onClick={()=>void offlineAppReadiness().then(setOfflineReady).catch(()=>setOfflineReady('No se pudo comprobar. Revise la conexión.'))}>Comprobar preparación sin internet</button></div>
     <p className="text-sm">Identificador del dispositivo: <code className="text-cyan-300">{seed.deviceId.slice(0,8)}</code> · registrado {new Date(seed.createdAt).toLocaleDateString('es-CO')} · GPS: <b>{gpsText}</b>{seed.activeRouteId ? ' · hay un recorrido activo en este dispositivo' : ''}.</p>

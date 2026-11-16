@@ -1,3 +1,4 @@
+import {WorkspaceTools} from './WorkspaceTools';
 import React,{useMemo,useState} from 'react';
 import {BarChart,Bar,XAxis,YAxis,Tooltip,ResponsiveContainer,CartesianGrid} from 'recharts';
 import type {CampaignExpense,Leader} from '../types';
@@ -46,8 +47,8 @@ export function ServiceCostsDashboard({expenses,leaders,tenantId}:{expenses:Camp
  ].filter(([count])=>Number(count)>0);
  return <section className="space-y-5" aria-label="Tablero de costos por servicio">
   <header className="module-heading"><h2>Costos por servicio</h2><span className="text-xs text-slate-400">{summary.records.length} gastos filtrados</span></header>
-  <details className="compact-disclosure"><summary>Filtros de costos{(responsible||territory||status||from||to)?' · activos':''}</summary>
-  <div className={card+' grid gap-3 sm:grid-cols-2 xl:grid-cols-5'}>
+  <WorkspaceTools>  <details className="app-popover"><summary className="compact-button">Detalle de filtros{(responsible||territory||status||from||to)?' · activos':''}</summary>
+  <div className="app-popover-panel"><div className={card+' grid gap-3 sm:grid-cols-2 xl:grid-cols-5'}>
    <label className="text-xs text-slate-300">Responsable<select className={input} value={responsible} onChange={e=>setResponsible(e.target.value)}><option value="">Todos los responsables</option>{responsibleIds.map(id=><option key={id} value={id}>{label(id)}</option>)}</select></label>
    <label className="text-xs text-slate-300">Vereda / barrio<select className={input} value={territory} onChange={e=>setTerritory(e.target.value)}><option value="">Todos los territorios</option>{territories.map(name=><option key={name}>{name}</option>)}</select></label>
    <label className="text-xs text-slate-300">Estado del gasto<select className={input} value={status} onChange={e=>setStatus(e.target.value)}><option value="">Todos los estados</option>{['Pagado','Aprobado','Pendiente'].map(name=><option key={name}>{name}</option>)}</select></label>
@@ -55,7 +56,8 @@ export function ServiceCostsDashboard({expenses,leaders,tenantId}:{expenses:Camp
    <label className="text-xs text-slate-300">Hasta<input className={input} type="date" value={to} onChange={e=>setTo(e.target.value)}/></label>
    <button type="button" className="min-h-10 text-left text-xs text-cyan-300 underline" onClick={()=>{setResponsible('');setTerritory('');setStatus('');setFrom('');setTo('');}}>Restablecer estos filtros</button>
   </div>
-  </details>
+  </div></details>
+</WorkspaceTools>
   {invalidRange&&<p role="alert" className="rounded-xl bg-rose-950/50 p-3 text-sm text-rose-200">La fecha inicial debe ser anterior o igual a la fecha final.</p>}
   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
    ['Gasto registrado',summary.total,'Suma de los importes filtrados'],['Pagado',summary.paid,'Registros con estado Pagado'],['Aprobado por pagar',summary.approved,'Aprobaciones pendientes de pago'],['Pendiente de aprobación',summary.pending,'Importes aún por revisar'],

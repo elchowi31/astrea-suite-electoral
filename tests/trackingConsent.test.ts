@@ -17,7 +17,7 @@ test('Declining tracking completes onboarding without authorizing GPS or blockin
   assert.equal(declined.trackingConsentAt,undefined);
   assert.equal(trackingConsentNeeded({...declined,automaticTracking:true}),true);
 });
-test('Participant status is mounted while monitor routes remain administrator-only',()=>{
-  const app=readFileSync('src/App.tsx','utf8');assert.equal(app.split('<TrackingStatusBanner/>').length-1,1);
+test('Tracking controls stay in their dedicated panel while monitor routes remain administrator-only',()=>{
+  const app=readFileSync('src/App.tsx','utf8');assert.equal(app.includes('TrackingStatusBanner'),false);assert.equal(readFileSync('src/components/DevicePersistence.tsx','utf8').split('<TrackingStatusPanel/>').length-1,1);
   assert.ok(app.includes("isTrackingAdministrator(currentUser) && activeTab === 'routes'"));
 });

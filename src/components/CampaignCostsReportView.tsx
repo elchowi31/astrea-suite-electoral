@@ -1,3 +1,4 @@
+import {WorkspaceTools} from './WorkspaceTools';
 import { createRecordId } from '../lib/recordIds';
 import {EditRecordButton} from './common/EditRecordButton';
 import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
@@ -312,22 +313,7 @@ export const CampaignCostsReportView: React.FC<CampaignCostsReportViewProps> = (
       
       {/* AUTHOR HEADER */}
 
-      {/* TOP SUMMARY BANNER */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-5 shadow-xl">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <span className="p-2 bg-blue-500/20 text-blue-400 rounded-xl border border-blue-500/30">
-              <DollarSign className="w-5 h-5" />
-            </span>
-            <h2 className="text-xl font-bold text-white tracking-tight">Reporte Financiero Oficial: {currentTenant.name}</h2>
-          </div>
-          <p className="text-xs text-slate-400">
-            Control de gasolina, vehículos, alimentación, publicidad, eventos y cajas menores con auditoría CNE.
-          </p>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
+      <h1 className="sr-only">Control detallado de gastos</h1><WorkspaceTools>
           <button
             onClick={handleOpenCreateModal}
             className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-600/30 transition cursor-pointer"
@@ -345,11 +331,9 @@ export const CampaignCostsReportView: React.FC<CampaignCostsReportViewProps> = (
             Exportar a Excel (.CSV)
           </button>
 
-        </div>
-      </div>
-
+</WorkspaceTools>
       {/* 4 CARDS: FINANCIAL PHASES METRICS */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="summary-first grid grid-cols-2 sm:grid-cols-4 gap-4" aria-label="Indicadores de gastos">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4.5 space-y-1">
           <span className="text-[10px] font-bold uppercase text-slate-400 block">Total Gasto Acumulado</span>
           <div className="text-xl font-black text-white font-mono">{formatCOP(totalEjecutado)}</div>

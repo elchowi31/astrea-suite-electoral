@@ -35,3 +35,12 @@ test('successful connection resets failure count and normal renewal stays active
  },onEvent:e=>{events.push(e);if(calls===4&&e.type==='connected')stop.abort();},wait:async()=>{}});
  assert.equal(calls,4);assert.ok(!events.some(e=>e.type==='fatal'));
 });
+
+test('expired saved links are discarded so a fresh QR or code can be requested',async()=>{
+ const events:any[]=[];await runWhatsappTab({body:{},signal:new AbortController().signal,request:async()=>new Response(JSON.stringify({error:'Vínculo vencido'}),{status:410}),onEvent:e=>events.push(e)});assert.equal(events[0].type,'fatal');assert.equal(events[0].resetSession,true);
+});
+test('persistent transient retries recover after more than six outages and remain cancellable',async()=>{
+ const stop=new AbortController(),events:any[]=[],delays:number[]=[];let calls=0;
+ await runWhatsappTab({body:{},signal:stop.signal,maxFailures:Infinity,request:async()=>{calls++;return calls<9?new Response('{}',{status:503}):stream([{type:'connected'}]);},onEvent:e=>{events.push(e);if(e.type==='connected')stop.abort();},wait:async ms=>{delays.push(ms);}});
+ assert.equal(calls,9);assert.ok(!events.some(e=>e.type==='fatal'||e.message?.includes('Infinity')));assert.ok(delays.every(delay=>delay<=30000));
+});

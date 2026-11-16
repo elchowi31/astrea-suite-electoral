@@ -151,5 +151,7 @@ export function isInstalledApp(): boolean {
   return safe(() => globalThis.matchMedia?.('(display-mode: standalone)').matches || (globalThis.navigator as Navigator & { standalone?: boolean }).standalone === true) ?? false;
 }
 
+export function hasTrackingConsent(seed:DeviceSeed|null):boolean{return seed?.trackingConsentVersion===1&&!!seed.trackingConsentAt;}
+
 /** Installing the tracking configuration requires affirmative consent; old grants alone are not consent. */
 export function trackingConsentNeeded(seed:DeviceSeed|null):boolean{return !(seed?.trackingSetupCompleted&&seed.automaticTracking===false)&&(seed?.trackingConsentVersion!==1||!seed.trackingConsentAt);}

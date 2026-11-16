@@ -1,3 +1,4 @@
+import {WorkspaceTools} from './WorkspaceTools';
 import { EditRecordButton } from './common/EditRecordButton';
 import { createRecordId } from '../lib/recordIds';
 import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
@@ -315,8 +316,8 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
 
   return (
     <div className="space-y-6 pb-12">
-      <header className="module-heading"><h1>Base territorial</h1><div className="module-actions"><button id="btn-register-grassroots-voter" onClick={()=>setIsRegisterVoterOpen(true)} className="compact-button is-primary"><Plus size={16}/>Registrar persona</button><button onClick={handleExportCSV} className="compact-button"><Download size={16}/>Exportar padrón</button></div></header>
-      <details className="compact-disclosure"><summary>Resumen y estructura de los registros · {grassrootsVoters.length} personas</summary><p className="mt-2 text-sm">Los registros se agrupan por los responsables y candidaturas asociados. Estos totales son registros internos y no representan votos emitidos.</p><p className="mt-2 text-sm">{leaders.length} líderes · {assemblyCandidates.length} candidaturas de Asamblea · {mayoralCandidates.length} de Alcaldía · {councilCandidates.length} de Concejo.</p></details>
+      <h1 className="sr-only">Base territorial</h1><WorkspaceTools><button id="btn-register-grassroots-voter" onClick={()=>setIsRegisterVoterOpen(true)} className="compact-button is-primary"><Plus size={16}/>Registrar persona</button><button onClick={handleExportCSV} className="compact-button"><Download size={16}/>Exportar padrón</button></WorkspaceTools>
+      <section className="summary-first" aria-label="Resumen de la base territorial"><dl className="overview-stats"><div><dt>Personas registradas</dt><dd>{grassrootsVoters.length}</dd></div><div><dt>Líderes</dt><dd>{leaders.length}</dd></div><div><dt>Candidaturas</dt><dd>{candidates.length}</dd></div></dl></section>
       {/* Visual Interactive Hierarchy Pyramid */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5 shadow-lg">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
