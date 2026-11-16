@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { UserProfile } from '../types';
 import { auth } from '../lib/firebase';
-import { readSeed, trackingConsentNeeded, updateSeed, gpsPermission, prepareNativeTracking } from '../lib/deviceSeed';
+import { readSeed, trackingConsentNeeded,hasTrackingConsent, updateSeed, gpsPermission, prepareNativeTracking } from '../lib/deviceSeed';
 import { localDataEnabled, queueAutomaticRoute, queueLocation, type QueuedLocation } from '../lib/deviceStorage';
 import { automaticRoute, emptyMovement, observeMovement, type MovementState } from '../lib/movementTracking';
 import { watchFixes, type Fix, type FixWatcher } from '../lib/nativeTracking';
@@ -85,7 +85,7 @@ export function useAutomaticTracking(props: Props) {
     if(active.current)await finish(movement.current.lastMovementAt);movement.current=emptyMovement();save();
     updateSeed({automaticPaused:true});setEnabled(false);setMoving(false);setMessage('Seguimiento automático pausado.');void props.flush();
   };
-  const enable=async()=>{if(trackingConsentNeeded(readSeed()))throw new Error('Complete la autorización inicial en este dispositivo.');if(!localDataEnabled())throw new Error('Active la conservación de datos en «Mi dispositivo».');
+  const enable=async()=>{if(!hasTrackingConsent(readSeed()))throw new Error('Complete la autorización inicial en este dispositivo.');if(!localDataEnabled())throw new Error('Active la conservación de datos en «Mi dispositivo».');
     const result=await prepareNativeTracking();if(result.state!=='granted')throw new Error('Permita la ubicación precisa en los ajustes de Astrea.');
     updateSeed({automaticTracking:true,automaticPaused:false,trackingSetupCompleted:true});setEnabled(true);setAttempt(value=>value+1);
   };

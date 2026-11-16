@@ -13,7 +13,7 @@ import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { EditRecordButton } from './components/common/EditRecordButton';
 import { OperationsEditingReferences } from './components/operations/OperationsEditingReferences';
 import { OperationsProvider } from './components/operations/OperationsContext';
-import {WhatsappConnectionProvider,WhatsappConnectionStatus} from './components/operations/WhatsappConnectionContext';
+import {WhatsappConnectionProvider} from './components/operations/WhatsappConnectionContext';
 const OperationsOverview = lazy(()=>import('./components/operations/OperationsOverview').then(m=>({default:m.OperationsOverview})));
 const PassengerEventsView = lazy(()=>import('./components/PassengerEventsView').then(m=>({default:m.PassengerEventsView})));
 const RewardsView = lazy(()=>import('./components/RewardsView').then(m=>({default:m.RewardsView})));
@@ -21,7 +21,7 @@ const SorteappRewardDrawsView = lazy(()=>import('./components/SorteappRewardDraw
 const DataImportsView = lazy(()=>import('./components/DataImportsView').then(m=>({default:m.DataImportsView})));
 const ResourcesView = lazy(()=>import('./components/operations/ResourcesView').then(m=>({default:m.ResourcesView})));
 import { DevicePersistencePanel, OfflineSyncStatus } from './components/DevicePersistence';
-import { RouteTrackingProvider,TrackingStatusBanner } from './components/RouteTrackingProvider';
+import { RouteTrackingProvider } from './components/RouteTrackingProvider';
 import {isTrackingAdministrator} from './lib/trackingPermissions';
 import {keepViewedTenant, type ViewerScope} from './lib/tenantSelection';
 const RouteOperationsView = lazy(()=>import('./components/RouteOperationsView').then(module=>({default:module.RouteOperationsView})));
@@ -271,9 +271,7 @@ export default function App() {
       }
     }
 
-    notifyFirestoreSave(
-      `¡Bienvenido(a), ${user.prefix ? `${user.prefix} ` : ''}${user.displayName}! Espacio cargado para ${user.municipality || 'Astrea'}.`
-    );
+
   };
 
   const handleRegisterUser = (newUser: UserProfile) => {
@@ -621,7 +619,6 @@ export default function App() {
         userRole={userRole}
         onSelectRole={() => {}}
         onLogout={handleLogout}
-        status={<TrackingStatusBanner/>}
         dataControl={demoControls}
       />
 
@@ -649,7 +646,7 @@ export default function App() {
           <PageNavigationBar current={activeTab} previous={navigation.previousPage} onBack={navigation.back} onHome={navigation.home}><WorkspaceNavigation tab={activeTab} user={currentUser} role={userRole} onNavigate={tab=>{if(['rewards','reward_draws','data_imports'].includes(tab))setDemoEnabled(false);navigate(tab);}}/></PageNavigationBar>
           <Suspense fallback={<div role="status" className="flex min-h-[45vh] items-center justify-center gap-3 text-sm text-slate-300"><RefreshCw className="h-4 w-4 animate-spin text-blue-400" />Cargando módulo…</div>}>
           <OperationsProvider key={`${currentTenant.tenantId}-${demoActive?'demo':'real'}`} tenant={currentTenant} user={demoViewUser} leaders={visibleLeaders} candidates={visibleCandidates} voters={visibleVoters} expenses={visibleExpenses} vehicles={visibleVehicles} contributions={visibleContributions} readOnly={demoActive} demo={demoBundle?.operations}>
-          <WhatsappConnectionProvider><WhatsappConnectionStatus/>
+          <WhatsappConnectionProvider>
           <DemoEditing.Provider value={demoActive&&demoBundle?{bundle:demoBundle,realReferences:{candidatos:candidates.map(c=>({id:c.id,name:c.fullName})),lideres:leaders.map(l=>({id:l.id,name:l.fullName})),aportes:donorContributions.map(c=>({id:c.id,name:c.donorName})),vehiculos:vehicles.map(v=>({id:v.id,name:v.licensePlate}))},onPromoted:()=>{setDemoEnabled(false);notifyFirestoreSave('Ficha guardada en datos reales.');}}:null}>
           <OperationsEditingReferences><div className="module-surface" data-module={activeTab}>
           {activeTab === 'rewards' && <RewardsView key={currentTenant.tenantId} user={currentUser} tenantId={currentTenant.tenantId}/>}
@@ -694,7 +691,7 @@ export default function App() {
             </div>
           )}
 
-          {currentUser && activeTab === 'resources' && <ResourcesView onSwitchAccount={()=>setShowAuthModal(true)}/>}
+          {currentUser && activeTab === 'resources' && <ResourcesView onUseRealData={()=>setDemoEnabled(false)} onSwitchAccount={()=>setShowAuthModal(true)}/>}
           {currentUser && activeTab === 'passengers' && <PassengerEventsView tenantId={currentTenant.tenantId} user={currentUser} readOnly={demoActive}/>}
 
           {currentUser && activeTab === 'users' && <UserManagementView currentUser={currentUser} currentTenant={currentTenant} users={users} leaders={leaders} candidates={candidates} />}

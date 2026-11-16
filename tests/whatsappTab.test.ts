@@ -35,7 +35,8 @@ test('Firestore checkpoint survives a new invocation, serializes writes and refu
  await first.auth.keys.set({'pre-key':{'1':{private:Buffer.from('secret'),public:Buffer.from('pub')}}});
  first.state.conversations.contact='new-draft';first.state.inbox.push({phone:'573009999999',jid:'573009999999@s.whatsapp.net',messageId:'in-1',text:'confirmar'});await first.save();
  first.state.startedAt=1000;await first.save();
- const second=await loadWhatsappSession(options);assert.equal(second.state.inbox[0].messageId,'in-1');assert.equal(second.state.conversations.contact,'new-draft');assert.deepEqual((await second.auth.keys.get('pre-key',['1']))['1'].private,Buffer.from('secret'));
+ const beforeRenewal=writes.length,previousExpiry=Date.parse(doc.fields.expiresAt.timestampValue);
+ const second=await loadWhatsappSession(options);assert.equal(writes.length,beforeRenewal+1);assert.ok(Date.parse(doc.fields.expiresAt.timestampValue)>=previousExpiry);assert.equal(second.state.inbox[0].messageId,'in-1');assert.equal(second.state.conversations.contact,'new-draft');assert.deepEqual((await second.auth.keys.get('pre-key',['1']))['1'].private,Buffer.from('secret'));
  assert.equal(second.state.startedAt,1000,'automatic renewals retain the admitted time range');
  assert.ok(writes.every(w=>!w.includes('secret')&&!w.includes('new-draft')&&!w.includes(session.key)));
  await second.auth.keys.set({'pre-key':{'1':null}});assert.equal((await second.auth.keys.get('pre-key',['1']))['1'],undefined);
@@ -175,10 +176,10 @@ for(const fault of ['lost-response','missing-version','transient'] as const)test
  await store.auth.keys.set({'pre-key':{'recover':{private:Buffer.from('recoverable-key'),public:Buffer.from('public-recovery-key')}}});
  await store.flush();
  store.state.conversations.contact='retained-draft';await store.save();await store.flush();
- const restored=await loadWhatsappSession(fixture.options);
+ const beforeRenewal=fixture.posts;assert.equal(beforeRenewal,fault==='transient'?4:3,'uncertain successful commits must not be rewritten');
+ const restored=await loadWhatsappSession(fixture.options);assert.equal(fixture.posts,beforeRenewal+1,'renewal refreshes retention once');
  assert.deepEqual((await restored.auth.keys.get('pre-key',['recover'])).recover.private,Buffer.from('recoverable-key'));
  assert.equal(restored.state.conversations.contact,'retained-draft');
- assert.equal(fixture.posts,fault==='transient'?4:3,'uncertain successful commits must not be rewritten');
 });
 test('permission failures stay visible, queued callers do not flood writes, and a later authorized save is possible',async()=>{
  const fixture=checkpointFixture(),store=await loadWhatsappSession(fixture.options);

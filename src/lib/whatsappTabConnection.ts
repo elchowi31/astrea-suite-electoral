@@ -1,4 +1,4 @@
-export type WhatsappEvent={type:string;message?:string;code?:string;requestId?:string;connected?:boolean;resetSession?:boolean};
+export type WhatsappEvent={type:string;message?:string;code?:string;qr?:string;requestId?:string;connected?:boolean;resetSession?:boolean};
 export function waitForRenewal(ms:number,signal:AbortSignal){
  return new Promise<void>(resolve=>{
   if(signal.aborted){resolve();return;}
@@ -20,7 +20,7 @@ export async function runWhatsappTab(options:{body:unknown;signal:AbortSignal;re
    const response=await options.request({method:'POST',signal:attempt.signal,body:JSON.stringify(options.body)});
    if(!response.ok){
     const data=await response.json().catch(()=>({}));
-    if(![409,408,429,500,502,503,504].includes(response.status)){onEvent({type:'fatal',message:data.error||'No se autorizó la conexión de WhatsApp.'});return;}
+    if(![409,408,429,500,502,503,504].includes(response.status)){onEvent({type:'fatal',message:data.error||'No se autorizó la conexión de WhatsApp.',...([410,422].includes(response.status)?{resetSession:true}:{})});return;}
     throw new Error(data.error||`El servidor respondió HTTP ${response.status}.`);
    }
    if(!response.headers.get('Content-Type')?.toLowerCase().startsWith('application/x-ndjson')){
@@ -49,7 +49,7 @@ export async function runWhatsappTab(options:{body:unknown;signal:AbortSignal;re
   finally{clearTimeout(watchdog);signal.removeEventListener('abort',abort);attempt.abort();}
   if(signal.aborted||fatal)return;
   if(!renew&&++failures>=maxFailures){onEvent({type:'fatal',message:`Recepción detenida después de ${failures} intentos fallidos. ${lastReason} Puede volver a iniciarla desde el panel.`});return;}
-  onEvent({type:'retry',message:renew?'Renovando la conexión automáticamente…':`${lastReason} Reintento ${failures}/${maxFailures}. Los registros guardados se conservan.`});
+  onEvent({type:'retry',message:renew?'Renovando la conexión automáticamente…':`${lastReason} Reintento ${failures}${Number.isFinite(maxFailures)?`/${maxFailures}`:''}. Los registros guardados se conservan.`});
   const delay=renew?300:Math.min(30000,2000*2**Math.min(failures-1,4));
   await (options.wait||waitForRenewal)(delay,signal);
  }

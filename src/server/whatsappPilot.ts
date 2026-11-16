@@ -8,7 +8,7 @@ import {hasPairedWhatsappIdentity} from './whatsappPairing.js';
 import {AgentError} from '../lib/requestAgent.js';
 
 // Each invocation is bounded; only the user's open tab can renew it.
-export async function runWhatsappPilot(options:{projectId:string;databaseId:string;token:string;uid:string;config:PilotConfig;session:TabSession;res:ServerResponse;checkActive:()=>Promise<void>},dependencies:{makeSocket?:typeof makeWASocket;loadSession?:typeof loadWhatsappSession;lease?:typeof pilotLease;segmentMs?:number;createDiagnostics?:typeof createWhatsappDiagnostics;intake?:ReturnType<typeof pilotIntake>}={}){
+export async function runWhatsappPilot(options:{projectId:string;databaseId:string;token:string;uid:string;config:PilotConfig;session:TabSession;pairingMode?:'qr'|'code';res:ServerResponse;checkActive:()=>Promise<void>},dependencies:{makeSocket?:typeof makeWASocket;loadSession?:typeof loadWhatsappSession;lease?:typeof pilotLease;segmentMs?:number;createDiagnostics?:typeof createWhatsappDiagnostics;intake?:ReturnType<typeof pilotIntake>}={}){
  const {res,config}=options;
  const base=`https://firestore.googleapis.com/v1/projects/${options.projectId}/databases/${encodeURIComponent(options.databaseId)}/documents`;
  const lease=(dependencies.lease||pilotLease)({base,token:options.token,phone:config.phone});await lease.acquire();
@@ -20,7 +20,7 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
  const ended=new Promise<void>(resolve=>{finish=resolve});
  const emit=(event:Record<string,unknown>)=>{if(!res.destroyed&&!res.writableEnded)res.write(JSON.stringify(event)+'\n');};
  const stop=(type:string,message:string,resetSession=false)=>{if(stopped)return;stopped=true;connected=false;outcome={type,message,...(resetSession?{resetSession:true}:{})};finish();};
- const incomplete=(message:string)=>stop('fatal',message+' Pulse «Iniciar / reanudar recepción» para obtener un código nuevo.',true);
+ const incomplete=(message:string)=>stop('fatal',message+' Pulse «Iniciar / reanudar recepción» para obtener un QR o código nuevo.',true);
  const failed=(error:unknown)=>stop('fatal',error instanceof AgentError?error.message:'Se detuvo la recepción. Revise la conexión antes de continuar.');
  const intake=dependencies.intake||pilotIntake({...options,runId:options.session.id,conversations:store.state.conversations,saveCursor:store.save});
  const queue=(task:()=>Promise<void>)=>{work=work.then(task).catch(failed);};
@@ -73,9 +73,14 @@ export async function runWhatsappPilot(options:{projectId:string;databaseId:stri
    // requestPairingCode mutates creds.me before sending. Calling it on the
    // early 'connecting' event can race the registration handshake and make
    // Baileys attempt a login with an identity that is not paired yet.
-   if(update.qr&&!hasPairedWhatsappIdentity(store.auth.creds)&&!pairRequested){
-    pairRequested=true;
-    void current.requestPairingCode(config.phone).then(code=>{if(!stopped&&current===socket){trace('pairing',{detail:'Código generado; esperando confirmación desde el teléfono receptor.'});emit({type:'pairing',code,message:'Esperando confirmación en el teléfono receptor. Todavía no hay recepción activa.'});}}).catch(()=>incomplete('No se pudo generar el código de WhatsApp.'));
+   if(update.qr&&!hasPairedWhatsappIdentity(store.auth.creds)){
+    if(options.pairingMode==='qr'){
+     trace('pairing',{detail:'QR actualizado; esperando el escaneo desde el teléfono receptor.'});
+     emit({type:'qr',qr:update.qr,message:'Escanee el QR desde Dispositivos vinculados de WhatsApp.'});
+    }else if(!pairRequested){
+     pairRequested=true;
+     void current.requestPairingCode(config.phone).then(code=>{if(!stopped&&current===socket){trace('pairing',{detail:'Código generado; esperando confirmación desde el teléfono receptor.'});emit({type:'pairing',code,message:'Ingrese el código desde Dispositivos vinculados de WhatsApp.'});}}).catch(()=>incomplete('No se pudo generar el código de WhatsApp.'));
+    }
    }
    if(update.isNewLogin&&hasPairedWhatsappIdentity(store.auth.creds)){
     trace('paired',{detail:'WhatsApp confirmó la vinculación; iniciando la recepción.'});emit({type:'paired',message:'Vinculación confirmada por WhatsApp. Iniciando la recepción…'});

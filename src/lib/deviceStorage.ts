@@ -79,6 +79,7 @@ export async function clearDeviceData(): Promise<void> {
   if ('caches' in window) for (const key of await caches.keys()) if (key.startsWith('astrea-app-')) await caches.delete(key);
   await new Promise<void>((resolve,reject) => { const request = indexedDB.deleteDatabase('astrea-route-queue'); request.onsuccess = () => resolve(); request.onerror = () => reject(request.error); request.onblocked = () => reject(new Error('Cierre las otras pestañas antes de retirar los datos.')); });
   await new Promise<void>((resolve,reject) => { const request = indexedDB.deleteDatabase('astrea-offline-mutations'); request.onsuccess = () => resolve(); request.onerror = () => reject(request.error); request.onblocked = () => reject(new Error('Cierre las otras pestañas antes de retirar los datos.')); });
+  await (await import('./whatsappDeviceSession')).clearWhatsappDeviceSessions();
   clearAstreaBrowserStorage([localStorage,sessionStorage]);
   memoryQueue.clear();
 }

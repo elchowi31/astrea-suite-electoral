@@ -1,3 +1,4 @@
+import {WorkspaceTools} from './WorkspaceTools';
 import { EditRecordButton } from './common/EditRecordButton';
 import { createRecordId } from '../lib/recordIds';
 import { parseLocation } from '../lib/territorialMaps';
@@ -183,10 +184,8 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
   return (
     <div className="space-y-6">
 
-      <header className="module-heading"><h1>Líderes y metas</h1><button onClick={()=>setShowModal(true)} className="compact-button is-primary"><PlusCircle size={16}/>Nuevo líder</button></header>
-      <details className="compact-disclosure"><summary>Resumen · {scopedLeaders.length} líderes · {scope.canViewAllMunicipalities?'Cesar':scope.allowedMunicipality||'Astrea'}</summary><p className="mt-2 text-xs">{userRole} · {currentTenant.name}. Se muestran los registros de su ámbito autorizado.</p>
-      {/* Overview Cards */}
-      <div className="compact-metrics grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <h1 className="sr-only">Líderes y metas</h1><WorkspaceTools><button onClick={()=>setShowModal(true)} className="compact-button is-primary"><PlusCircle size={16}/>Nuevo líder</button><details className="app-popover"><summary className="compact-button">Ámbito</summary><div className="app-popover-panel"><p>{scope.canViewAllMunicipalities?'Cesar':scope.allowedMunicipality||'Astrea'} · {userRole} · {currentTenant.name}</p></div></details></WorkspaceTools>
+      <section aria-label="Indicadores de líderes" className="summary-first">      <div className="compact-metrics grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Líderes Activos</span>
           <div className="text-2xl font-extrabold text-white font-mono">{scopedLeaders.length} Coordinadores</div>
@@ -215,9 +214,7 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
           <div className="text-2xl font-extrabold text-amber-300 font-mono">{overallProgress.toFixed(1)}%</div>
           <p className="text-[11px] text-slate-400">Objetivo del comando central</p>
         </div>
-      </div>
-
-      </details>
+      </div></section>
       {/* Leaders Table & Cards */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-3">
