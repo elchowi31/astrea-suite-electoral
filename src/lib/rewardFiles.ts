@@ -8,9 +8,10 @@ export async function importRewardMatrix(file:Pick<File,'size'|'arrayBuffer'>):P
   const XLSX=await import('xlsx'),workbook=XLSX.read(bytes,{type:'array'}),sheet=workbook.Sheets.Datos;
   if(!sheet)throw new Error('Use la plantilla de recompensas con la hoja Datos.');
   const value=(cell:string)=>{if(sheet[cell]?.f)throw new Error(`${cell}: las entradas deben ser valores, no fórmulas.`);return sheet[cell]?.v;};
-  const config:RewardConfig={targetHours:Number(value('C6')),farmCount:Number(value('C7')),teamCount:Number(value('C8')),farms:structuredClone(DEFAULT_REWARDS.farms)};
+  const manual=value('C4')==='astrea-rewards-manual-v2';
+  const config:RewardConfig={schemaVersion:manual?2:1,targetHours:Number(value('C6')),farmCount:Number(value('C7')),teamCount:Number(value('C8')),farms:structuredClone(DEFAULT_REWARDS.farms)};
   for(let i=0;i<100;i++){const row=i+14,production=value(`E${row}`);if(production===undefined&&i>=config.farmCount)continue;
-    config.farms[i]={id:`farm-${i+1}`,name:String(value(`C${row}`)||`Granja ${i+1}`),fruit:String(value(`D${row}`)||'Frutas'),production:production===undefined?NaN:Number(production),manualHours:Array.from({length:10},(_,j)=>{const n=value(`${String.fromCharCode(70+j)}${row}`);return n===undefined||n===''?null:Number(n);})};
+    config.farms[i]={id:`farm-${i+1}`,name:String(value(`C${row}`)||`Granja ${i+1}`),fruit:String(value(`D${row}`)||'Frutas'),production:production===undefined?NaN:Number(production),...(manual?{targetHoursPerTeam:value(`F${row}`)===undefined?config.targetHours:Number(value(`F${row}`))}:{}),manualHours:Array.from({length:10},(_,j)=>{const n=value(`${String.fromCharCode((manual?71:70)+j)}${row}`);return n===undefined||n===''?null:Number(n);})};
   }
   validateRewardConfig(config);return config;
 }

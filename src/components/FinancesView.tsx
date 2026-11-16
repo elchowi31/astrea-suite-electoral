@@ -13,7 +13,6 @@ import {
   calcularProyeccionReal2026
 } from '../data/colombiaElectoralData';
 import { generarIdDocumentoLegible } from '../lib/slugify';
-import { AuthorHeader } from './common/AuthorHeader';
 import {
   DollarSign,
   BarChart3,
@@ -450,57 +449,10 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
     <div className="space-y-6">
       
       {/* AUTHOR HEADER */}
-      <AuthorHeader 
-        title="Dashboard Financiero & Auditoría de Aportantes CNE 2026"
-        subtitle="Control Dinámico de Inversión • Desglose Alimentación, Transporte, Combustible y Publicidad • Cuentas Claras CNE"
-      />
 
-      {/* Main Bar with Navigation & Quick Actions */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-2xl border border-emerald-500/30">
-              <DollarSign className="w-6 h-6" />
-            </span>
-            <div>
-              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                Finanzas, Donaciones & Costos Detallados
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Organización: <strong className="text-slate-200 font-semibold">{currentTenant.name}</strong> • Sincronizado en <code className="text-emerald-400 font-mono">/aportes</code> y <code className="text-blue-400 font-mono">/gastos</code>
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            onClick={handleExportCneCsv}
-            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-2.5 rounded-xl text-xs font-semibold border border-slate-700 transition cursor-pointer shadow-sm"
-            title="Descargar reporte en formato Cuentas Claras CNE"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-            <span>Exportar CNE (CSV)</span>
-          </button>
-
-          <button
-            onClick={() => setShowDonorModal(true)}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-lg shadow-blue-600/20 transition cursor-pointer"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>+ Registrar Aportante / Aporte</span>
-          </button>
-
-          <button
-            onClick={() => setShowExpenseModal(true)}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-lg shadow-emerald-600/20 transition cursor-pointer"
-          >
-            <Receipt className="w-4 h-4" />
-            <span>+ Registrar Costo / Gasto</span>
-          </button>
-        </div>
-      </div>
-
+      <header className="module-heading"><h1>Finanzas y aportes</h1><div className="module-actions"><details className="app-popover"><summary className="compact-button">Más</summary><div className="app-popover-panel"><button className="compact-button" onClick={handleExportCneCsv}><FileSpreadsheet size={16}/>Exportar CNE (CSV)</button><button className="compact-button" onClick={()=>setShowDonorModal(true)}><PlusCircle size={16}/>Registrar aportante o aporte</button></div></details><button className="compact-button is-primary" onClick={()=>setShowExpenseModal(true)}><Receipt size={16}/>Nuevo gasto</button></div></header>
+      {(ledger.invalidRecords>0||ledger.unknownExpenseStatuses>0||ledger.unknownContributionAmount>0)&&<p role="alert" className="compact-alert">Hay registros inválidos o sin clasificación. Revise los datos antes de conciliar.</p>}
+      <details className="compact-disclosure"><summary>Resumen financiero, conciliación y presupuesto</summary>
       {/* Top 5 High-Precision KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Total Aportes */}
@@ -574,8 +526,9 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
 
       <section aria-label="Conciliación de registros" className="rounded-xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300"><p>El saldo monetario usa aportes en efectivo y pagos monetarios registrados; no equivale a una conciliación bancaria. Los aportes en especie no aumentan caja.</p><div className="mt-3 grid gap-3 sm:grid-cols-3"><p>Pagado: <strong>{formatCOP(ledger.paid)}</strong></p><p>Aprobado por pagar: <strong>{formatCOP(ledger.approved)}</strong></p><p>Pendiente de aprobación: <strong>{formatCOP(ledger.pending)}</strong></p></div><p className="mt-2">Saldo después de compromisos monetarios: {formatCOP(ledger.afterCommitments)}</p>{(ledger.invalidRecords>0||ledger.unknownExpenseStatuses>0||ledger.unknownContributionAmount>0)&&<p role="alert" className="mt-2 text-amber-300">Hay registros inválidos o sin clasificación. Revise los datos antes de conciliar.</p>}</section>
       {/* Sub-Navigation Tabs */}
-      <CampaignPlanningPanel tenant={currentTenant} userRole={userRole as UserRole} onNavigateCandidates={onNavigateCandidates}/>
-      <div className="flex flex-wrap gap-1 border-b border-slate-800">
+      <CampaignPlanningPanel tenant={currentTenant} userRole={userRole as UserRole} onNavigateCandidates={onNavigateCandidates}/></details>
+      <label className="financial-mobile-view">Vista<select aria-label="Vista financiera" className="compact-input" value={activeTab} onChange={e=>setActiveTab(e.target.value as typeof activeTab)}>{[['service_costs','Costos por servicio'],['dashboard','Gráficas y comparativas'],['aportantes','Aportantes'],['gastos','Gastos'],['topes_cne','Presupuesto y topes']].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+      <div className="financial-desktop-view flex flex-wrap gap-1 border-b border-slate-800">
         <button onClick={() => setActiveTab('service_costs')} className={`flex min-h-11 items-center gap-2 rounded-t-xl px-4 py-2.5 text-xs font-bold ${activeTab === 'service_costs' ? 'border-t-2 border-cyan-400 bg-slate-900 text-cyan-300' : 'text-slate-400 hover:text-slate-200'}`}><BarChart3 className="h-4 w-4"/>Costos por servicio</button>
         <button
           onClick={() => setActiveTab('dashboard')}
@@ -627,7 +580,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
       </div>
 
       {/* DYNAMIC FILTER BAR (Visible across all tabs) */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <details className="compact-disclosure"><summary>Filtros{(filterDonorPerson!=='TODOS'||filterRubro!=='TODOS'||filterContributionType!=='TODOS'||searchTerm)?' · activos':''}</summary><div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
           <Filter className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>Filtros Dinámicos:</span>
@@ -705,7 +658,7 @@ export const FinancesView: React.FC<FinancesViewProps> = ({
             </button>
           )}
         </div>
-      </div>
+      </div></details>
 
       {/* ========================================================================= */}
       {/* TAB 1: DASHBOARD & COMPARATIVAS VISUALES CON RECHARTS */}

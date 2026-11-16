@@ -315,102 +315,8 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-emerald-300 text-xs font-semibold uppercase tracking-wider">
-              <Layers className="w-3.5 h-3.5" />
-              Arquitectura Electoral Piramidal (Bottom-Up Rollup)
-            </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-              Jerarquía Electoral, Líderes & Volumen de Votos
-            </h1>
-            <p className="text-slate-300 text-sm max-w-3xl leading-relaxed">
-              El flujo de datos se alimenta desde el <strong className="text-emerald-300">Votante Raso en territorio</strong>, consolidándose en tiempo real hacia los <strong className="text-white">Líderes</strong>, <strong className="text-white">Concejales</strong>, <strong className="text-white">Alcaldes</strong>, <strong className="text-white">Diputados de Asamblea</strong> y <strong className="text-white">Gobernación</strong>.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              id="btn-register-grassroots-voter"
-              onClick={() => setIsRegisterVoterOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-900/30 transition-all cursor-pointer hover:scale-[1.02]"
-            >
-              <Plus className="w-4 h-4" />
-              + Registrar Votante Fidelizado
-            </button>
-
-            <button
-              onClick={handleExportCSV}
-              className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors cursor-pointer"
-            >
-              <Download className="w-4 h-4" />
-              Exportar Padrón
-            </button>
-          </div>
-        </div>
-
-        {/* Global Rollup KPI Metrics */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6 pt-6 border-t border-slate-800/80">
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Gobernación</span>
-              <Crown className="w-3.5 h-3.5 text-amber-400" />
-            </div>
-            <p className="text-lg font-bold text-white mt-1">
-              {(governorCandidate.votesCommitted || 0) + hierarchicalMetrics.totalGrassroots}
-            </p>
-            <span className="text-[10px] text-emerald-400 font-medium">Consolidado Dptal.</span>
-          </div>
-
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Asamblea</span>
-              <Building className="w-3.5 h-3.5 text-indigo-400" />
-            </div>
-            <p className="text-lg font-bold text-white mt-1">
-              {assemblyCandidates.reduce((acc, c) => acc + (c.votesCommitted || 0), 0) + hierarchicalMetrics.totalGrassroots}
-            </p>
-            <span className="text-[10px] text-indigo-300 font-medium">{assemblyCandidates.length} Candidatos</span>
-          </div>
-
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Alcaldías</span>
-              <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-            </div>
-            <p className="text-lg font-bold text-white mt-1">
-              {mayoralCandidates.reduce((acc, c) => acc + (c.votesCommitted || 0), 0) + hierarchicalMetrics.totalGrassroots}
-            </p>
-            <span className="text-[10px] text-emerald-300 font-medium">{mayoralCandidates.length} Municipios</span>
-          </div>
-
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Concejales</span>
-              <Users className="w-3.5 h-3.5 text-blue-400" />
-            </div>
-            <p className="text-lg font-bold text-white mt-1">
-              {councilCandidates.reduce((acc, c) => acc + (c.votesCommitted || 0), 0) + hierarchicalMetrics.totalGrassroots}
-            </p>
-            <span className="text-[10px] text-blue-300 font-medium">{councilCandidates.length} Aspirantes</span>
-          </div>
-
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-3 col-span-2 sm:col-span-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Votantes Rasos</span>
-              <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-            </div>
-            <p className="text-lg font-bold text-emerald-400 mt-1">
-              {grassrootsVoters.length}
-            </p>
-            <span className="text-[10px] text-slate-300 font-medium">{leaders.length} Líderes en Campo</span>
-          </div>
-        </div>
-      </div>
-
+      <header className="module-heading"><h1>Base territorial</h1><div className="module-actions"><button id="btn-register-grassroots-voter" onClick={()=>setIsRegisterVoterOpen(true)} className="compact-button is-primary"><Plus size={16}/>Registrar persona</button><button onClick={handleExportCSV} className="compact-button"><Download size={16}/>Exportar padrón</button></div></header>
+      <details className="compact-disclosure"><summary>Resumen y estructura de los registros · {grassrootsVoters.length} personas</summary><p className="mt-2 text-sm">Los registros se agrupan por los responsables y candidaturas asociados. Estos totales son registros internos y no representan votos emitidos.</p><p className="mt-2 text-sm">{leaders.length} líderes · {assemblyCandidates.length} candidaturas de Asamblea · {mayoralCandidates.length} de Alcaldía · {councilCandidates.length} de Concejo.</p></details>
       {/* Visual Interactive Hierarchy Pyramid */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5 shadow-lg">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -472,7 +378,7 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
         {/* Pyramid Graphic Rows */}
         <div className="space-y-3 pt-2">
           {/* LEVEL 1: Gobernación (Peak) */}
-          {(selectedHierarchyTier === 'all' || selectedHierarchyTier === 'Gobernacion') && (
+          {governorCandidate && (selectedHierarchyTier === 'all' || selectedHierarchyTier === 'Gobernacion') && (
             <div className="bg-gradient-to-r from-amber-950/40 via-slate-800/80 to-amber-950/40 border border-amber-500/40 rounded-2xl p-4 transition-all hover:border-amber-400 shadow-md">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">

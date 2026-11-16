@@ -45,7 +45,8 @@ export function ServiceCostsDashboard({expenses,leaders,tenantId}:{expenses:Camp
   [summary.mismatched,'gastos cuyo total difiere de cantidad × costo unitario'],
  ].filter(([count])=>Number(count)>0);
  return <section className="space-y-5" aria-label="Tablero de costos por servicio">
-  <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-widest text-cyan-300">Control financiero</p><h2 className="mt-1 text-2xl font-bold text-slate-50">Costos por servicio y responsable</h2><p className="mt-2 max-w-3xl text-sm text-slate-400">Gastos registrados, cantidades y soportes. Los filtros de rubro, municipio y búsqueda de arriba también se aplican a este tablero.</p></div><span className="rounded-full border border-cyan-800 bg-cyan-950/40 px-3 py-2 text-xs text-cyan-200">{summary.records.length} gastos en el ámbito filtrado</span></div>
+  <header className="module-heading"><h2>Costos por servicio</h2><span className="text-xs text-slate-400">{summary.records.length} gastos filtrados</span></header>
+  <details className="compact-disclosure"><summary>Filtros de costos{(responsible||territory||status||from||to)?' · activos':''}</summary>
   <div className={card+' grid gap-3 sm:grid-cols-2 xl:grid-cols-5'}>
    <label className="text-xs text-slate-300">Responsable<select className={input} value={responsible} onChange={e=>setResponsible(e.target.value)}><option value="">Todos los responsables</option>{responsibleIds.map(id=><option key={id} value={id}>{label(id)}</option>)}</select></label>
    <label className="text-xs text-slate-300">Vereda / barrio<select className={input} value={territory} onChange={e=>setTerritory(e.target.value)}><option value="">Todos los territorios</option>{territories.map(name=><option key={name}>{name}</option>)}</select></label>
@@ -54,6 +55,7 @@ export function ServiceCostsDashboard({expenses,leaders,tenantId}:{expenses:Camp
    <label className="text-xs text-slate-300">Hasta<input className={input} type="date" value={to} onChange={e=>setTo(e.target.value)}/></label>
    <button type="button" className="min-h-10 text-left text-xs text-cyan-300 underline" onClick={()=>{setResponsible('');setTerritory('');setStatus('');setFrom('');setTo('');}}>Restablecer estos filtros</button>
   </div>
+  </details>
   {invalidRange&&<p role="alert" className="rounded-xl bg-rose-950/50 p-3 text-sm text-rose-200">La fecha inicial debe ser anterior o igual a la fecha final.</p>}
   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
    ['Gasto registrado',summary.total,'Suma de los importes filtrados'],['Pagado',summary.paid,'Registros con estado Pagado'],['Aprobado por pagar',summary.approved,'Aprobaciones pendientes de pago'],['Pendiente de aprobación',summary.pending,'Importes aún por revisar'],

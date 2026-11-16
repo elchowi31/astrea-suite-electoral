@@ -15,7 +15,6 @@ import {
   getVeredasYBarrios
 } from '../data/colombiaElectoralData';
 import { generarIdDocumentoLegible } from '../lib/slugify';
-import { AuthorHeader } from './common/AuthorHeader';
 import {
   Truck,
   Bus,
@@ -189,10 +188,6 @@ export const TransportView: React.FC<TransportViewProps> = ({
     <div className="space-y-6">
       
       {/* AUTHOR HEADER */}
-      <AuthorHeader
-        title="Gestión de Transporte, Rutas Veredales & Vales Día D"
-        subtitle="Logística de Movilización Votantes • Control Flota Cesar • Alertas de Cobertura RURAL"
-      />
 
       <TransportControlCenter/>
       {isTrackingAdministrator(currentUser)&&!readOnly&&<details className="rounded-2xl border border-slate-700 p-4"><summary className="cursor-pointer font-semibold">Ubicación y seguimiento de la flota</summary><FleetTrackingPanel key={currentTenant.tenantId} tenantId={currentTenant.tenantId} user={currentUser!} members={members} vehicles={scopedVehicles} /></details>}

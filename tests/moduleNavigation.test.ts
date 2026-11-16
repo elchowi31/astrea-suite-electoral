@@ -40,6 +40,6 @@ test('every registered module inherits accessible back and dashboard actions aut
     if(tab==='dashboard'){assert.equal(markup,'');continue;}
     assert.match(markup,/aria-label="Volver a Finanzas y aportes"/,tab);
     assert.match(markup,/aria-label="Ir al tablero principal"/,tab);
-    assert.match(markup,/min-h-12/,tab);
+    assert.match(markup,/class="app-page-back"/,tab);
   }
 });
