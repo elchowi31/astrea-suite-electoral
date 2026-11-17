@@ -6,6 +6,7 @@ export interface GeoGeometry { type: 'Point' | 'LineString' | 'Polygon'; coordin
 export interface GeoFeature { id: string; name: string; description: string; geometries: GeoGeometry[]; properties: Record<string, string> }
 export interface GeographicLayer { id: string; tenantId: string; importId: string; name: string; filename: string; features: GeoFeature[]; createdBy: string; importedAt: string }
 export interface ImportResult { filename: string; features: GeoFeature[]; warnings: string[]; networkLinks?: string[] }
+export type GeographicImportDraft={preview:ImportResult;name:string};
 /** Todas las geometrías y partes de la importación, no solamente su primer punto. */
 export function layerCoordinates(layers: GeographicLayer[]): Coordinate[] {
   return layers.flatMap(layer=>layer.features.flatMap(feature=>feature.geometries.flatMap(geometry=>[...geometry.coordinates,...(geometry.holes||[]).flatMap(hole=>hole.coordinates)]))).filter(validLocation);

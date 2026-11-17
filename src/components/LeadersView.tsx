@@ -4,8 +4,9 @@ import { createRecordId } from '../lib/recordIds';
 import { parseLocation } from '../lib/territorialMaps';
 import { LocationPicker } from './common/LocationPicker';
 import React, { useState, useEffect } from 'react';
-import { Tenant, Leader, UserProfile, UserRole } from '../types';
-import { getTerritorialScope, filterLeadersByScope } from '../lib/permissions';
+import { Tenant, Leader, UserProfile, UserRole, Candidate } from '../types';
+import { getTerritorialScope, filterLeadersByScope,filterCandidatesByScope } from '../lib/permissions';
+import {candidateGoal,canEditElectoralData,electoralNumber} from '../lib/electoralTeam';
 import {
   DEPARTAMENTOS_COLOMBIA,
   getMunicipiosPorDepartamento,
@@ -36,6 +37,7 @@ interface LeadersViewProps {
   currentUser?: UserProfile | null;
   userRole?: UserRole;
   leaders: Leader[];
+  candidates?:Candidate[];
   onAddLeader: (leader: Leader) => Promise<void>;
 }
 
@@ -44,11 +46,18 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
   currentUser = null,
   userRole = 'Alcalde',
   leaders,
+  candidates=[],
   onAddLeader,
 }) => {
   const scope = getTerritorialScope(currentUser, userRole);
   const [showModal, setShowModal] = useState<boolean>(false);
   const [filterZone, setFilterZone] = useState<string>('TODOS');
+  const scopedCandidates=filterCandidatesByScope(candidates,currentUser,userRole,currentTenant.tenantId);
+  const preferredCandidate=()=>scopedCandidates.find(row=>row.id===currentUser?.assignedCandidateId)||scopedCandidates.find(row=>row.chamber===userRole)||scopedCandidates.find(row=>!row.parentCandidateId)||scopedCandidates[0];
+  const [candidateId,setCandidateId]=useState(()=>preferredCandidate()?.id||'');
+  const [assignedCandidateId,setAssignedCandidateId]=useState(()=>preferredCandidate()?.id||'');
+  useEffect(()=>{if(candidateId!=='all'&&!scopedCandidates.some(row=>row.id===candidateId))setCandidateId(preferredCandidate()?.id||'');},[candidateId,candidates,currentUser?.assignedCandidateId]);
+  const selectedCandidate=scopedCandidates.find(row=>row.id===candidateId);
 
   // Form state (Predictive & Proactive)
   const [fullName, setFullName] = useState('');
@@ -115,23 +124,27 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
     setVeredaOrBarrio(veredasInfo.veredas[0] || '');
   };
 
-  const scopedLeaders = filterLeadersByScope(leaders, currentUser, userRole, currentTenant.tenantId);
+  const authorizedLeaders = filterLeadersByScope(leaders, currentUser, userRole, currentTenant.tenantId);
+  const goal=selectedCandidate?candidateGoal(selectedCandidate,scopedCandidates,authorizedLeaders):null;
+  const scopedLeaders=goal?goal.team:authorizedLeaders;
+  const unassignedLeaders=authorizedLeaders.filter(row=>!row.assignedCandidateId||!scopedCandidates.some(candidate=>candidate.id===row.assignedCandidateId));
   const filteredLeaders = filterZone === 'TODOS'
     ? scopedLeaders
     : scopedLeaders.filter((l) => l.zoneOrDistrict === filterZone || l.municipality === filterZone);
 
   // Totals
-  const totalVoteTarget = scopedLeaders.reduce((acc, curr) => acc + curr.voteTarget, 0);
-  const totalVotesCommitted = scopedLeaders.reduce((acc, curr) => acc + curr.votesCommitted, 0);
-  const totalActivists = scopedLeaders.reduce((acc, curr) => acc + curr.activistsCount, 0);
-  const overallProgress = totalVoteTarget > 0 ? (totalVotesCommitted / totalVoteTarget) * 100 : 0;
+  const totalVoteTarget = scopedLeaders.reduce((acc, curr) => acc + electoralNumber(curr.voteTarget), 0);
+  const totalVotesCommitted = scopedLeaders.reduce((acc, curr) => acc + electoralNumber(curr.votesCommitted), 0);
+  const totalActivists = scopedLeaders.reduce((acc, curr) => acc + electoralNumber(curr.activistsCount), 0);
+  const progressTarget=goal?(goal.configured?goal.target:0):totalVoteTarget;
+  const overallProgress = progressTarget > 0 ? totalVotesCommitted / progressTarget * 100 : 0;
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     const target = Number(voteTarget);
     const committed = Number(votesCommitted || 0);
-    if (!fullName.trim() || !Number.isFinite(target) || target <= 0) {
+    if (!fullName.trim() || !Number.isSafeInteger(target) || target <= 0) {
       setFormError('Ingrese el nombre y una meta de votos mayor que cero.');
       return;
     }
@@ -139,6 +152,7 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
       setFormError('Ingrese un número entero de votos mayor o igual que cero. Puede superar la meta.');
       return;
     }
+    if(assignedCandidateId&&!scopedCandidates.some(row=>row.id===assignedCandidateId)){setFormError('Seleccione una candidatura de su ámbito autorizado.');return;}
     let location;
     try { location = parseLocation(latitude, longitude); }
     catch (error) { setFormError((error as Error).message); return; }
@@ -146,6 +160,7 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
     const leader: Leader = {
       id: createRecordId(currentTenant.tenantId, generatedDocId || 'lider'),
       tenantId: currentTenant.tenantId,
+      ...(assignedCandidateId?{assignedCandidateId}:{}),
       fullName: fullName.trim(),
       zoneOrDistrict,
       department,
@@ -184,7 +199,10 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
   return (
     <div className="space-y-6">
 
-      <h1 className="sr-only">Líderes y metas</h1><WorkspaceTools><button onClick={()=>setShowModal(true)} className="compact-button is-primary"><PlusCircle size={16}/>Nuevo líder</button><details className="app-popover"><summary className="compact-button">Ámbito</summary><div className="app-popover-panel"><p>{scope.canViewAllMunicipalities?'Cesar':scope.allowedMunicipality||'Astrea'} · {userRole} · {currentTenant.name}</p></div></details></WorkspaceTools>
+      <h1 className="sr-only">Líderes y metas</h1><WorkspaceTools>
+        <label className="electoral-team-choice"><span className="sr-only">Candidatura y equipo</span><select aria-label="Candidatura y equipo" title="Candidatura y equipo" value={candidateId||'all'} onChange={event=>{setCandidateId(event.target.value);setFilterZone('TODOS');}}><option value="all">Todos los equipos</option>{scopedCandidates.map(row=><option key={row.id} value={row.id}>{row.fullName} · {row.chamber}</option>)}</select></label>
+        {selectedCandidate&&canEditElectoralData(currentUser?.role||userRole)&&<EditRecordButton collection="candidatos" record={selectedCandidate} fieldKeys={['voteTarget']} label="Editar meta" title={`Meta general · ${selectedCandidate.fullName}`}/>}
+        <button onClick={()=>{setAssignedCandidateId(selectedCandidate?.id||'');setShowModal(true);}} className="compact-button is-primary"><PlusCircle size={16}/>Nuevo líder</button><details className="app-popover"><summary className="compact-button">Ayuda</summary><div className="app-popover-panel"><p>{scope.allowedDepartment||currentUser?.department||'Todos los departamentos autorizados'} · {scope.canViewAllMunicipalities?'Todos los municipios autorizados':scope.allowedMunicipality} · {userRole} · {currentTenant.name}</p><p className="mt-2">Cada líder se suma una vez. Las metas propias de candidaturas de apoyo permanecen independientes; elija su candidatura para compararlas.</p><p className="mt-2">Vincule líderes mediante «Candidatura asignada» en su ficha y candidaturas de apoyo mediante «Candidatura superior» en Candidaturas → Editar. Los vínculos determinan qué equipo se compara.</p></div></details></WorkspaceTools>
       <section aria-label="Indicadores de líderes" className="summary-first">      <div className="compact-metrics grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Líderes Activos</span>
@@ -193,28 +211,34 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Meta Total Votos</span>
-          <div className="text-2xl font-extrabold text-blue-400 font-mono">{totalVoteTarget.toLocaleString('es-CO')}</div>
-          <p className="text-[11px] text-slate-400">Sumatoria de compromisos territoriales</p>
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{goal?'Meta general de candidatura':'Metas de líderes'}</span>
+          <div className="text-2xl font-extrabold text-blue-400 font-mono">{goal?(goal.configured?goal.target.toLocaleString('es-CO'):'Sin definir'):totalVoteTarget.toLocaleString('es-CO')}</div>
+          <p className="text-[11px] text-slate-400">{selectedCandidate?.fullName||'Suma de metas individuales · elija una candidatura para editar su meta general'}</p>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Votos Fidelizados</span>
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Compromisos reportados</span>
           <div className="text-2xl font-extrabold text-emerald-400 font-mono">{totalVotesCommitted.toLocaleString('es-CO')}</div>
           <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
             <div
               className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-              style={{ width: `${overallProgress}%` }}
+              style={{ width: `${Math.min(100,overallProgress)}%` }}
             />
           </div>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Avance General</span>
-          <div className="text-2xl font-extrabold text-amber-300 font-mono">{overallProgress.toFixed(1)}%</div>
-          <p className="text-[11px] text-slate-400">Objetivo del comando central</p>
+          <div className="text-2xl font-extrabold text-amber-300 font-mono">{progressTarget>0?`${overallProgress.toFixed(1)}%`:goal?.configured?'—':'Sin meta'}</div>
+          <p className="text-[11px] text-slate-400">{goal?'Reportados por líderes / meta general':'Reportados / suma de metas individuales'}</p>
         </div>
-      </div></section>
+      </div>
+      {goal&&<div role="status" className={`candidate-goal-balance ${goal.configured&&goal.difference===0?'is-matched':''}`}>
+        <strong>{!goal.configured?'Defina la meta general de esta candidatura.':goal.difference<0?`Faltan ${(-goal.difference).toLocaleString('es-CO')} votos en las metas del equipo.`:goal.difference>0?`Las metas del equipo superan la meta general en ${goal.difference.toLocaleString('es-CO')} votos.`:'Las metas del equipo coinciden con la meta general.'}</strong>
+        <span>Metas de líderes: {goal.teamTarget.toLocaleString('es-CO')} · Meta general: {goal.configured?goal.target.toLocaleString('es-CO'):'sin definir'} · {goal.team.length} líderes · {goal.supporting.length} candidaturas de apoyo.</span>
+      </div>}
+      {!!unassignedLeaders.length&&<p className="text-xs text-amber-200">{unassignedLeaders.length} líderes sin candidatura vinculada dentro de este ámbito. Asigne «Candidatura asignada» al editar su ficha para incluirlos en la comparación.</p>}
+      </section>
       {/* Leaders Table & Cards */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-3">
@@ -384,6 +408,7 @@ export const LeadersView: React.FC<LeadersViewProps> = ({
                 />
               </div>
 
+              <label className="block text-slate-300 font-semibold">Candidatura asignada<select aria-label="Candidatura del nuevo líder" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-800 p-2.5" value={assignedCandidateId} onChange={event=>setAssignedCandidateId(event.target.value)}><option value="">Sin asignar</option>{scopedCandidates.map(row=><option key={row.id} value={row.id}>{row.fullName} · {row.chamber}</option>)}</select><span className="mt-1 block text-xs font-normal text-slate-400">La meta de este líder permanece independiente de la meta general.</span></label>
               {/* Departamento & Municipio Dropdowns */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>

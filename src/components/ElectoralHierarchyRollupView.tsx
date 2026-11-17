@@ -1,4 +1,5 @@
 import {WorkspaceTools} from './WorkspaceTools';
+import {candidatePeople,filterElectoralBase,EMPTY_ELECTORAL_FILTERS,electoralNumber} from '../lib/electoralTeam';
 import { EditRecordButton } from './common/EditRecordButton';
 import { createRecordId } from '../lib/recordIds';
 import { FormSaveStatus, useFirestoreForm } from './FormSaveStatus';
@@ -45,9 +46,9 @@ interface ElectoralHierarchyRollupViewProps {
 }
 
 export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupViewProps> = ({
-  candidates,
-  leaders,
-  grassrootsVoters,
+  candidates:allCandidates,
+  leaders:allLeaders,
+  grassrootsVoters:allVoters,
   currentUser,
   userRole = 'Alcalde',
   onAddVoter,
@@ -62,6 +63,18 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
   const [selectedCandidateId, setSelectedCandidateId] = useState<string>('all');
   const [selectedLeaderId, setSelectedLeaderId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedDepartment,setSelectedDepartment]=useState('all'),[selectedSector,setSelectedSector]=useState('all');
+  const source=useMemo(()=>({tenantId:currentUser?.tenantId||allCandidates[0]?.tenantId||allLeaders[0]?.tenantId||'',candidates:allCandidates,leaders:allLeaders,voters:allVoters}),[currentUser?.tenantId,allCandidates,allLeaders,allVoters]);
+  const filters={department:selectedDepartment,municipality:selectedMunicipality,candidateId:selectedCandidateId,leaderId:selectedLeaderId,sector:selectedSector};
+  const {candidates,leaders,voters:grassrootsVoters}=useMemo(()=>filterElectoralBase(source,filters),[source,selectedDepartment,selectedMunicipality,selectedCandidateId,selectedLeaderId,selectedSector]);
+  const departmentRows=filterElectoralBase(source,{...EMPTY_ELECTORAL_FILTERS,department:selectedDepartment});
+  const choiceRows=filterElectoralBase(source,{...filters,leaderId:'all',candidateId:'all',sector:'all'});
+  const leaderChoices=filterElectoralBase(source,{...filters,leaderId:'all'}).leaders;
+  const authorizedRows=filterElectoralBase(source,EMPTY_ELECTORAL_FILTERS);
+  const departments=[...new Set([...authorizedRows.candidates,...authorizedRows.leaders,...authorizedRows.voters].map(row=>row.department).filter((value):value is string=>!!value))].sort();
+  const sectors=[...new Set([...choiceRows.leaders.map(row=>row.veredaOrBarrio),...choiceRows.voters.map(row=>row.sector)].filter((value):value is string=>!!value))].sort();
+  const clearFilters=()=>{setSelectedDepartment('all');setSelectedMunicipality('all');setSelectedCandidateId('all');setSelectedLeaderId('all');setSelectedSector('all');setSearchQuery('');};
+  const registeredFor=(candidate:Candidate)=>candidatePeople(candidate,allCandidates,allLeaders,grassrootsVoters).length;
 
   // Registration Modal State
   const [isRegisterVoterOpen, setIsRegisterVoterOpen] = useState<boolean>(false);
@@ -81,7 +94,7 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
 
   // Extract Governor candidate (Top of hierarchy)
   const governorCandidate = useMemo(() => {
-    return candidates.find(c => c.electoralLevel === 'Gobernación') || candidates[0];
+    return candidates.find(c => c.electoralLevel === 'Gobernación');
   }, [candidates]);
 
   // Extract Assembly / Diputados candidates
@@ -102,60 +115,19 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
   // Municipalities list
   const municipalities = useMemo(() => {
     const set = new Set<string>();
-    candidates.forEach(c => {
+    departmentRows.candidates.forEach(c => {
       if (c.municipality && !c.municipality.includes('Todo el Departamento')) {
         set.add(c.municipality);
       }
     });
-    leaders.forEach(l => {
+    departmentRows.leaders.forEach(l => {
       if (l.municipality) set.add(l.municipality);
     });
-    grassrootsVoters.forEach(v => {
+    departmentRows.voters.forEach(v => {
       if (v.municipality) set.add(v.municipality);
     });
     return Array.from(set);
-  }, [candidates, leaders, grassrootsVoters]);
-
-  // Dynamic Hierarchical Roll-Up Metrics
-  const hierarchicalMetrics = useMemo(() => {
-    // Total Grassroots voters in system
-    const totalGrassroots = grassrootsVoters.length;
-
-    // Aggregated votes by Leader
-    const leaderVoteMap = new Map<string, number>();
-    grassrootsVoters.forEach(v => {
-      if (v.leaderId) {
-        leaderVoteMap.set(v.leaderId, (leaderVoteMap.get(v.leaderId) || 0) + 1);
-      }
-    });
-
-    // Aggregated votes by Concejal
-    const councilVoteMap = new Map<string, number>();
-    grassrootsVoters.forEach(v => {
-      if (v.candidateId) {
-        councilVoteMap.set(v.candidateId, (councilVoteMap.get(v.candidateId) || 0) + 1);
-      }
-    });
-
-    // Aggregated votes by Municipality (Alcaldía)
-    const municipalityVoteMap = new Map<string, number>();
-    grassrootsVoters.forEach(v => {
-      if (v.municipality) {
-        municipalityVoteMap.set(v.municipality, (municipalityVoteMap.get(v.municipality) || 0) + 1);
-      }
-    });
-
-    // Department total
-    const departmentTotalVotes = grassrootsVoters.length;
-
-    return {
-      totalGrassroots,
-      leaderVoteMap,
-      councilVoteMap,
-      municipalityVoteMap,
-      departmentTotalVotes
-    };
-  }, [grassrootsVoters]);
+  }, [allCandidates,allLeaders,allVoters,selectedDepartment]);
 
   // Sector Breakdown (Veredas / Barrios)
   const sectorSummaries = useMemo<SectorVolumeSummary[]>(() => {
@@ -199,8 +171,8 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
     });
 
     return Array.from(sectorMap.values()).map(item => {
-      const target = item.leaders.size > 0 ? item.leaders.size * 50 : 100;
-      const coveragePct = Math.min(100, Math.round((item.voters / Math.max(1, target)) * 100));
+      const target = leaders.filter(row=>item.leaders.has(row.id)).reduce((sum,row)=>sum+electoralNumber(row.voteTarget),0);
+      const coveragePct = target>0?Math.min(100, Math.round(item.voters / target * 100)):0;
       let status: SectorVolumeSummary['status'] = 'Requiere Refuerzo';
       if (coveragePct >= 100) status = 'Meta Superada';
       else if (coveragePct >= 70) status = 'En Rango';
@@ -209,7 +181,7 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
       return {
         sector: item.sector,
         municipality: item.municipality,
-        voterCensus: target * 4,
+        voterCensus: 0,
         targetVotes: target,
         committedVotes: item.voters,
         leadersCount: item.leaders.size,
@@ -222,9 +194,6 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
   // Filtered Voters for Table
   const filteredVoters = useMemo(() => {
     return grassrootsVoters.filter(voter => {
-      if (selectedMunicipality !== 'all' && voter.municipality !== selectedMunicipality) return false;
-      if (selectedCandidateId !== 'all' && voter.candidateId !== selectedCandidateId) return false;
-      if (selectedLeaderId !== 'all' && voter.leaderId !== selectedLeaderId) return false;
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
       return (
@@ -255,7 +224,7 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
       fullName: newVoterName.trim(),
       documentNumber: newVoterDoc.trim(),
       phone: newVoterPhone.trim() || 'No registrada',
-      department: 'Cesar',
+      department: assignedLeader?.department||assignedCandidate?.department||currentUser?.department||'',
       municipality: newVoterMun,
       sector: newVoterSector.trim(),
       pollingStation: newVoterPollingStation.trim() || 'Puesto Cabecera Municipal',
@@ -316,7 +285,16 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
 
   return (
     <div className="space-y-6 pb-12">
-      <h1 className="sr-only">Base territorial</h1><WorkspaceTools><button id="btn-register-grassroots-voter" onClick={()=>setIsRegisterVoterOpen(true)} className="compact-button is-primary"><Plus size={16}/>Registrar persona</button><button onClick={handleExportCSV} className="compact-button"><Download size={16}/>Exportar padrón</button></WorkspaceTools>
+      <h1 className="sr-only">Base territorial</h1><WorkspaceTools>
+        <details className="app-popover"><summary className="compact-button">Filtros{Object.values(filters).some(value=>value!=='all')?' · activos':''}</summary><div className="app-popover-panel electoral-filter-panel">
+          <label>Departamento<select aria-label="Departamento de la base" value={selectedDepartment} onChange={event=>{setSelectedDepartment(event.target.value);setSelectedMunicipality('all');setSelectedCandidateId('all');setSelectedLeaderId('all');setSelectedSector('all');}}><option value="all">Todos los departamentos autorizados</option>{departments.map(value=><option key={value}>{value}</option>)}</select></label>
+          <label>Municipio<select aria-label="Municipio de la base" value={selectedMunicipality} onChange={event=>{setSelectedMunicipality(event.target.value);setSelectedCandidateId('all');setSelectedLeaderId('all');setSelectedSector('all');}}><option value="all">Todos los municipios autorizados</option>{municipalities.map(value=><option key={value}>{value}</option>)}</select></label>
+          <label>Candidatura y equipo<select aria-label="Candidatura de la base" value={selectedCandidateId} onChange={event=>{setSelectedCandidateId(event.target.value);setSelectedLeaderId('all');}}><option value="all">Todas las candidaturas</option>{choiceRows.candidates.map(row=><option key={row.id} value={row.id}>{row.fullName} · {row.chamber}</option>)}</select></label>
+          <label>Líder<select aria-label="Líder de la base" value={selectedLeaderId} onChange={event=>setSelectedLeaderId(event.target.value)}><option value="all">Todos los líderes</option>{leaderChoices.map(row=><option key={row.id} value={row.id}>{row.fullName}</option>)}</select></label>
+          <label>Sector / vereda / barrio<select aria-label="Sector de la base" value={selectedSector} onChange={event=>{setSelectedSector(event.target.value);setSelectedLeaderId('all');}}><option value="all">Todos los sectores</option>{sectors.map(value=><option key={value}>{value}</option>)}</select></label>
+          <button type="button" className="compact-button" onClick={clearFilters}>Limpiar filtros</button><p className="text-xs text-slate-400">Los filtros actualizan indicadores, pirámide, sectores, padrón y exportación dentro de su acceso autorizado.</p>
+        </div></details>
+        <button id="btn-register-grassroots-voter" onClick={()=>setIsRegisterVoterOpen(true)} className="compact-button is-primary"><Plus size={16}/>Registrar persona</button><button onClick={handleExportCSV} className="compact-button"><Download size={16}/>Exportar padrón</button></WorkspaceTools>
       <section className="summary-first" aria-label="Resumen de la base territorial"><dl className="overview-stats"><div><dt>Personas registradas</dt><dd>{grassrootsVoters.length}</dd></div><div><dt>Líderes</dt><dd>{leaders.length}</dd></div><div><dt>Candidaturas</dt><dd>{candidates.length}</dd></div></dl></section>
       {/* Visual Interactive Hierarchy Pyramid */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5 shadow-lg">
@@ -327,14 +305,14 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
               Pirámide de Mando & Arrastre de Volumen Electoral
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Haz clic en cualquier nivel para desplegar los detalles y ver cómo los votos de cada concejal y líder suman verticalmente.
+              Haz clic en cualquier nivel para desplegar los detalles y ver las personas registradas en cada equipo vinculado, sin añadir de nuevo los compromisos declarados.
             </p>
           </div>
 
           {/* Quick Filter Buttons */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-thin">
             <button
-              onClick={() => { setSelectedHierarchyTier('all'); setSelectedMunicipality('all'); }}
+              onClick={() => setSelectedHierarchyTier('all')}
               className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 selectedHierarchyTier === 'all' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
@@ -389,7 +367,7 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                        Nivel Superior: Gobernación del Cesar
+                        Gobernación · {governorCandidate.department}
                       </span>
                     </div>
                     <h3 className="text-sm font-bold text-white mt-1">
@@ -402,13 +380,13 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
                   <div className="text-right">
                     <span className="text-xs text-slate-400">Meta Dptal: {governorCandidate.voteTarget?.toLocaleString()} votos</span>
                     <p className="text-base font-extrabold text-amber-400">
-                      {((governorCandidate.votesCommitted || 0) + hierarchicalMetrics.totalGrassroots).toLocaleString()} votos consolidados
+                      {registeredFor(governorCandidate).toLocaleString('es-CO')} personas registradas
                     </p>
                   </div>
                   <div className="w-28 bg-slate-700 rounded-full h-2.5 overflow-hidden">
                     <div
                       className="bg-amber-400 h-2.5 rounded-full"
-                      style={{ width: `${Math.min(100, Math.round((((governorCandidate.votesCommitted || 0) + hierarchicalMetrics.totalGrassroots) / (governorCandidate.voteTarget || 1)) * 100))}%` }}
+                      style={{ width: `${Math.min(100, Math.round(registeredFor(governorCandidate) / (governorCandidate.voteTarget || 1) * 100))}%` }}
                     ></div>
                   </div>
                 </div>
@@ -417,7 +395,7 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
           )}
 
           {/* LEVEL 2: Asamblea / Diputados */}
-          {(selectedHierarchyTier === 'all' || selectedHierarchyTier === 'Asamblea') && (
+          {assemblyCandidates.length>0&&(selectedHierarchyTier === 'all' || selectedHierarchyTier === 'Asamblea') && (
             <div className="bg-gradient-to-r from-indigo-950/40 via-slate-800/80 to-indigo-950/40 border border-indigo-500/40 rounded-2xl p-4 transition-all hover:border-indigo-400">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -440,11 +418,11 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
                   <div className="text-right">
                     <span className="text-xs text-slate-400">Sinergia con Gobernación</span>
                     <p className="text-base font-extrabold text-indigo-400">
-                      {assemblyCandidates.reduce((a, c) => a + (c.votesCommitted || 0), 0) + hierarchicalMetrics.totalGrassroots} votos
+                      {new Set(assemblyCandidates.flatMap(candidate=>candidatePeople(candidate,allCandidates,allLeaders,grassrootsVoters).map(person=>person.id))).size} personas registradas
                     </p>
                   </div>
                   <span className="text-xs px-2.5 py-1 bg-indigo-500/20 text-indigo-300 rounded-lg font-bold border border-indigo-500/30">
-                    {assemblyCandidates.length} Curules en disputa
+                    {assemblyCandidates.length} candidaturas
                   </span>
                 </div>
               </div>
@@ -452,19 +430,18 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
           )}
 
           {/* LEVEL 3: Alcaldías Municipales */}
-          {(selectedHierarchyTier === 'all' || selectedHierarchyTier === 'Alcaldia') && (
+          {mayoralCandidates.length>0&&(selectedHierarchyTier === 'all' || selectedHierarchyTier === 'Alcaldia') && (
             <div className="space-y-2">
               <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between px-2">
                 <span>Nivel Municipal: Candidatos a Alcaldías ({mayoralCandidates.length})</span>
-                <span className="text-emerald-400">Arrastre hacia Gobernación & Asamblea</span>
+                <span className="text-emerald-400">Equipos vinculados por candidatura</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 {mayoralCandidates.map((mayor) => {
-                  const munVoters = grassrootsVoters.filter(v => v.municipality === mayor.municipality).length;
-                  const totalCommitted = (mayor.votesCommitted || 0) + munVoters;
-                  const target = mayor.voteTarget || 10000;
-                  const pct = Math.min(100, Math.round((totalCommitted / target) * 100));
+                  const totalCommitted = registeredFor(mayor);
+                  const target = electoralNumber(mayor.voteTarget);
+                  const pct = target>0?Math.min(100, Math.round(totalCommitted / target * 100)):0;
 
                   return (
                     <div
@@ -484,14 +461,14 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
 
                       <div className="mt-3 space-y-1.5">
                         <div className="flex items-center justify-between text-[11px] text-slate-400">
-                          <span>Votos: {totalCommitted.toLocaleString()}</span>
-                          <span>Meta: {target.toLocaleString()}</span>
+                          <span>Personas: {totalCommitted.toLocaleString('es-CO')}</span>
+                          <span>Meta general: {target.toLocaleString('es-CO')}</span>
                         </div>
                         <div className="w-full bg-slate-700 rounded-full h-1.5 overflow-hidden">
                           <div className="bg-emerald-400 h-1.5 rounded-full" style={{ width: `${pct}%` }}></div>
                         </div>
                         <p className="text-[10px] text-slate-400 pt-1">
-                          {grassrootsVoters.filter(v => v.municipality === mayor.municipality).length} votantes registrados desde la base
+                          Registros de esta candidatura y sus equipos vinculados
                         </p>
                       </div>
                     </div>
@@ -502,19 +479,18 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
           )}
 
           {/* LEVEL 4: Concejales Municipales */}
-          {(selectedHierarchyTier === 'all' || selectedHierarchyTier === 'Concejo') && (
+          {councilCandidates.length>0&&(selectedHierarchyTier === 'all' || selectedHierarchyTier === 'Concejo') && (
             <div className="space-y-2 pt-2">
               <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between px-2">
                 <span>Nivel Corporación: Concejales & Listas Abiertas ({councilCandidates.length})</span>
-                <span className="text-blue-400">Alimentan Alcaldía & Asamblea</span>
+                <span className="text-blue-400">Apoyos según vínculos registrados</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {councilCandidates.map((council) => {
-                  const directVoters = grassrootsVoters.filter(v => v.candidateId === council.id).length;
-                  const total = (council.votesCommitted || 0) + directVoters;
-                  const target = council.voteTarget || 1200;
-                  const pct = Math.min(100, Math.round((total / target) * 100));
+                  const total = registeredFor(council);
+                  const target = electoralNumber(council.voteTarget);
+                  const pct = target>0?Math.min(100, Math.round(total / target * 100)):0;
 
                   return (
                     <div
@@ -536,12 +512,12 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
                           </div>
                           <h4 className="text-xs font-bold text-white mt-1">{council.fullName}</h4>
                         </div>
-                        <span className="text-xs font-bold text-blue-400">{total} votos</span>
+                        <span className="text-xs font-bold text-blue-400">{total} personas</span>
                       </div>
 
                       <div className="mt-2.5 pt-2 border-t border-slate-700/60 flex items-center justify-between text-[10px] text-slate-300">
                         <span>Meta Curul: {target}</span>
-                        <span className="text-emerald-400 font-semibold">{directVoters} votantes rasos directos</span>
+                        <span className="text-emerald-400 font-semibold">{total} personas del equipo</span>
                       </div>
                     </div>
                   );
@@ -561,24 +537,10 @@ export const ElectoralHierarchyRollupView: React.FC<ElectoralHierarchyRollupView
               Distribución Territorial por Sectores, Veredas & Barrios
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Monitoreo predictivo de metas de votos comprometidos por cada micro-sector geográfico.
+              Metas de líderes y personas registradas en los sectores del filtro actual.
             </p>
           </div>
 
-          {/* Municipality Selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Filtrar Municipio:</span>
-            <select
-              value={selectedMunicipality}
-              onChange={(e) => setSelectedMunicipality(e.target.value)}
-              className="bg-slate-800 border border-slate-700 text-xs text-white rounded-xl px-3 py-1.5 focus:outline-none focus:border-indigo-500"
-            >
-              <option value="all">Todos los Municipios</option>
-              {municipalities.map(m => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          </div>
         </div>
 
         {/* Sectors Grid/Cards */}

@@ -13,14 +13,15 @@ import { SatelliteRadarCanvas } from './SatelliteRadarCanvas';
 import { GoogleTerritorialMap } from './GoogleTerritorialMap';
 import { GeographicImportPanel } from './GeographicImportPanel';
 import { subscribeToCollection } from '../lib/firebase';
-import { importedPoints, layerCoordinates, geographicFeatureMatches, geographicProperty, type GeographicLayer } from '../lib/geographicImport';
+import { importedPoints, layerCoordinates, geographicFeatureMatches, geographicProperty, type GeographicLayer,type GeographicImportDraft } from '../lib/geographicImport';
 import {useTeamPositions} from './useTeamPositions';
 import {useRouteTracking} from './RouteTrackingProvider';
 import {teamLocations} from '../lib/teamLocations';
 import {TeamLocationList} from './TeamLocationList';
+import {canEditElectoralData} from '../lib/electoralTeam';
 
 interface Props {
-  candidates?:Candidate[]; onExit?:()=>void;
+  candidates?:Candidate[]; onExit?:()=>void;onUseRealData?:(draft?:GeographicImportDraft)=>void;initialImport?:GeographicImportDraft;onImportRestored?:()=>void;
   leaders?: Leader[]; vehicles?: TransportVehicle[]; tenantName?: string;
   tenantId: string; currentUser: UserProfile; userRole: UserRole; members?:UserProfile[]; readOnly?: boolean; onOpenTracking?: (routeId?:string) => void;
 }
@@ -28,18 +29,19 @@ const input = 'w-full min-w-0 rounded-lg border border-slate-700 bg-slate-950 p-
 const button = 'rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-40';
 const section = 'rounded-2xl border border-slate-800 bg-slate-900 p-4 sm:p-5';
 const EMPTY_GEOMETRY: Coordinate[] = [];
-export const TerritorialMapView: React.FC<Props> = ({ candidates=[],onExit,leaders = [], vehicles = [], members=[], tenantName = 'Organización', tenantId, currentUser, userRole, readOnly = false, onOpenTracking }) => {
+export const TerritorialMapView: React.FC<Props> = ({ candidates=[],onExit,onUseRealData,initialImport,onImportRestored,leaders = [], vehicles = [], members=[], tenantName = 'Organización', tenantId, currentUser, userRole, readOnly = false, onOpenTracking }) => {
   const scopedLeaders = useMemo(() => filterLeadersByScope(leaders, currentUser, userRole, tenantId), [leaders, currentUser, userRole, tenantId]);
   const scopedVehicles = useMemo(() => filterVehiclesByScope(vehicles, currentUser, userRole, tenantId), [vehicles, currentUser, userRole, tenantId]);
   const [geographicLayers,setGeographicLayers]=useState<GeographicLayer[]>([]);const [hiddenLayers,setHiddenLayers]=useState<Set<string>>(new Set());
-  useEffect(()=>readOnly?undefined:subscribeToCollection<GeographicLayer>('capas_geograficas',setGeographicLayers,[],tenantId),[tenantId,readOnly]);
-  const shownLayers=useMemo(()=>geographicLayers.filter(layer=>!hiddenLayers.has(layer.importId)),[geographicLayers,hiddenLayers]);
+  const [previewLayers,setPreviewLayers]=useState<GeographicLayer[]>([]);
+  useEffect(()=>{setGeographicLayers([]);return readOnly?undefined:subscribeToCollection<GeographicLayer>('capas_geograficas',setGeographicLayers,[],tenantId);},[tenantId,readOnly]);
+  const shownLayers=useMemo(()=>[...geographicLayers,...previewLayers].filter(layer=>!hiddenLayers.has(layer.importId)),[geographicLayers,previewLayers,hiddenLayers]);
   const tracking=useRouteTracking(), live=useTeamPositions(currentUser,tenantId,!readOnly);
   const administrator=isTrackingAdministrator(currentUser)&&!readOnly;
   const teams=useMemo(()=>teamLocations({viewer:administrator?currentUser:null,tenantId,leaders:scopedLeaders,vehicles:scopedVehicles,members,positions:live.positions,routes:tracking.routes,now:live.now}),[administrator,currentUser,tenantId,scopedLeaders,scopedVehicles,members,live.positions,tracking.routes,live.now]);
   const teamRows=useMemo(()=>mapTeams({viewer:currentUser,tenantId,leaders:scopedLeaders,members,positions:live.positions,teams,now:live.now}),[currentUser,tenantId,scopedLeaders,members,live.positions,teams,live.now]);
   const points = useMemo(() => [...(administrator?teamRows.flatMap(row=>row.point?[row.point]:[]):territoryPoints(scopedLeaders, scopedVehicles)),...importedPoints(shownLayers)], [administrator,teamRows,scopedLeaders, scopedVehicles,shownLayers]);
-  const [drawer,setDrawer]=useState<'filters'|'layers'|'teams'|'tools'|null>(null);
+  const [drawer,setDrawer]=useState<'filters'|'layers'|'teams'|'tools'|null>(initialImport?'layers':null);
   const [candidate,setCandidate]=useState('all'),[leader,setLeader]=useState('all'),[source,setSource]=useState('all');
   const [featureRef,setFeatureRef]=useState<{layerId:string;featureId:string}|null>(null),[placing,setPlacing]=useState(false);
   const [municipality, setMunicipality] = useState('todos'); const [zone, setZone] = useState('todos');
@@ -123,6 +125,7 @@ export const TerritorialMapView: React.FC<Props> = ({ candidates=[],onExit,leade
       <select aria-label="Mapa base" className="rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs" value={view} onChange={e=>setView(e.target.value as typeof view)}><option value="satellite">Satelital HD</option><option value="streets">Calles</option><option value="google">Google Maps</option></select>
       <button aria-expanded={drawer==='filters'} className={button} onClick={()=>setDrawer(drawer==='filters'?null:'filters')}><SlidersHorizontal size={15} className="mr-1 inline"/>Filtros</button>
       <button aria-expanded={drawer==='layers'} className={button} onClick={()=>setDrawer(drawer==='layers'?null:'layers')}><Layers size={15} className="mr-1 inline"/>Capas</button>
+      {!!previewLayers.length&&<button className={button} onClick={()=>{setPreviewLayers([]);setMapSelection(null);}}>Quitar vista previa</button>}
       {administrator&&<button aria-expanded={drawer==='teams'} className={button} onClick={()=>setDrawer(drawer==='teams'?null:'teams')}><Users size={15} className="mr-1 inline"/>Equipos</button>}
       <button aria-expanded={drawer==='tools'} className={button} onClick={()=>setDrawer(drawer==='tools'?null:'tools')}><Route size={15} className="mr-1 inline"/>Rutas</button>
     </header>
@@ -131,8 +134,8 @@ export const TerritorialMapView: React.FC<Props> = ({ candidates=[],onExit,leade
         {view==='google'?<GoogleTerritorialMap fill center={center} points={filtered} route={route?.geometry||EMPTY_GEOMETRY} geographicLayers={displayLayers} fitCoordinates={mapSelection?.coordinates} pickedLocation={picked} onSelectPoint={selectPoint} onPickLocation={pickLocation} onSelectFeature={selectFeature}/>
           :<SatelliteRadarCanvas fill center={center} points={filtered} selectedId={selectedId} layer={view} route={route?.geometry||EMPTY_GEOMETRY} geographicLayers={displayLayers} fitCoordinates={mapSelection?.coordinates} pickedLocation={picked} onSelectPoint={selectPoint} onPickLocation={pickLocation} onSelectFeature={selectFeature}/>}
       </div>
-      {drawer&&<aside aria-label="Opciones del mapa" className="absolute bottom-3 left-3 top-3 z-[1100] flex w-[min(400px,calc(100%-24px))] flex-col overflow-hidden rounded-2xl border border-slate-600 bg-slate-950/95 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-700 p-3"><h3 className="font-bold">{({filters:'Qué mostrar',layers:'Capas y archivos',teams:'Equipos por aspirante',tools:'Rutas y ubicaciones'})[drawer]}</h3><button aria-label="Cerrar opciones" className="rounded-lg p-2 hover:bg-slate-800" onClick={()=>setDrawer(null)}><X size={18}/></button></div>
+      <aside aria-label="Opciones del mapa" style={{display:drawer?undefined:'none'}} className="absolute bottom-3 left-3 top-3 z-[1100] flex w-[min(400px,calc(100%-24px))] flex-col overflow-hidden rounded-2xl border border-slate-600 bg-slate-950/95 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-700 p-3"><h3 className="font-bold">{drawer?({filters:'Qué mostrar',layers:'Capas y archivos',teams:'Equipos por aspirante',tools:'Rutas y ubicaciones'})[drawer]:'Capas y archivos'}</h3><button aria-label="Cerrar opciones" className="rounded-lg p-2 hover:bg-slate-800" onClick={()=>setDrawer(null)}><X size={18}/></button></div>
         <div className="min-h-0 space-y-4 overflow-auto overscroll-contain p-3">
           {(drawer==='filters'||drawer==='teams')&&<>
             <label className="block text-xs">Buscar<input aria-label="Buscar ubicación" className={'mt-1 '+input} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nombre, dato de la ficha, placa…"/></label>
@@ -154,7 +157,7 @@ export const TerritorialMapView: React.FC<Props> = ({ candidates=[],onExit,leade
             {filteredTeams.map(row=><div key={row.kind+'-'+row.id} className="rounded-xl border border-slate-700 bg-slate-900 p-3"><p className="text-sm font-semibold">{row.name}</p><p className="mt-1 text-xs text-slate-400">{row.kind==='leader'?'Líder':row.kind==='vehicle'?'Vehículo':'Integrante'} · {candidates.find(c=>c.id===row.candidateId)?.fullName||'Sin aspirante asignado'}</p><p className="mt-2 text-xs text-cyan-200">{row.status}</p>{row.point?.capturedAt&&<p className="mt-1 text-[11px] text-slate-400">Último reporte: {new Date(row.point.capturedAt).toLocaleString('es-CO')}</p>}<button disabled={!row.point} className={button+' mt-2'} onClick={()=>{if(row.point){selectPoint(row.point);setMapSelection({label:row.name,coordinates:[row.point],kind:'team'});}}}>{row.point?'Ver en mapa':'Sin coordenadas'}</button></div>)}
             {!filteredTeams.length&&<p className="text-sm text-slate-400">No hay equipos que coincidan con los filtros.</p>}
           </>}
-          <div hidden={drawer!=='layers'}><GeographicImportPanel tenantId={tenantId} layers={geographicLayers} hidden={hiddenLayers} onToggle={id=>setHiddenLayers(previous=>{const next=new Set(previous);next.has(id)?next.delete(id):next.add(id);return next;})} onViewLayer={parts=>{viewLayer(parts);setDrawer(null);}} onRoute={saved=>{viewRoute(saved);setDrawer(null);}} readOnly={readOnly}/></div>
+          <div hidden={drawer!=='layers'}><GeographicImportPanel tenantId={tenantId} layers={geographicLayers} hidden={hiddenLayers} onToggle={id=>setHiddenLayers(previous=>{const next=new Set(previous);next.has(id)?next.delete(id):next.add(id);return next;})} onViewLayer={parts=>{viewLayer(parts);setDrawer(null);}} onPreviewLayer={parts=>{setPreviewLayers(parts);if(parts.length){viewLayer(parts);setMessage('Vista previa local del archivo · todavía no se ha guardado.');setDrawer(null);}}} onRoute={saved=>{viewRoute(saved);setDrawer(null);}} readOnly={readOnly} onUseRealData={onUseRealData} initialImport={initialImport} onImportRestored={onImportRestored} canSave={canEditElectoralData(currentUser.role)}/></div>
           {drawer==='tools'&&<><div className="flex flex-wrap gap-2"><button className={button} aria-pressed={placing} onClick={()=>{setPlacing(!placing);setDrawer(null);}}>Elegir ubicación en mapa</button>{administrator&&<button className={button} onClick={()=>void useGPS()}>Mi ubicación GPS</button>}{administrator&&onOpenTracking&&<button className={button} onClick={()=>onOpenTracking()}>Recorridos y seguimiento</button>}</div>
                 <section className={section}>
         <h3 className="flex items-center gap-2 text-sm font-bold text-white"><MapPin size={18} />Ubicación seleccionada</h3>
@@ -183,8 +186,8 @@ export const TerritorialMapView: React.FC<Props> = ({ candidates=[],onExit,leade
       </section>
           </>}
         </div>
-      </aside>}
-      {selectedFeature&&selectedLayer&&<div className="absolute bottom-3 right-3 top-20 z-[1200] w-[min(420px,calc(100%-24px))]"><GeographicFeatureCard key={selectedLayer.id+'-'+selectedFeature.id} layer={selectedLayer} feature={selectedFeature} readOnly={readOnly} onClose={()=>{setFeatureRef(null);setSelectedId('');}}/></div>}
+      </aside>
+      {selectedFeature&&selectedLayer&&<div className="absolute bottom-3 right-3 top-20 z-[1200] w-[min(420px,calc(100%-24px))]"><GeographicFeatureCard key={selectedLayer.id+'-'+selectedFeature.id} layer={selectedLayer} feature={selectedFeature} readOnly={readOnly||previewLayers.some(layer=>layer.id===selectedLayer.id)||!canEditElectoralData(currentUser.role)} onClose={()=>{setFeatureRef(null);setSelectedId('');}}/></div>}
       {selected&&selected.type!=='import'&&!drawer&&<article aria-label="Ficha del equipo" className="absolute bottom-12 right-3 z-[1100] w-[min(360px,calc(100%-24px))] rounded-xl border border-slate-600 bg-slate-900 p-4 shadow-2xl"><button aria-label="Cerrar ficha de equipo" className="float-right p-1" onClick={()=>setSelectedId('')}><X size={18}/></button><h3 className="pr-6 font-bold">{selected.name}</h3><p className="mt-1 text-xs text-slate-400">{selected.subtitle} · {selected.municipality}</p><p className="mt-2 text-sm text-cyan-200">{selected.status}</p>{selected.capturedAt&&<p className="mt-1 text-xs">Última actualización: {new Date(selected.capturedAt).toLocaleString('es-CO')}</p>}<div className="mt-3 flex gap-2"><button className={button} onClick={()=>{addStop(selected,selected.name);setDrawer('tools');}}>Añadir a ruta</button><a className={button} href={googleLocationUrl(selected)} target="_blank" rel="noreferrer">Google Maps</a></div></article>}
       {placing&&<div className="absolute left-1/2 top-3 z-[1050] flex max-w-[70%] -translate-x-1/2 items-center gap-2 rounded-xl bg-amber-950 p-3 text-xs text-amber-100">Toque el mapa para elegir una ubicación.<button className="underline" onClick={()=>setPlacing(false)}>Terminar</button></div>}
       {message&&<div role="status" className="absolute bottom-12 left-3 z-[1300] flex max-w-[calc(100%-24px)] items-center gap-3 rounded-xl border border-cyan-700 bg-slate-950 p-3 text-xs text-cyan-100">{message}<button aria-label="Cerrar mensaje" onClick={()=>setMessage('')}><X size={16}/></button></div>}

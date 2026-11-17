@@ -5,7 +5,11 @@ import {initializeTestEnvironment} from '@firebase/rules-unit-testing';
 import {initializeApp,deleteApp} from 'firebase/app';
 import {createUserWithEmailAndPassword,signInWithEmailAndPassword,getAuth,connectAuthEmulator,signOut} from 'firebase/auth';
 import {doc,getDocFromServer,setDoc,getFirestore,connectFirestoreEmulator,terminate} from 'firebase/firestore';
-import {app,auth,db,createDemoCollection,persistEntity,saveCommitteeTask} from '../src/lib/firebase';
+import {app,auth,db,createDemoCollection,persistEntity,persistFirestoreBatch,saveCommitteeTask} from '../src/lib/firebase';
+import {candidateGoal} from '../src/lib/electoralTeam';
+import {parseKml,layerChunks} from '../src/lib/geographicImport';
+import {DOMParser} from '@xmldom/xmldom';
+import type {Candidate,Leader} from '../src/types';
 import {DEMO_COLLECTIONS,demoRows,updateDemoRecord,saveDemoEntity,saveDemoRegistration,saveDemoTask,promoteDemoRecord} from '../src/lib/demoWorkspace';
 import {demoOperationsStore} from '../src/lib/demoOperationsStore';
 import * as realOperations from '../src/lib/operationsStore';
@@ -119,6 +123,29 @@ test('Firestore persistence: all demo collections, operations, real edits and in
       await saveCommitteeTask(profile.tenantId,coordination.id,committee.id,{...task,completed:!task.completed});
       await updateCommitteeRecord(profile.tenantId,coordination.id,committee.id,undefined,{name:'Comité corregido'},committee as any);
       assert.equal((await getDocFromServer(doc(db,'comites_coordinaciones',coordination.id))).data()!.committees[0].name,'Comité corregido');
+    });
+    await t.test('General candidate targets preserve leader targets and imported KML survives a separate client',async()=>{
+      const b=await read(),candidate={...b.candidates[0],id:'persistence-team--goal',voteTarget:1000};delete candidate.parentCandidateId;
+      const child={...candidate,id:'persistence-team--support',parentCandidateId:candidate.id,voteTarget:300};
+      const team=[{...b.leaders[0],id:'persistence-team--goal-a',assignedCandidateId:candidate.id,voteTarget:400},{...b.leaders[1],id:'persistence-team--goal-b',assignedCandidateId:child.id,voteTarget:350}];
+      for(const row of [candidate,child])await persistEntity('candidatos',row.id,row);
+      for(const row of team)await persistEntity('lideres',row.id,row);
+      await updateOperationalRecord('candidatos',candidate.id,profile.tenantId,{voteTarget:900},candidate);
+      await assert.rejects(updateOperationalRecord('candidatos',candidate.id,profile.tenantId,{voteTarget:950},candidate),/Otra persona/);
+      await assert.rejects(updateOperationalRecord('candidatos',candidate.id,profile.tenantId,{voteTarget:3.5}),/entero/);
+      const kml='<kml><Placemark><name>Prueba geográfica</name><Point><coordinates>-73.9785,9.4981</coordinates></Point></Placemark><Placemark><name>Ruta de prueba</name><LineString><coordinates>-73.9785,9.4981 -73.977,9.499</coordinates></LineString></Placemark></kml>';
+      const imported={...parseKml(kml,new DOMParser() as unknown as globalThis.DOMParser),filename:'verificacion.kml'},layers=layerChunks(imported,profile.tenantId,'Mapa de prueba',user.uid);
+      await persistFirestoreBatch(profile.tenantId,layers.map(row=>({collection:'capas_geograficas',id:row.id,type:'set',data:row})));
+      const second=initializeApp(app.options,`goals-and-map-${Date.now()}`),secondAuth=getAuth(second),secondDb=getFirestore(second);
+      connectAuthEmulator(secondAuth,'http://127.0.0.1:9098',{disableWarnings:true});connectFirestoreEmulator(secondDb,'127.0.0.1',8088);
+      try{
+        await signInWithEmailAndPassword(secondAuth,email,password);
+        const fresh=(await getDocFromServer(doc(secondDb,'candidatos',candidate.id))).data() as Candidate;
+        const freshLeaders=await Promise.all(team.map(async row=>(await getDocFromServer(doc(secondDb,'lideres',row.id))).data() as Leader));
+        assert.equal(fresh.voteTarget,900);assert.deepEqual(freshLeaders.map(row=>row.voteTarget),[400,350]);assert.equal((await getDocFromServer(doc(secondDb,'candidatos',child.id))).data()!.voteTarget,300);
+        assert.equal(candidateGoal(fresh,[fresh,child],freshLeaders).difference,-150);
+        assert.deepEqual((await getDocFromServer(doc(secondDb,'capas_geograficas',layers[0].id))).data()!.features,imported.features);
+      }finally{await signOut(secondAuth);await terminate(secondDb);await deleteApp(second);}
     });
     await t.test('A separate client without cache sees the exact stored bundle',async()=>{
       const expected=await read(),second=initializeApp(app.options,`independent-${Date.now()}`),secondAuth=getAuth(second),secondDb=getFirestore(second);
