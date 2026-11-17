@@ -1,4 +1,5 @@
 import {WriteAccessProvider} from './components/WriteAccess';
+import type {GeographicImportDraft} from './lib/geographicImport';
 import {setOperationMetricsScope} from './lib/operationMetrics';
 import {FinanceWorkspaceView} from './components/FinanceWorkspaceView';
 import {ElectoralEvidenceView} from './components/ElectoralEvidenceView';
@@ -120,6 +121,8 @@ export default function App() {
   const navigation = useModuleNavigation(currentUser ? JSON.stringify([currentUser.uid, currentUser.role]) : null, selectedTenantId);
   const { activeTab, navigate } = navigation;
   const [routeToOpen,setRouteToOpen]=useState('');
+  const [geographicDraft,setGeographicDraft]=useState<(GeographicImportDraft&{uid:string;tenantId:string;role:string})|null>(null);
+  useEffect(()=>setGeographicDraft(null),[currentUser?.uid,selectedTenantId,currentUser?.role]);
   useEffect(()=>{if(activeTab!=='routes')setRouteToOpen('');},[activeTab]);
 
   // Auth modal state
@@ -709,6 +712,7 @@ export default function App() {
 
           {currentUser && activeTab === 'hierarchy_pyramid' && (
             <ElectoralHierarchyRollupView
+              key={`${currentUser.uid}-${currentTenant.tenantId}`}
               currentUser={demoViewUser}
               userRole={userRole}
               grassrootsVoters={visibleVoters}
@@ -753,11 +757,14 @@ export default function App() {
 
           {currentUser && activeTab === 'map' && (
             <TerritorialMapView
-              key={`${currentTenant.tenantId}-${demoActive ? 'demo' : 'real'}`}
+              key={`${currentUser.uid}-${currentTenant.tenantId}`}
               tenantId={currentTenant.tenantId}
               currentUser={currentUser}
               userRole={userRole}
               readOnly={demoActive}
+              initialImport={geographicDraft?.uid===currentUser.uid&&geographicDraft.tenantId===currentTenant.tenantId&&geographicDraft.role===currentUser.role?geographicDraft:undefined}
+              onImportRestored={()=>setGeographicDraft(null)}
+              onUseRealData={draft=>{setGeographicDraft(draft?{...draft,uid:currentUser.uid,tenantId:currentTenant.tenantId,role:currentUser.role}:null);setDemoEnabled(false);}}
               members={[currentUser,...users]}
               candidates={visibleCandidates}
               onExit={navigation.back}
@@ -791,10 +798,12 @@ export default function App() {
 
           {currentUser && activeTab === 'leaders' && (
             <LeadersView
+              key={`${currentUser.uid}-${currentTenant.tenantId}`}
               currentTenant={currentTenant}
               currentUser={currentUser}
               userRole={userRole}
               leaders={visibleLeaders}
+              candidates={visibleCandidates}
               onAddLeader={handleAddLeader}
             />
           )}
