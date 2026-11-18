@@ -33,6 +33,12 @@ test('two seats use quotient and remainders; blank majority cannot certify a win
   assert.equal(calculation.result.thresholdVotes, 151);
   assert.match(simulateElection({ ...input([300, 100]), blankPct: 60 }).issues.join(' '), /blanco/);
 });
+
+test('An exact Senate or ordinary corporation threshold is sufficient; the two-seat exception remains strict',()=>{
+ const senate=simulateElection({...input([970,30]),level:'Senado de la República',seats:3});assert.equal(senate.result.thresholdVotes,30);assert.equal(senate.result.allocationsByParty.find(row=>row.totalVotes===30)?.passedThreshold,true);
+ const council=simulateElection({...input([900,100]),seats:5});assert.equal(council.result.thresholdVotes,100);assert.equal(council.result.allocationsByParty.find(row=>row.totalVotes===100)?.passedThreshold,true);
+ const two=simulateElection({...input([850,150]),seats:2});assert.equal(two.result.thresholdVotes,151);assert.equal(two.result.allocationsByParty.find(row=>row.totalVotes===150)?.passedThreshold,false);
+});
 test('scenario toggles are deterministic and restore validation respects the tenant', () => {
   const base = { ...input(), turnout: 55 };
   assert.deepEqual(buildScenario(base, 'optimista'), buildScenario(base, 'optimista'));

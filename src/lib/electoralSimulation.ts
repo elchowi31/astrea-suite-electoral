@@ -22,7 +22,7 @@ export function distributeVotes(parties: DhondtSimulationParty[], budget: number
   [...shares].sort((a, b) => b.fraction - a.fraction || a.index - b.index).forEach(row => {
     if (remaining-- > 0) shares[row.index].votes++;
   });
-  return parties.map((party, index) => ({ ...party, votes: shares[index].votes, candidateVotes: undefined }));
+  return parties.map((party, index) => ({ ...party, votes: shares[index].votes, candidateVotes:party.listKind==='closed'?party.candidateVotes:undefined }));
 }
 
 export function getVoteBudget(census: number, turnout: number, nullPct: number, unmarkedPct: number, blankPct: number) {
@@ -48,21 +48,26 @@ export function simulateElection(input: ElectionParameters): { result: DhondtSim
   if (sum !== budget) issues.push(`Las listas suman ${sum.toLocaleString('es-CO')} votos; deben sumar ${budget.toLocaleString('es-CO')}. Ajuste los votos o use «Ajustar al total».`);
   if (!totalValidVotes) issues.push('No hay votos válidos para repartir.');
   if (!isSingle && parties.some(party => party.candidatesCount !== undefined && (!Number.isInteger(party.candidatesCount) || party.candidatesCount < 1))) issues.push('Revise el número de candidatos habilitados de cada lista.');
+  if(parties.some(party=>party.listKind!==undefined&&!['open','closed'].includes(party.listKind)))issues.push('Revise el tipo de lista.');
+  if(parties.some(party=>party.candidateVotes&&(party.candidateVotes.some(member=>!member.name.trim()||!Number.isSafeInteger(member.position)||member.position<1||!Number.isSafeInteger(member.votes)||member.votes<0)||new Set(party.candidateVotes.map(member=>member.position)).size!==party.candidateVotes.length||(party.listKind!=='closed'&&party.candidateVotes.reduce((sum,member)=>sum+member.votes,0)>party.votes))))issues.push('Revise los aspirantes y votos individuales de la lista.');
   if (blankVotes > totalValidVotes / 2) issues.push('El voto en blanco supera la mitad de los votos válidos; este escenario requiere evaluar la repetición electoral.');
   const quotient = seats > 0 ? totalValidVotes / seats : 0;
-  const thresholdExact = isSingle ? 0 : level === 'Senado de la República' ? totalValidVotes * 0.03 : quotient * (seats === 2 ? 0.3 : 0.5);
-  const thresholdVotes = isSingle ? 0 : Math.floor(thresholdExact) + 1;
+  // RNEC Circular Única v4 §39.15.2: alcanzar el umbral habilita el reparto.
+  // La excepción de dos curules exige superar estrictamente el 30% del cociente (§39.15.1.2).
+  const thresholdVotes = isSingle ? 0 : level==='Senado de la República'?Math.ceil(totalValidVotes*3/100):seats===2?Math.floor(totalValidVotes*3/(seats*10))+1:Math.ceil(totalValidVotes/(seats*2));
   const passed = parties.filter(party => party.votes > 0 && (isSingle || party.votes >= thresholdVotes));
   const failed = parties.filter(party => !passed.includes(party));
+  const thresholdException=!isSingle&&!passed.length&&parties.some(party=>party.votes>0);
+  const eligible=thresholdException?parties.filter(party=>party.votes>0):passed;
   const steps: DhondtQuotientStep[] = [];
-  if (!issues.length && passed.length) {
+  if (!issues.length && eligible.length) {
     if (isSingle) {
-      const sorted = [...passed].sort((a, b) => b.votes - a.votes);
+      const sorted = [...eligible].sort((a, b) => b.votes - a.votes);
       if (sorted[0].votes === sorted[1]?.votes) issues.push('Hay empate en el primer lugar; la simulación no decide el desempate.');
       else steps.push({ partyId: sorted[0].id, partyName: sorted[0].name, partyColor: sorted[0].color, divisor: 1, quotient: sorted[0].votes, isSeatWinner: true, seatWonNumber: 1 });
     } else if (seats === 2) {
       // Cociente y mayores residuos para la excepción constitucional de dos curules.
-      const base = passed.map(party => ({ party, seats: Math.floor(party.votes / quotient), remainder: party.votes % quotient }));
+      const base = eligible.map(party => ({ party, seats: Math.floor(party.votes / quotient), remainder: party.votes % quotient }));
       let remaining = seats - base.reduce((acc, row) => acc + row.seats, 0);
       const sorted = [...base].sort((a, b) => b.remainder - a.remainder);
       if (remaining > 0 && remaining < sorted.length && sorted[remaining - 1].remainder === sorted[remaining].remainder) issues.push('Hay empate en los residuos que definen la última curul.');
@@ -70,7 +75,7 @@ export function simulateElection(input: ElectionParameters): { result: DhondtSim
       let number = 1;
       base.forEach(({ party, seats: count }) => { for (let i = 0; i < count; i++) steps.push({ partyId: party.id, partyName: party.name, partyColor: party.color, divisor: i + 1, quotient, isSeatWinner: true, seatWonNumber: number++ }); });
     } else {
-      passed.forEach(party => {
+      eligible.forEach(party => {
         const limit = Math.min(seats, party.candidatesCount ?? seats);
         for (let divisor = 1; divisor <= limit; divisor++) steps.push({ partyId: party.id, partyName: party.name, partyColor: party.color, divisor, quotient: party.votes / divisor, isSeatWinner: false });
       });
@@ -80,7 +85,6 @@ export function simulateElection(input: ElectionParameters): { result: DhondtSim
       else steps.slice(0, seats).forEach((step, index) => { step.isSeatWinner = true; step.seatWonNumber = index + 1; });
     }
   }
-  if (!issues.length && !passed.length) issues.push('Ninguna lista supera el umbral; se requiere revisar el escenario y la regla aplicable.');
   if (!issues.length && steps.filter(step => step.isSeatWinner).length !== seats) issues.push('El modelo no logró cubrir todas las curules con las listas habilitadas.');
   if (issues.length) steps.forEach(step => { step.isSeatWinner = false; step.seatWonNumber = undefined; });
   const winning = steps.filter(step => step.isSeatWinner);
@@ -93,7 +97,7 @@ export function simulateElection(input: ElectionParameters): { result: DhondtSim
       surplusVotes: cifraRepartidora ? party.votes - cifraRepartidora * won.length : 0, passedThreshold: passed.includes(party) };
   });
   const user = allocationsByParty.find(party => party.isUserParty);
-  return { issues, result: { totalCensus: census, totalVoters, turnoutPercentage: turnout, blankVotes, nullVotes, unmarkedVotes, totalValidVotes,
+  return { issues, result: { thresholdException,totalCensus: census, totalVoters, turnoutPercentage: turnout, blankVotes, nullVotes, unmarkedVotes, totalValidVotes,
     thresholdPercentage: totalValidVotes ? thresholdVotes / totalValidVotes * 100 : 0, thresholdVotes, quotient, seatsInContest: seats,
     electoralThresholdPassedParties: passed, electoralThresholdFailedParties: failed, allocationsByParty, dhondtMatrix: steps, cifraRepartidora,
     userPartySeats: user?.seatsWon ?? 0,

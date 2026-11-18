@@ -422,6 +422,7 @@ export interface DhondtSimulationParty {
   color: string;
   candidatesCount?: number;
   candidateVotes?: { id: string; name: string; position: number; votes: number }[];
+  listKind?: 'open'|'closed';
 }
 
 export interface DhondtQuotientStep {
@@ -435,6 +436,7 @@ export interface DhondtQuotientStep {
 }
 
 export interface DhondtSimulationResult {
+  thresholdException?: boolean;
   totalCensus: number;
   totalVoters: number;
   turnoutPercentage: number;

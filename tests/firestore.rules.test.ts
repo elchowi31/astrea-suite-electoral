@@ -24,6 +24,34 @@ after(async()=>{if (env) await env.cleanup();});
 const check=(name:string,fn:()=>Promise<void>)=>test(name,{skip:!enabled},fn);
 const dbFor=(uid:string)=>env.authenticatedContext(uid,{email:`${uid}@test.invalid`}).firestore();
 
+check('Territorial goals persist separately from leader targets, require revisions and isolate personal demo goals',async()=>{
+ const admin=dbFor('admin'),id='team-a--territorial--real--cesar--astrea',base={id,tenantId:'team-a',department:'Cesar',municipality:'Astrea',mode:'real',ownerId:'admin',targetVotes:500,revision:1,updatedAt:'2026-11-17',updatedBy:'admin'};
+ await assertSucceeds(setDoc(doc(admin,'metas_territoriales',id),base));
+ await assertSucceeds(updateDoc(doc(admin,'metas_territoriales',id),{targetVotes:750,revision:2}));
+ const saved=await assertSucceeds(getDoc(doc(admin,'metas_territoriales',id)));if(saved.data()?.targetVotes!==750)throw Error('Target not preserved');
+ await assertFails(updateDoc(doc(admin,'metas_territoriales',id),{targetVotes:900,revision:2}));
+ await assertFails(updateDoc(doc(admin,'metas_territoriales',id),{targetVotes:-1,revision:3}));
+ await assertFails(updateDoc(doc(admin,'metas_territoriales',id),{municipality:'Other',revision:3}));
+ for(const uid of ['operator','reader','other','inactive'])await assertFails(updateDoc(doc(dbFor(uid),'metas_territoriales',id),{targetVotes:900,revision:3,updatedBy:uid}));
+ const demoId='team-a--territorial--demo--admin--astrea';await assertSucceeds(setDoc(doc(admin,'metas_territoriales',demoId),{...base,id:demoId,mode:'demo'}));
+ await assertFails(getDoc(doc(dbFor('operator'),'metas_territoriales',demoId)));await assertFails(getDoc(doc(dbFor('other'),'metas_territoriales',id)));
+ await assertSucceeds(getDocs(query(collection(admin,'metas_territoriales'),where('tenantId','==','team-a'),where('mode','==','demo'),where('ownerId','==','admin'))));
+});
+check('Form designs are private to the owner and tenant with optimistic revisions',async()=>{
+ const id='team-a--form-check',admin=dbFor('admin'),row={id,tenantId:'team-a',ownerId:'admin',kind:'form-design',name:'Administrative form',mimeType:'application/vnd.astrea.form-design',category:'Diseño de formulario',summary:'Draft',syncedAt:'2026-11-17',revision:1,design:{title:'Registration',description:'Purpose',questions:[{id:'12345678',title:'Contact',type:'short',required:true,options:[],help:''}]},reviewed:false};
+ await assertSucceeds(setDoc(doc(admin,'formularios_diseno',id),row));await assertSucceeds(updateDoc(doc(admin,'formularios_diseno',id),{revision:2,reviewed:true}));
+ await assertSucceeds(getDocs(query(collection(admin,'formularios_diseno'),where('tenantId','==','team-a'),where('ownerId','==','admin'))));
+ for(const uid of ['operator','other','reader']){await assertFails(getDoc(doc(dbFor(uid),'formularios_diseno',id)));await assertFails(updateDoc(doc(dbFor(uid),'formularios_diseno',id),{revision:3,ownerId:uid}));}
+ await assertFails(updateDoc(doc(admin,'formularios_diseno',id),{revision:2}));await assertFails(updateDoc(doc(admin,'formularios_diseno',id),{revision:3,accessToken:'forbidden'}));
+});
+check('Calendar preferences bind an owner and selected Google account, and cannot store access tokens',async()=>{
+ const id='team-a--calendar-check',admin=dbFor('admin'),row={id,tenantId:'team-a',ownerId:'admin',googleUid:'separate-google-account',calendarId:'secondary-calendar',updatedAt:'2026-11-17'};
+ await assertSucceeds(setDoc(doc(admin,'workspace_conexiones',id),row));await assertSucceeds(updateDoc(doc(admin,'workspace_conexiones',id),{calendarId:'another-calendar'}));
+ const read=await assertSucceeds(getDoc(doc(admin,'workspace_conexiones',id)));if(read.data()?.calendarId!=='another-calendar')throw Error('Calendar selection not persisted');
+ await assertFails(updateDoc(doc(admin,'workspace_conexiones',id),{googleUid:'replaced'}));await assertFails(updateDoc(doc(admin,'workspace_conexiones',id),{accessToken:'forbidden'}));
+ for(const uid of ['operator','other','reader'])await assertFails(getDoc(doc(dbFor(uid),'workspace_conexiones',id)));
+});
+
 check('Offline receipts are immutable, scoped to the actor and cannot carry form data',async()=>{
   const db=dbFor('operator');
   const ref=doc(db,'usuarios/operator/mutaciones_offline/receipt-one');

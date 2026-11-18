@@ -7,6 +7,12 @@ export const DEFAULT_REWARDS: RewardConfig = {
   farms: Array.from({length:100},(_,i)=>({id:`farm-${i+1}`,name:`Granja ${i+1}`,fruit:i===0?'Naranjas':i===1?'Manzanas':'Frutas',production:i===0?20:i===1?300:8,targetHoursPerTeam:500,manualHours:Array(10).fill(null)})),
 };
 const cents=(value:number)=>Math.round(value*100);
+/** Explicitly selected sample in a new plan, never a replacement of stored work. */
+export function sampleRewardConfig():RewardConfig{
+ const plan=structuredClone(DEFAULT_REWARDS);plan.farmCount=4;
+ const samples=[{fruit:'Naranjas',production:20,target:500,hours:[300,400,250]},{fruit:'Manzanas',production:300,target:2000,hours:[1800,2200,1400]},{fruit:'Mangos',production:60,target:800,hours:[900,600,800]},{fruit:'Limones',production:40,target:600,hours:[450,650,300]}];
+ samples.forEach((row,index)=>{plan.farms[index]={...plan.farms[index],name:`Granja de muestra ${index+1}`,fruit:row.fruit,production:row.production,targetHoursPerTeam:row.target,manualHours:[...row.hours,...Array(7).fill(null)]};});return plan;
+}
 export function validHours(value:unknown): value is number { return typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=1_000_000&&Math.abs(value*100-Math.round(value*100))<0.000001; }
 /** Largest remainders, stable tie break by row. Integer input/output preserves the total. */
 export function apportion(total:number,weights:number[]):number[]{

@@ -859,7 +859,7 @@ export default function App() {
           )}
 
           {currentUser && activeTab === 'ai' && (
-            <AiAssistantView
+            <AiAssistantView key={`${currentTenant.tenantId}-${currentUser.uid}-${demoActive}`}
               currentTenant={currentTenant}
               candidates={visibleCandidates}
               districts={visibleDistricts}
