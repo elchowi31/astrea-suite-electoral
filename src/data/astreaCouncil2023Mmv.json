@@ -1,0 +1,584 @@
+{
+  "municipality": "Astrea",
+  "department": "Cesar",
+  "year": 2023,
+  "level": "Concejo Municipal",
+  "seats": 11,
+  "census": 16558,
+  "voters": 11827,
+  "blankVotes": 74,
+  "nullVotes": 257,
+  "unmarkedVotes": 263,
+  "validVotes": 11307,
+  "partyVotes": 11233,
+  "tables": 52,
+  "source": "Registraduría Nacional del Estado Civil · Archivo mesa a mesa (MMV) · Elecciones territoriales 2023",
+  "sourceUrl": "https://observatorio.registraduria.gov.co/views/electoral/historicos-resultados.php",
+  "downloadUrl": "https://observatorio.registraduria.gov.co/comprimidos/MMV_TERRITORIALES2023_CESAR.zip",
+  "referenceDate": "2023-10-29",
+  "seatsSource": "https://www.registraduria.gov.co/IMG/pdf/20230719_curules-concejo.pdf",
+  "parties": [
+    {
+      "code": "00008",
+      "name": "PARTIDO DE LA UNIÓN POR LA GENTE - PARTIDO DE LA U",
+      "votes": 2602,
+      "partyOnlyVotes": 77,
+      "candidatesCount": 11,
+      "candidates": [
+        {
+          "code": "00001",
+          "name": "JOSE ALFREDO RIVERA BARRIOS",
+          "votes": 620,
+          "nameAvailable": true
+        },
+        {
+          "code": "00002",
+          "name": "LUIS CARLOS RODRIGUEZ POLANCO",
+          "votes": 562,
+          "nameAvailable": true
+        },
+        {
+          "code": "00003",
+          "name": "WILLIAN ZARABANDA DOMINGUEZ",
+          "votes": 216,
+          "nameAvailable": true
+        },
+        {
+          "code": "00004",
+          "name": "JOSE DANILO GAVIRIA JARAMILLO",
+          "votes": 87,
+          "nameAvailable": true
+        },
+        {
+          "code": "00005",
+          "name": "JOSE GREGORIO MEJIA MATUTE",
+          "votes": 35,
+          "nameAvailable": true
+        },
+        {
+          "code": "00006",
+          "name": "MASIEL ZAMIRA MEJIA ESPAÑA",
+          "votes": 9,
+          "nameAvailable": true
+        },
+        {
+          "code": "00007",
+          "name": "MILENA CORREA VIDES",
+          "votes": 182,
+          "nameAvailable": true
+        },
+        {
+          "code": "00008",
+          "name": "JOSE CARLOS MATUTE TERNERA",
+          "votes": 242,
+          "nameAvailable": true
+        },
+        {
+          "code": "00009",
+          "name": "GLADYS MARIA ARRIETA MOJICA",
+          "votes": 35,
+          "nameAvailable": true
+        },
+        {
+          "code": "00010",
+          "name": "PEDRO MANUEL CARCAMO BLANCO",
+          "votes": 150,
+          "nameAvailable": true
+        },
+        {
+          "code": "00011",
+          "name": "BLANCA LORENA TORRES ALCENDRA",
+          "votes": 387,
+          "nameAvailable": true
+        }
+      ]
+    },
+    {
+      "code": "00002",
+      "name": "PARTIDO CONSERVADOR COLOMBIANO",
+      "votes": 2199,
+      "partyOnlyVotes": 63,
+      "candidatesCount": 10,
+      "candidates": [
+        {
+          "code": "00001",
+          "name": "JULIO ENRIQUE SALAS URBAY",
+          "votes": 294,
+          "nameAvailable": true
+        },
+        {
+          "code": "00002",
+          "name": "SAMUEL ENRIQUE RAMIREZ TROYE",
+          "votes": 457,
+          "nameAvailable": true
+        },
+        {
+          "code": "00003",
+          "name": "EDUARDO ENRIQUE JINETE ZAPATA",
+          "votes": 396,
+          "nameAvailable": true
+        },
+        {
+          "code": "00004",
+          "name": "ROSA ISELA SEPULVEDA RAMIREZ",
+          "votes": 38,
+          "nameAvailable": true
+        },
+        {
+          "code": "00005",
+          "name": "OVER ALONSO CARRILLO GOMEZ",
+          "votes": 451,
+          "nameAvailable": true
+        },
+        {
+          "code": "00006",
+          "name": "NASARIO RAFAEL ARIAS",
+          "votes": 28,
+          "nameAvailable": true
+        },
+        {
+          "code": "00007",
+          "name": "SORAYA BEATRIZ MUÑOZ JIMENEZ",
+          "votes": 13,
+          "nameAvailable": true
+        },
+        {
+          "code": "00008",
+          "name": "ROSMERYS DE JESUS RIVERA DIAZ",
+          "votes": 11,
+          "nameAvailable": true
+        },
+        {
+          "code": "00009",
+          "name": "VICTOR DANILO PACHECO GOMEZ",
+          "votes": 112,
+          "nameAvailable": true
+        },
+        {
+          "code": "00010",
+          "name": "ODILSON MUÑOZ CASTILLO",
+          "votes": 336,
+          "nameAvailable": true
+        }
+      ]
+    },
+    {
+      "code": "00003",
+      "name": "PARTIDO CAMBIO RADICAL",
+      "votes": 1790,
+      "partyOnlyVotes": 44,
+      "candidatesCount": 10,
+      "candidates": [
+        {
+          "code": "00001",
+          "name": "INES PUERTAS RODRIGUEZ",
+          "votes": 367,
+          "nameAvailable": true
+        },
+        {
+          "code": "00002",
+          "name": "JUAN ROBERTO DIAZ AMARIS",
+          "votes": 19,
+          "nameAvailable": true
+        },
+        {
+          "code": "00003",
+          "name": "LUIS ALBERTO DAZA GUETTE",
+          "votes": 152,
+          "nameAvailable": true
+        },
+        {
+          "code": "00004",
+          "name": "WILSON ALFONSO FLOREZ OROZCO",
+          "votes": 59,
+          "nameAvailable": true
+        },
+        {
+          "code": "00005",
+          "name": "GLADIS MERCEDES QUINTANA GARCIA",
+          "votes": 27,
+          "nameAvailable": true
+        },
+        {
+          "code": "00006",
+          "name": "JUAN LUIS ANGULO ANDRADE",
+          "votes": 144,
+          "nameAvailable": true
+        },
+        {
+          "code": "00007",
+          "name": "HENRY BARRIOS RIVERA",
+          "votes": 259,
+          "nameAvailable": true
+        },
+        {
+          "code": "00008",
+          "name": "HENDRY CAMARGO DAU",
+          "votes": 146,
+          "nameAvailable": true
+        },
+        {
+          "code": "00009",
+          "name": "LUZ ESTELA ALVARADO CHAVEZ",
+          "votes": 281,
+          "nameAvailable": true
+        },
+        {
+          "code": "00010",
+          "name": "ROBERTO CARLOS REYES RODRIGUEZ",
+          "votes": 292,
+          "nameAvailable": true
+        }
+      ]
+    },
+    {
+      "code": "00001",
+      "name": "PARTIDO LIBERAL COLOMBIANO",
+      "votes": 1458,
+      "partyOnlyVotes": 61,
+      "candidatesCount": 11,
+      "candidates": [
+        {
+          "code": "00001",
+          "name": "ELKIN LEONITH VILORIA LENGUAS",
+          "votes": 440,
+          "nameAvailable": true
+        },
+        {
+          "code": "00002",
+          "name": "JULIO CESAR RUIZ OSORIO",
+          "votes": 274,
+          "nameAvailable": true
+        },
+        {
+          "code": "00003",
+          "name": "YULENIS ESTER OSORIO BARRAZA",
+          "votes": 209,
+          "nameAvailable": true
+        },
+        {
+          "code": "00004",
+          "name": "KEVIN LEONARDO SALCEDO VASQUEZ",
+          "votes": 361,
+          "nameAvailable": true
+        },
+        {
+          "code": "00005",
+          "name": "JESUS MANUEL GARCIA HERNANDEZ",
+          "votes": 27,
+          "nameAvailable": true
+        },
+        {
+          "code": "00006",
+          "name": "Opción 6 · nombre no consignado en el MMV",
+          "votes": 0,
+          "nameAvailable": false
+        },
+        {
+          "code": "00007",
+          "name": "Opción 7 · nombre no consignado en el MMV",
+          "votes": 0,
+          "nameAvailable": false
+        },
+        {
+          "code": "00008",
+          "name": "ZENAIDA MAIRETH ORTIZ GARCIA",
+          "votes": 5,
+          "nameAvailable": true
+        },
+        {
+          "code": "00009",
+          "name": "RAFAEL ENRIQUE OSPINO ESTRADA",
+          "votes": 62,
+          "nameAvailable": true
+        },
+        {
+          "code": "00010",
+          "name": "LUIS MIGUEL MENDEZ PATERNINA",
+          "votes": 9,
+          "nameAvailable": true
+        },
+        {
+          "code": "00011",
+          "name": "SHILEYS MISCHELA DIAZ PEREZ",
+          "votes": 10,
+          "nameAvailable": true
+        }
+      ]
+    },
+    {
+      "code": "00016",
+      "name": "MOVIMIENTO ALIANZA DEMOCRÁTICA AMPLIA - Res. 2049 de 2021",
+      "votes": 1043,
+      "partyOnlyVotes": 13,
+      "candidatesCount": 6,
+      "candidates": [
+        {
+          "code": "00001",
+          "name": "MAYRA MARETH MENDEZ RANGEL",
+          "votes": 111,
+          "nameAvailable": true
+        },
+        {
+          "code": "00002",
+          "name": "IVAN RENE BARRANCO HERNANDEZ",
+          "votes": 165,
+          "nameAvailable": true
+        },
+        {
+          "code": "00003",
+          "name": "ROBINSON DE JESUS RUIDIAZ SAUCEDO",
+          "votes": 268,
+          "nameAvailable": true
+        },
+        {
+          "code": "00004",
+          "name": "LUIS JAVIER HOSTIA MADRID",
+          "votes": 114,
+          "nameAvailable": true
+        },
+        {
+          "code": "00005",
+          "name": "SISIEVETTE RANGEL LOPEZ",
+          "votes": 75,
+          "nameAvailable": true
+        },
+        {
+          "code": "00006",
+          "name": "MANUEL BUSTILLO JIMENEZ",
+          "votes": 297,
+          "nameAvailable": true
+        }
+      ]
+    },
+    {
+      "code": "00012",
+      "name": "MOVIMIENTO ALTERNATIVO INDÍGENA Y SOCIAL \"MAIS\"",
+      "votes": 763,
+      "partyOnlyVotes": 24,
+      "candidatesCount": 7,
+      "candidates": [
+        {
+          "code": "00001",
+          "name": "ANDRES REYNALDO MORA CRESPO",
+          "votes": 362,
+          "nameAvailable": true
+        },
+        {
+          "code": "00002",
+          "name": "NELSON MEJIA NAVARRO",
+          "votes": 108,
+          "nameAvailable": true
+        },
+        {
+          "code": "00003",
+          "name": "CLARIVEL POSADA NUÑEZ",
+          "votes": 39,
+          "nameAvailable": true
+        },
+        {
+          "code": "00004",
+          "name": "PABLO ANTONIO BETANCUR JIMENEZ",
+          "votes": 0,
+          "nameAvailable": true
+        },
+        {
+          "code": "00005",
+          "name": "Opción 5 · nombre no consignado en el MMV",
+          "votes": 0,
+          "nameAvailable": false
+        },
+        {
+          "code": "00006",
+          "name": "TANIA MARCELA DIAZ ESPAÑA",
+          "votes": 53,
+          "nameAvailable": true
+        },
+        {
+          "code": "00007",
+          "name": "ELIECER ENRIQUE SCHELEGUEL NAVARRO",
+          "votes": 177,
+          "nameAvailable": true
+        }
+      ]
+    },
+    {
+      "code": "00005",
+      "name": "MOVIMIENTO AUTORIDADES INDÍGENAS DE COLOMBIA \"AICO\"",
+      "votes": 726,
+      "partyOnlyVotes": 8,
+      "candidatesCount": 6,
+      "candidates": [
+        {
+          "code": "00001",
+          "name": "DAIRO LOPEZ GARCIA",
+          "votes": 232,
+          "nameAvailable": true
+        },
+        {
+          "code": "00002",
+          "name": "YULEIDIS PATRICIA CARO LOBO",
+          "votes": 9,
+          "nameAvailable": true
+        },
+        {
+          "code": "00003",
+          "name": "WILMAN ENRIQUE NAVARRO CASTRILLO",
+          "votes": 413,
+          "nameAvailable": true
+        },
+        {
+          "code": "00004",
+          "name": "YERLIS MARCELA MARQUEZ MACHADO",
+          "votes": 6,
+          "nameAvailable": true
+        },
+        {
+          "code": "00005",
+          "name": "JOSE DANIEL BETANCUR BOLAÑOS",
+          "votes": 5,
+          "nameAvailable": true
+        },
+        {
+          "code": "00006",
+          "name": "LEUN ALFONSO GARCIA FONTALVO",
+          "votes": 53,
+          "nameAvailable": true
+        }
+      ]
+    },
+    {
+      "code": "00006",
+      "name": "PARTIDO ALIANZA SOCIAL INDEPENDIENTE \"ASI\"",
+      "votes": 382,
+      "partyOnlyVotes": 21,
+      "candidatesCount": 11,
+      "candidates": [
+        {
+          "code": "00001",
+          "name": "WUENDI PAOLA CARRASCAL CAMPO",
+          "votes": 30,
+          "nameAvailable": true
+        },
+        {
+          "code": "00002",
+          "name": "LUIS EDUARDO MANJARREZ DIAZ",
+          "votes": 10,
+          "nameAvailable": true
+        },
+        {
+          "code": "00003",
+          "name": "INGRIS PAOLA TERAHAN RIVERA",
+          "votes": 19,
+          "nameAvailable": true
+        },
+        {
+          "code": "00004",
+          "name": "WILSON RAFAEL PEREZ MORENO",
+          "votes": 7,
+          "nameAvailable": true
+        },
+        {
+          "code": "00005",
+          "name": "GEINER TOMASE POLO",
+          "votes": 18,
+          "nameAvailable": true
+        },
+        {
+          "code": "00006",
+          "name": "NAIZA JASITH HERRERA CANO",
+          "votes": 8,
+          "nameAvailable": true
+        },
+        {
+          "code": "00007",
+          "name": "NESTOR JULIO CARO HERNANDEZ",
+          "votes": 8,
+          "nameAvailable": true
+        },
+        {
+          "code": "00008",
+          "name": "OSCAR DANIEL MADRID CARO",
+          "votes": 3,
+          "nameAvailable": true
+        },
+        {
+          "code": "00009",
+          "name": "MANUEL JOSE BARRIOS RIVERA",
+          "votes": 253,
+          "nameAvailable": true
+        },
+        {
+          "code": "00010",
+          "name": "OSCAR DAVID VALLE ROJAS",
+          "votes": 3,
+          "nameAvailable": true
+        },
+        {
+          "code": "00011",
+          "name": "IRINA LIZETH MARTINEZ ARRIETA",
+          "votes": 2,
+          "nameAvailable": true
+        }
+      ]
+    },
+    {
+      "code": "00004",
+      "name": "PARTIDO ALIANZA VERDE",
+      "votes": 270,
+      "partyOnlyVotes": 11,
+      "candidatesCount": 8,
+      "candidates": [
+        {
+          "code": "00001",
+          "name": "ZAMIR ALFREDO FRAIJA ARANGO",
+          "votes": 87,
+          "nameAvailable": true
+        },
+        {
+          "code": "00002",
+          "name": "YULEIDIS VASQUEZ SOSA",
+          "votes": 37,
+          "nameAvailable": true
+        },
+        {
+          "code": "00003",
+          "name": "NERIS EMILIO GARCIA CASTRO",
+          "votes": 24,
+          "nameAvailable": true
+        },
+        {
+          "code": "00004",
+          "name": "GUSTAVO ERNESTO SCHLEGUEL RANGEL",
+          "votes": 21,
+          "nameAvailable": true
+        },
+        {
+          "code": "00005",
+          "name": "ILBA ROSA ALFARO CASTILLO",
+          "votes": 11,
+          "nameAvailable": true
+        },
+        {
+          "code": "00006",
+          "name": "CAMILO ANDRES CONTRERAS GOMEZ",
+          "votes": 32,
+          "nameAvailable": true
+        },
+        {
+          "code": "00007",
+          "name": "MARIBEL FRAGOZO CASTRO",
+          "votes": 18,
+          "nameAvailable": true
+        },
+        {
+          "code": "00008",
+          "name": "JUAN EVANGELISTA DIAZ",
+          "votes": 29,
+          "nameAvailable": true
+        }
+      ]
+    }
+  ]
+}
+
