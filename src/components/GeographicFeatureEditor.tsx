@@ -3,6 +3,7 @@ import {createPortal} from 'react-dom';
 import {saveGeographicFeature} from '../lib/mapPersistence';
 import {canonicalStoredValue} from '../lib/serialization';
 import {validateGeographicFeatures,type GeographicLayer,type GeoFeature} from '../lib/geographicImport';
+import {geographicAttributes} from '../lib/geographicAttributes';
 const input='min-h-11 w-full min-w-0 rounded-lg border border-slate-600 bg-slate-950 p-2.5 text-sm text-white';
 const button='min-h-11 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white disabled:opacity-40';
 export function GeographicFeatureEditor({layer,feature,readOnly=false,inline=false,onEditingChange}:{key?:React.Key;layer:GeographicLayer;feature:GeoFeature;readOnly?:boolean;inline?:boolean;onEditingChange?:(editing:boolean)=>void}){
@@ -19,14 +20,15 @@ export function GeographicFeatureEditor({layer,feature,readOnly=false,inline=fal
     event.preventDefault();setBusy(true);setError('');
     try{
       if(!draft.name.trim())throw new Error('Complete el nombre.');
-      validateGeographicFeatures([draft]);await saveGeographicFeature(layer,draft,original);close();setSaved(true);
+      validateGeographicFeatures([draft]);const preserved={...draft,source:feature.source||{origin:'before-edit' as const,name:feature.name,description:feature.description,properties:{...feature.properties},folderPath:[]}};await saveGeographicFeature(layer,preserved,original);close();setSaved(true);
     }catch(error){setError((error as Error).message);}finally{setBusy(false);}
   }}>
     <h3 className="font-bold text-white">Editar ficha</h3><fieldset disabled={busy} className="min-w-0 space-y-4">
-      <label className="block text-xs">Nombre<input aria-label="Nombre del elemento" required maxLength={160} className={`mt-1 ${input}`} value={draft.name} onChange={e=>setDraft({...draft,name:e.target.value})}/></label>
+      <label className="block text-xs">{geographicAttributes(feature).locationTitle?'Ubicación / rótulo original del mapa':'Rótulo del elemento en el mapa'}<input aria-label="Rótulo o ubicación del mapa" required maxLength={160} className={`mt-1 ${input}`} value={draft.name} onChange={e=>setDraft({...draft,name:e.target.value})}/></label>
       {Object.entries(draft.properties).map(([key,value])=><label key={key} className="block text-xs">{key}<textarea aria-label={`Dato ${key}`} rows={String(value).length>120?3:1} className={`mt-1 ${input}`} value={value} onChange={e=>setDraft({...draft,properties:{...draft.properties,[key]:e.target.value}})}/></label>)}
       <label className="block text-xs">Descripción<textarea aria-label="Descripción del elemento" rows={3} className={`mt-1 ${input}`} value={draft.description} onChange={e=>setDraft({...draft,description:e.target.value})}/></label>
-      <details><summary className="cursor-pointer text-sm text-cyan-300">Editar coordenadas</summary>
+      {!draft.geometries.length&&<div className="space-y-2 text-xs text-amber-200"><p>El archivo original no incluye coordenadas para esta ficha. Sus datos se conservan.</p><button type="button" className={button} onClick={()=>setDraft({...draft,geometries:[{type:'Point',coordinates:[{latitude:NaN,longitude:NaN}]}]})}>Añadir coordenadas manuales</button></div>}
+      <details open={!!geometry&&!Number.isFinite(geometry.coordinates[0]?.latitude)}><summary className="cursor-pointer text-sm text-cyan-300">Editar coordenadas</summary>
         <div className="mt-3 grid gap-2 sm:grid-cols-2"><label className="text-xs">Geometría<select aria-label="Geometría a editar" className={`mt-1 ${input}`} value={part} onChange={e=>{setPart(Number(e.target.value));setRing(0);setPage(0);}}>{draft.geometries.map((item,i)=><option key={i} value={i}>{i+1}. {item.type==='Point'?'Punto':item.type==='Polygon'?'Polígono':'Ruta'}</option>)}</select></label>{geometry?.type==='Polygon'&&<label className="text-xs">Borde<select aria-label="Borde del polígono" className={`mt-1 ${input}`} value={ring} onChange={e=>{setRing(Number(e.target.value));setPage(0);}}><option value={0}>Exterior</option>{geometry.holes?.map((_,i)=><option key={i} value={i+1}>Interior {i+1}</option>)}</select></label>}</div>
         <p className="my-2 text-xs text-slate-400">Grados decimales. El primer y último punto de cada polígono permanecen unidos.</p>
         <div className="space-y-2">{coordinates?.slice(page*25,page*25+25).map((point,i)=>{const index=page*25+i;return <div key={index} className="grid grid-cols-[1.5rem_1fr_1fr] items-center gap-2"><span className="text-xs">{index+1}</span><input aria-label={`Latitud ${index+1}`} className={input} type="number" step="any" min={-90} max={90} required value={Number.isFinite(point.latitude)?point.latitude:''} onChange={e=>updateCoordinate(index,'latitude',e.target.value===''?NaN:Number(e.target.value))}/><input aria-label={`Longitud ${index+1}`} className={input} type="number" step="any" min={-180} max={180} required value={Number.isFinite(point.longitude)?point.longitude:''} onChange={e=>updateCoordinate(index,'longitude',e.target.value===''?NaN:Number(e.target.value))}/></div>;})}</div>

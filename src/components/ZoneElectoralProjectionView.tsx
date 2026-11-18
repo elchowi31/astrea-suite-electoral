@@ -1,5 +1,8 @@
 import {categoryColors} from '../lib/chartPalette';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState,useEffect,useContext } from 'react';
+import {createPortal} from 'react-dom';
+import {DemoEditing} from './common/EditRecordButton';
+import {canEditTerritorialGoal,subscribeTerritorialGoals,saveTerritorialGoal,type TerritorialGoal} from '../lib/territorialGoals';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { AlertTriangle, Bus, DollarSign, MapPin, Target, TrendingUp, Users } from 'lucide-react';
 import { CampaignExpense, Candidate, Leader, Tenant, TransportVehicle, UserProfile, UserRole } from '../types';
@@ -29,12 +32,14 @@ export const ZoneElectoralProjectionView: React.FC<ZoneElectoralProjectionViewPr
 }) => {
   const scope = getTerritorialScope(currentUser, userRole);
   const [selectedMunicipality, setSelectedMunicipality] = useState('todos');
+  const demo=!!useContext(DemoEditing),[goals,setGoals]=useState<TerritorialGoal[]>([]),[goalError,setGoalError]=useState(''),[editingGoal,setEditingGoal]=useState(''),[goalValue,setGoalValue]=useState(''),[goalRevision,setGoalRevision]=useState(0),[savingGoal,setSavingGoal]=useState(false);
+  useEffect(()=>{setGoals([]);setEditingGoal('');setGoalError('');if(!currentUser)return;return subscribeTerritorialGoals(currentTenant.tenantId,currentUser.uid,demo,setGoals,()=>setGoalError('No se pudieron leer las metas territoriales guardadas.'));},[currentTenant.tenantId,currentUser?.uid,demo]);
 
   const allowedMunicipality = scope.canViewAllMunicipalities ? null : scope.allowedMunicipality;
-  const scopedLeaders = allowedMunicipality ? leaders.filter((item) => item.municipality === allowedMunicipality) : leaders;
-  const scopedExpenses = allowedMunicipality ? expenses.filter((item) => item.municipality === allowedMunicipality) : expenses;
-  const scopedVehicles = allowedMunicipality ? vehicles.filter((item) => item.municipality === allowedMunicipality) : vehicles;
-  const scopedCandidates = allowedMunicipality ? candidates.filter((item) => item.municipality === allowedMunicipality) : candidates;
+  const inScope=(item:{tenantId:string;department?:string;municipality?:string})=>item.tenantId===currentTenant.tenantId
+    && (!['Gobernador','Diputado'].includes(currentUser?.role||userRole)||!!currentUser?.department&&item.department===currentUser.department)
+    && (!allowedMunicipality||item.municipality===allowedMunicipality);
+  const scopedLeaders=leaders.filter(inScope),scopedExpenses=expenses.filter(inScope),scopedVehicles=vehicles.filter(inScope),scopedCandidates=candidates.filter(inScope);
 
   const municipalities = useMemo(() => Array.from(new Set([
     ...scopedLeaders.map((item) => item.municipality),
@@ -52,7 +57,8 @@ export const ZoneElectoralProjectionView: React.FC<ZoneElectoralProjectionViewPr
     const candidateTarget = zoneCandidates.reduce((sum, item) => sum + Math.max(0, item.voteTarget || 0), 0);
     const leaderCommitted = zoneLeaders.reduce((sum, item) => sum + Math.max(0, item.votesCommitted || 0), 0);
     const candidateCommitted = zoneCandidates.reduce((sum, item) => sum + Math.max(0, item.votesCommitted || 0), 0);
-    const target = leaderTarget || candidateTarget;
+    const storedGoal=goals.find(goal=>goal.municipality===municipality);
+    const target = storedGoal?.targetVotes??(leaderTarget || candidateTarget);
     const committed = leaderCommitted || candidateCommitted;
     const investment = zoneExpenses.reduce((sum, item) => sum + Math.max(0, item.amount || 0), 0);
     return {
@@ -61,12 +67,13 @@ export const ZoneElectoralProjectionView: React.FC<ZoneElectoralProjectionViewPr
       vehicles: zoneVehicles.length,
       capacity: zoneVehicles.reduce((sum, item) => sum + Math.max(0, item.capacity || 0), 0),
       target,
+      leaderTarget,storedGoal,
       committed,
       investment,
-      progress: target ? Math.min(100, Math.round((committed / target) * 100)) : 0,
+      progress: target ? Math.round((committed / target) * 100) : 0,
       costPerCommitted: committed ? Math.round(investment / committed) : 0,
     };
-  }), [municipalities, scopedLeaders, scopedCandidates, scopedExpenses, scopedVehicles]);
+  }), [municipalities, scopedLeaders, scopedCandidates, scopedExpenses, scopedVehicles,goals]);
 
   const visibleRows = selectedMunicipality === 'todos' ? rows : rows.filter((item) => item.municipality === selectedMunicipality);
   const selectedExpenses = selectedMunicipality === 'todos' ? scopedExpenses : scopedExpenses.filter((item) => item.municipality === selectedMunicipality);
@@ -84,7 +91,7 @@ export const ZoneElectoralProjectionView: React.FC<ZoneElectoralProjectionViewPr
     leaders: acc.leaders + item.leaders,
     vehicles: acc.vehicles + item.vehicles,
   }), { target: 0, committed: 0, investment: 0, leaders: 0, vehicles: 0 });
-  const progress = totals.target ? Math.min(100, Math.round((totals.committed / totals.target) * 100)) : 0;
+  const progress = totals.target ? Math.round((totals.committed / totals.target) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -106,12 +113,14 @@ export const ZoneElectoralProjectionView: React.FC<ZoneElectoralProjectionViewPr
       </header>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Metric icon={<Target />} label="Meta" value={totals.target.toLocaleString('es-CO')} tone="text-blue-300" />
+        <div><Metric icon={<Target />} label="Meta territorial" value={totals.target.toLocaleString('es-CO')} tone="text-blue-300" />{canEditTerritorialGoal(currentUser?.role||userRole)&&<button className="compact-button mt-1" onClick={()=>{const row=visibleRows.find(row=>row.municipality===selectedMunicipality)||visibleRows[0];if(!row)return;setEditingGoal(row.municipality);setGoalValue(String(row.target));setGoalRevision(row.storedGoal?.revision||0);setGoalError('');}}>Editar meta territorial</button>}</div>
         <Metric icon={<TrendingUp />} label="Comprometidos" value={totals.committed.toLocaleString('es-CO')} tone="text-emerald-300" />
         <Metric icon={<DollarSign />} label="Gasto registrado" value={money(totals.investment)} tone="text-amber-300" />
         <Metric icon={<Users />} label="Líderes" value={String(totals.leaders)} tone="text-purple-300" />
         <Metric icon={<Bus />} label="Vehículos" value={String(totals.vehicles)} tone="text-cyan-300" />
       </div>
+      {goalError&&<p role="alert" className="text-sm text-amber-200">{goalError}</p>}
+      {editingGoal&&createPortal(<div className="fixed inset-0 z-[5000] grid place-items-center bg-slate-950/90 p-3"><form role="dialog" aria-modal="true" aria-label="Editar meta territorial" className="w-full max-w-md space-y-4 rounded-2xl border border-slate-600 bg-slate-900 p-5 text-slate-200" onSubmit={async event=>{event.preventDefault();setSavingGoal(true);setGoalError('');try{const department=scopedLeaders.find(row=>row.municipality===editingGoal)?.department||scopedCandidates.find(row=>row.municipality===editingGoal)?.department||currentUser?.department||'';await saveTerritorialGoal({tenantId:currentTenant.tenantId,department,municipality:editingGoal,demo,targetVotes:Number(goalValue),revision:goalRevision});setEditingGoal('');}catch(error){setGoalError((error as Error).message);}finally{setSavingGoal(false);}}}><h3 className="font-bold">Meta territorial · {editingGoal}</h3><p className="text-xs">{demo?'Se guardará en su entorno de prueba.':'Se guardará para esta organización.'} Las metas individuales de líderes y candidaturas permanecen independientes.</p><label className="block text-sm">Municipio<select aria-label="Municipio de la meta territorial" className="compact-input mt-1" value={editingGoal} onChange={event=>{const row=rows.find(row=>row.municipality===event.target.value)!;setEditingGoal(row.municipality);setGoalValue(String(row.target));setGoalRevision(row.storedGoal?.revision||0);}}>{municipalities.map(value=><option key={value}>{value}</option>)}</select></label><label className="block text-sm">Meta de votos<input aria-label="Meta territorial de votos" required className="compact-input mt-1" type="number" min="0" max="100000000" step="1" value={goalValue} onChange={event=>setGoalValue(event.target.value)}/></label><p className="text-xs text-slate-400">Metas individuales de líderes: {rows.find(row=>row.municipality===editingGoal)?.leaderTarget.toLocaleString('es-CO')||0}. Se conserva esa suma para comparar con la meta territorial.</p>{goalError&&<p role="alert">{goalError}</p>}<div className="flex gap-2"><button disabled={savingGoal} className="compact-button is-primary">{savingGoal?'Guardando…':'Guardar meta'}</button><button type="button" disabled={savingGoal} className="compact-button" onClick={()=>setEditingGoal('')}>Cancelar</button></div></form></div>,document.body)}
 
       {!visibleRows.length ? (
         <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 p-10 text-center">
@@ -128,7 +137,7 @@ export const ZoneElectoralProjectionView: React.FC<ZoneElectoralProjectionViewPr
                   <div><p className="text-xs font-bold uppercase tracking-wide text-blue-300">{row.municipality}</p><p className="mt-1 text-[11px] text-slate-500">{row.leaders} líderes · {row.vehicles} vehículos · {row.capacity} plazas/salida</p></div>
                   <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-xs font-bold text-emerald-300">{row.progress}%</span>
                 </div>
-                <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${row.progress}%` }} /></div>
+                <p className="mt-2 text-xs text-slate-400">Metas de líderes: {row.leaderTarget.toLocaleString('es-CO')} · {row.target>row.leaderTarget?`Faltan ${(row.target-row.leaderTarget).toLocaleString('es-CO')} para cubrir la meta territorial`:row.target<row.leaderTarget?`La suma supera la meta en ${(row.leaderTarget-row.target).toLocaleString('es-CO')}`:'La suma coincide con la meta territorial'}.</p><div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100,row.progress)}%` }} /></div>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-xs"><div><span className="text-slate-500">Meta</span><p className="font-mono font-bold text-white">{row.target.toLocaleString('es-CO')}</p></div><div><span className="text-slate-500">Comprometidos</span><p className="font-mono font-bold text-emerald-300">{row.committed.toLocaleString('es-CO')}</p></div><div><span className="text-slate-500">Gasto</span><p className="font-mono font-bold text-amber-300">{money(row.investment)}</p></div><div><span className="text-slate-500">Costo/compromiso</span><p className="font-mono font-bold text-purple-300">{row.costPerCommitted ? money(row.costPerCommitted) : 'Sin base'}</p></div></div>
               </article>
             ))}

@@ -3,7 +3,7 @@ import type { Coordinate, TerritorialRoute, TerritoryPoint } from './territorial
 import { validLocation } from './territorialMaps';
 
 export interface GeoGeometry { type: 'Point' | 'LineString' | 'Polygon'; coordinates: Coordinate[]; holes?: { coordinates: Coordinate[] }[] }
-export interface GeoFeature { id: string; name: string; description: string; geometries: GeoGeometry[]; properties: Record<string, string> }
+export interface GeoFeature { id: string; name: string; description: string; geometries: GeoGeometry[]; properties: Record<string, string>;source?:{origin:'import'|'before-edit';name:string;description:string;properties:Record<string,string>;folderPath:string[]} }
 export interface GeographicLayer { id: string; tenantId: string; importId: string; name: string; filename: string; features: GeoFeature[]; createdBy: string; importedAt: string }
 export interface ImportResult { filename: string; features: GeoFeature[]; warnings: string[]; networkLinks?: string[] }
 export type GeographicImportDraft={preview:ImportResult;name:string};
@@ -59,17 +59,20 @@ export function parseKml(xml: string, parser: Pick<DOMParser, 'parseFromString'>
         geometries.push({ type, coordinates: kmlCoordinates(outer), holes: descendants(node, 'innerBoundaryIs').map(ring => ({ coordinates: kmlCoordinates(ring) })) });
       } else geometries.push({ type, coordinates: kmlCoordinates(node) });
     }
-    if (!geometries.length) continue;
     const properties: Record<string, string> = {};
     for (const data of [...descendants(placemark, 'Data'), ...descendants(placemark, 'SimpleData')]) {
       const key = data.getAttribute('name');
-      if (key && !['__proto__','constructor','prototype'].includes(key)) properties[key] = data.localName === 'SimpleData' ? data.textContent?.trim() || '' : text(data, 'value');
+      if (key && !['__proto__','constructor','prototype'].includes(key)) properties[key] = (data.localName === 'SimpleData' ? data : direct(data,'value'))?.textContent || '';
     }
-    features.push({ id: `feature-${features.length + 1}`, name: text(placemark, 'name').slice(0,160) || `Elemento ${features.length + 1}`, description: text(placemark, 'description'), geometries, properties });
+    const name=text(placemark,'name')||`Elemento ${features.length+1}`,description=text(placemark,'description'),folderPath:string[]=[];
+    let parent=placemark.parentNode;
+    while(parent){if((parent as Element).localName==='Folder'){const direct=Array.from(parent.childNodes).find(node=>(node as Element).localName==='name')?.textContent?.trim();if(direct)folderPath.unshift(direct);}parent=parent.parentNode;}
+    features.push({ id: `feature-${features.length + 1}`, name:name.slice(0,160), description, geometries, properties,source:{origin:'import',name,description,properties:{...properties},folderPath} });
   }
   const networkLinks=descendants(document,'NetworkLink').map(node=>descendants(node,'href')[0]?.textContent?.trim()||'').filter(Boolean);
   if(networkLinks.length>5)throw new Error('Máximo cinco enlaces externos por archivo.');
   const warnings=networkLinks.length?['Este archivo enlaza datos externos. Recupere las ubicaciones de My Maps o exporte un KML con las geometrías incluidas.']:[];
+  const unlocated=features.filter(feature=>!feature.geometries.length).length;if(unlocated)warnings.push(`${unlocated} fichas sin coordenadas se conservan en la lista y la exportación; no se muestran como puntos en el mapa.`);
   return {filename:'',features:features.length||!networkLinks.length?validate(features):[],warnings,networkLinks};
 }
 export function parseCoordinateRows(rows: Record<string, unknown>[], sheet = ''): ImportResult {

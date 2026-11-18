@@ -772,6 +772,51 @@ service cloud.firestore {
         && canOperateTenant(resource.data.tenantId);
     }
 
+    function ownWorkspaceData(data) {
+      return canOperateTenant(data.tenantId) && data.ownerId == request.auth.uid;
+    }
+    match /formularios_diseno/{id} {
+      allow get: if signedIn() && !exists(/databases/$(database)/documents/formularios_diseno/$(id));
+      allow read: if canReadTenant(resource.data.tenantId) && resource.data.ownerId == request.auth.uid;
+      allow create, update: if ownWorkspaceData(request.resource.data)
+        && request.resource.data.keys().hasOnly(['id','tenantId','ownerId','kind','name','mimeType','category','summary','syncedAt','revision','design','reviewed','remote','googleUid'])
+        && request.resource.data.id == id && request.resource.data.kind == 'form-design'
+        && request.resource.data.design is map && request.resource.data.design.questions is list
+        && request.resource.data.design.questions.size()>0 && request.resource.data.design.questions.size()<=30
+        && request.resource.data.reviewed is bool && request.resource.data.revision is int
+        && ((!exists(/databases/$(database)/documents/formularios_diseno/$(id)) && request.resource.data.revision==1)
+          || (resource.data.tenantId == request.resource.data.tenantId && resource.data.ownerId == request.auth.uid && request.resource.data.revision == resource.data.revision+1));
+    }
+    match /workspace_conexiones/{id} {
+      allow get: if signedIn() && !exists(/databases/$(database)/documents/workspace_conexiones/$(id));
+      allow read: if canReadTenant(resource.data.tenantId) && resource.data.ownerId == request.auth.uid;
+      allow create, update: if ownWorkspaceData(request.resource.data)
+        && request.resource.data.keys().hasOnly(['id','tenantId','ownerId','googleUid','calendarId','updatedAt'])
+        && request.resource.data.id == id && request.resource.data.googleUid is string && request.resource.data.calendarId is string
+        && (!exists(/databases/$(database)/documents/workspace_conexiones/$(id)) || (resource.data.tenantId==request.resource.data.tenantId && resource.data.ownerId==request.auth.uid && resource.data.googleUid==request.resource.data.googleUid));
+    }
+    function territorialGoalEditor(data) {
+      return sameTenant(data.tenantId) && me().role in ['AdminTenant','Gobernador','Diputado','Alcalde','JefePolitico']
+        && (me().role == 'AdminTenant' || (me().role in ['Gobernador','Diputado'] && data.department == me().get('department',''))
+          || (me().role in ['Alcalde','JefePolitico'] && data.municipality == me().get('municipality','')));
+    }
+    function validTerritorialGoal(data,id) {
+      return data.keys().hasOnly(['id','tenantId','department','municipality','mode','ownerId','targetVotes','revision','updatedAt','updatedBy'])
+        && data.id == id && data.department is string && data.department.size()>0 && data.municipality is string && data.municipality.size()>0
+        && data.mode in ['real','demo'] && data.ownerId is string && data.ownerId.size()>0
+        && (data.mode == 'real' || data.ownerId == request.auth.uid)
+        && data.targetVotes is int && data.targetVotes>=0 && data.targetVotes<=100000000
+        && data.revision is int && data.revision>0 && data.updatedBy == request.auth.uid && data.updatedAt is string;
+    }
+    match /metas_territoriales/{id} {
+      allow get: if signedIn() && !exists(/databases/$(database)/documents/metas_territoriales/$(id));
+      allow read: if canReadTenant(resource.data.tenantId) && (resource.data.mode == 'real' || resource.data.ownerId == request.auth.uid);
+      allow create: if territorialGoalEditor(request.resource.data) && validTerritorialGoal(request.resource.data,id) && request.resource.data.revision == 1 && request.resource.data.ownerId == request.auth.uid;
+      allow update: if territorialGoalEditor(resource.data) && validTerritorialGoal(request.resource.data,id)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['targetVotes','revision','updatedAt','updatedBy'])
+        && request.resource.data.revision == resource.data.revision+1;
+    }
+
     // Preserve the already published, verified owner access during migration.
     match /{document=**} {
       allow read, write: if platformAdmin();
