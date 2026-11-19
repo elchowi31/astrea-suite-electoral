@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {MessageCircle} from 'lucide-react';
 import {WhatsappDiagnosticsPanel} from './WhatsappDiagnosticsPanel';
 import {useOperations} from './OperationsContext';
-import {useWhatsappConnection,type PairingMode} from './WhatsappConnectionContext';
+import {useWhatsappConnection} from './WhatsappConnectionContext';
 import {localDataEnabled} from '../../lib/deviceStorage';
 import {button,input,secondary,Field} from './OperationsUI';
 function WhatsappQr({value}:{value:string}){
@@ -11,9 +11,10 @@ function WhatsappQr({value}:{value:string}){
  return image?<img src={image} width={280} height={280} alt="QR para vincular el receptor de WhatsApp" className="whatsapp-qr"/>:<p role={error?'alert':'status'}>{error||'Preparando la imagen del QR…'}</p>;
 }
 export function WhatsappPilotPanel({onSwitchAccount,onUseRealData}:{onSwitchAccount?:()=>void;onUseRealData?:()=>void}){
- const {user,readOnly,events,requests}=useOperations(),wa=useWhatsappConnection();const [open,setOpen]=useState(false),[actionError,setActionError]=useState('');const codePanel=useRef<HTMLDivElement|null>(null);
+ const {user,readOnly,events,requests}=useOperations(),wa=useWhatsappConnection();const [open,setOpen]=useState(true),[actionError,setActionError]=useState('');const codePanel=useRef<HTMLDivElement|null>(null);
+ const hasPairing=!!(wa.code||wa.qr);
  useEffect(()=>{if(wa.code||wa.qr)setOpen(true);},[wa.code,wa.qr]);
- useEffect(()=>{if(!open||!wa.code&&!wa.qr)return;const frame=requestAnimationFrame(()=>{codePanel.current?.focus({preventScroll:true});codePanel.current?.scrollIntoView({block:'nearest'});});return()=>cancelAnimationFrame(frame);},[open,wa.code,wa.qr]);
+ useEffect(()=>{if(!open||!hasPairing)return;const frame=requestAnimationFrame(()=>{codePanel.current?.scrollIntoView({block:'nearest',behavior:'instant'});});return()=>cancelAnimationFrame(frame);},[open,hasPairing]);
  const patch=(value:Partial<typeof wa.config>)=>wa.setConfig(previous=>({...previous,...value}));
  if(user?.role!=='AdminGlobal')return <details className="compact-disclosure" aria-label="Vincular WhatsApp"><summary>WhatsApp · acceso al receptor</summary><p className="my-2 text-sm">La vinculación del receptor requiere una cuenta administradora global. Su cuenta puede gestionar las solicitudes según sus permisos.</p>{onSwitchAccount&&<button type="button" className={secondary} onClick={onSwitchAccount}>Cambiar cuenta</button>}</details>;
  const reset=async()=>{setActionError('');try{await wa.reset();}catch{setActionError('No se pudo retirar el vínculo de este dispositivo. Puede revisar el almacenamiento en Mi dispositivo.');}};
